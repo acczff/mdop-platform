@@ -1,0 +1,39 @@
+# 贡献指南
+
+## 基本流程
+
+1. 从最新 `main` 创建短生命周期分支。
+2. 一个分支只处理一个明确目标。
+3. 先更新相关业务或技术文档，再实现代码和测试。
+4. 本地完成适用的格式化、测试和构建检查。
+5. 通过 Pull Request 合并，禁止直接向 `main` 提交日常功能。
+
+推荐分支名：
+
+- `feature/<description>`：新能力
+- `fix/<description>`：缺陷修复
+- `docs/<description>`：文档调整
+- `chore/<description>`：工程维护
+
+推荐提交信息采用 Conventional Commits，例如：
+
+```text
+feat(wms): add purchase receipt domain model
+fix(security): reject expired access tokens
+docs: clarify I0 completion criteria
+```
+
+## 完成定义
+
+每个变更至少满足：
+
+- 范围和验收标准明确。
+- 代码、配置、数据库和文档保持一致。
+- 正常、异常、权限和并发场景得到适当验证。
+- 不破坏模块依赖边界。
+- 不包含真实企业数据、个人信息、明文密钥或生产配置。
+- Pull Request 说明变更内容、原因、影响和验证方式。
+
+## 架构变更
+
+新增系统、中间件、跨模块依赖或重大技术方案前，必须先更新总体蓝图或新增 ADR，记录背景、备选方案、选择理由、代价和重新评估条件。

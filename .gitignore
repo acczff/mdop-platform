@@ -1,0 +1,49 @@
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+secrets/
+credentials/
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+
+# Java and Maven
+target/
+*.class
+*.jar
+*.war
+*.ear
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Node.js and frontend
+node_modules/
+dist/
+coverage/
+.pnpm-store/
+*.tsbuildinfo
+
+# IDE and editors
+.idea/
+.vscode/
+.project
+.classpath
+.settings/
+*.iml
+.obsidian/
+
+# Logs, runtime data and temporary files
+logs/
+tmp/
+*.log
+*.pid
+*.tmp
+*.bak
+
+# Operating systems
+.DS_Store
+Thumbs.db
+Desktop.ini
