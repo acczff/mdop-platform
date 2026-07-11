@@ -18,6 +18,7 @@ target/
 *.ear
 .mvn/timing.properties
 .mvn/wrapper/maven-wrapper.jar
+out/
 
 # Node.js and frontend
 node_modules/
