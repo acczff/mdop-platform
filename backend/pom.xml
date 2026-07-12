@@ -20,6 +20,17 @@
   <name>mdop-backend</name>
   <description>MDOP平台后端父工程</description>
 
+  <modules>
+    <module>mdop-common</module>
+    <module>mdop-security</module>
+    <module>mdop-system</module>
+    <module>mdop-master-data</module>
+    <module>mdop-wms</module>
+    <module>mdop-integration</module>
+    <module>mdop-test-support</module>
+    <module>mdop-boot</module>
+  </modules>
+
   <properties>
     <java.version>25</java.version>
   </properties>
