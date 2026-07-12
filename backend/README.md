@@ -1,6 +1,6 @@
 # Backend
 
-后端将在 I0 迭代中建立 Java 21、Spring Boot 和 Maven 多模块的模块化单体工程。
+后端将在 I0 迭代中建立 Java 25 LTS、Spring Boot 和 Maven 多模块的模块化单体工程。
 
 计划模块包括：
 
