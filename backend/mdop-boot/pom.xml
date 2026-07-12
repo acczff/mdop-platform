@@ -18,4 +18,37 @@
   <name>mdop-boot</name>
   <description>MDOP应用启动与装配模块</description>
 
+  <dependencies>
+    <dependency>
+      <groupId>io.github.acczff.mdop</groupId>
+      <artifactId>mdop-security</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.github.acczff.mdop</groupId>
+      <artifactId>mdop-system</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.github.acczff.mdop</groupId>
+      <artifactId>mdop-master-data</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.github.acczff.mdop</groupId>
+      <artifactId>mdop-wms</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.github.acczff.mdop</groupId>
+      <artifactId>mdop-integration</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.github.acczff.mdop</groupId>
+      <artifactId>mdop-test-support</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
 </project>

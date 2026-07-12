@@ -18,4 +18,16 @@
   <name>mdop-system</name>
   <description>MDOP系统管理模块</description>
 
+  <dependencies>
+    <dependency>
+      <groupId>io.github.acczff.mdop</groupId>
+      <artifactId>mdop-common</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.github.acczff.mdop</groupId>
+      <artifactId>mdop-security</artifactId>
+    </dependency>
+  </dependencies>
+
 </project>

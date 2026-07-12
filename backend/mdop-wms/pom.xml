@@ -18,4 +18,21 @@
   <name>mdop-wms</name>
   <description>MDOP仓储管理模块</description>
 
+  <dependencies>
+    <dependency>
+      <groupId>io.github.acczff.mdop</groupId>
+      <artifactId>mdop-common</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.github.acczff.mdop</groupId>
+      <artifactId>mdop-security</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.github.acczff.mdop</groupId>
+      <artifactId>mdop-master-data</artifactId>
+    </dependency>
+  </dependencies>
+
 </project>

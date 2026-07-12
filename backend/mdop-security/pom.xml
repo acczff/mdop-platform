@@ -18,4 +18,11 @@
   <name>mdop-security</name>
   <description>MDOP认证与授权模块</description>
 
+  <dependencies>
+    <dependency>
+      <groupId>io.github.acczff.mdop</groupId>
+      <artifactId>mdop-common</artifactId>
+    </dependency>
+  </dependencies>
+
 </project>
