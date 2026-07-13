@@ -1,0 +1,8 @@
+logging:
+  level:
+    io.github.acczff.mdop: INFO
+
+management:
+  endpoint:
+    health:
+      show-details: when-authorized
