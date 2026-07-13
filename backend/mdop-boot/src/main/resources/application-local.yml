@@ -1,3 +1,9 @@
+spring:
+  datasource:
+    url: "jdbc:mysql://127.0.0.1:${MDOP_MYSQL_PORT}/${MDOP_MYSQL_DATABASE}"
+    username: "${MDOP_MYSQL_USER}"
+    password: "${MDOP_MYSQL_PASSWORD}"
+
 logging:
   level:
     io.github.acczff.mdop: DEBUG
