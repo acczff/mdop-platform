@@ -1,0 +1,44 @@
+name: mdop-local
+
+services:
+  mysql:
+    image: ${MDOP_MYSQL_IMAGE:-mysql:8.4.10}
+    container_name: ${MDOP_MYSQL_CONTAINER_NAME:-mdop-mysql}
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+    environment:
+      MYSQL_DATABASE: ${MDOP_MYSQL_DATABASE:?未设置 MDOP_MYSQL_DATABASE}
+      MYSQL_USER: ${MDOP_MYSQL_USER:?未设置 MDOP_MYSQL_USER}
+      MYSQL_PASSWORD: ${MDOP_MYSQL_PASSWORD:?未设置 MDOP_MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MDOP_MYSQL_ROOT_PASSWORD:?未设置 MDOP_MYSQL_ROOT_PASSWORD}
+      TZ: ${MDOP_TIME_ZONE:-Asia/Shanghai}
+
+    ports:
+      - "127.0.0.1:${MDOP_MYSQL_PORT:-3306}:3306"
+
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h 127.0.0.1 -u"$${MYSQL_USER}" --password="$${MYSQL_PASSWORD}" --silent
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+    networks:
+      - mdop-network
+
+volumes:
+  mysql-data:
+
+networks:
+  mdop-network:
+    driver: bridge
