@@ -1,3 +1,14 @@
 spring:
   application:
     name: mdop-platform
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+  endpoint:
+    health:
+      show-details: never
