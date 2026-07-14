@@ -9,12 +9,25 @@
 当前已经建立：
 
 - MySQL 8.4.10 LTS（长期支持版）本地容器
-- MySQL 健康检查
-- MySQL 数据卷持久化
+- RabbitMQ 4.3.2 Management（管理版）本地容器
+- Redis 8.2.7 本地容器
+- 三项基础设施的健康检查
+- MySQL、RabbitMQ 和 Redis 命名数据卷
 - 本地环境变量模板
-- 仅本机开放的数据库端口
+- 仅绑定本机地址的服务端口
+- Redis AOF（追加文件）持久化基线
 
-RabbitMQ（消息队列）、Redis（缓存数据库）和应用容器将在后续迭代加入。
+应用容器、生产部署和监控系统将在后续迭代加入。
+
+三项基础设施的职责：
+
+```text
+MySQL：业务事实和最终数据源
+RabbitMQ：可靠跨系统事件
+Redis：缓存、限流和短期状态
+```
+
+Redis 不作为库存余额、正式幂等结果等核心业务事实的唯一数据源，Redis Pub/Sub 不替代 RabbitMQ。
 
 ## 2. 目录结构
 
@@ -32,7 +45,7 @@ deploy
 说明：
 
 - `compose.local.yml`：本地容器编排配置
-- `.env.example`：可以提交的环境变量模板
+- `.env.example`：可以提交的环境变量模板，只包含安全占位值
 - `.env.local`：包含本地真实密码，不得提交
 - `docker`：后续保存应用镜像构建文件
 - `monitoring`：后续保存监控配置
@@ -53,25 +66,34 @@ docker compose version
 docker context show
 ```
 
-当前应使用：
+使用 Docker Desktop 时，当前 Docker Context（运行环境上下文）通常应为：
 
 ```text
 desktop-linux
 ```
 
-## 4. 首次启动
+## 4. 首次配置
 
 以下命令必须在项目根目录执行。
 
-复制本地环境配置：
+只有在 `.env.local` 不存在时，才从示例文件创建本地配置：
 
 ```powershell
 Copy-Item deploy/env/.env.example deploy/env/.env.local
 ```
 
-修改 `.env.local`，为应用账号和管理员账号设置两个不同的本地密码。
+如果 `.env.local` 已经存在，不要再次复制覆盖。
 
-不要将真实密码写入 `.env.example`，也不要提交 `.env.local`。
+修改 `.env.local`，至少设置以下本地真实密码：
+
+- MySQL 应用账号密码
+- MySQL `root` 管理员密码
+- RabbitMQ 管理员密码
+- Redis 密码
+
+不同服务和账号应使用不同密码。
+
+不要将真实密码写入 `.env.example`，也不要提交或分享 `.env.local`。
 
 校验 Compose 配置：
 
@@ -79,86 +101,213 @@ Copy-Item deploy/env/.env.example deploy/env/.env.local
 docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml config --quiet
 ```
 
-启动 MySQL：
+查看 Compose 已识别的服务：
+
+```powershell
+docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml config --services
+```
+
+预期包含：
+
+```text
+mysql
+rabbitmq
+redis
+```
+
+## 5. 启动与状态检查
+
+启动全部本地基础设施：
+
+```powershell
+docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml up -d
+```
+
+只启动单个服务：
 
 ```powershell
 docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml up -d mysql
+docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml up -d rabbitmq
+docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml up -d redis
 ```
 
-查看运行状态：
+查看全部服务状态：
 
 ```powershell
 docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml ps
 ```
 
-MySQL 正常运行时应显示：
+正常运行时，三个服务的状态都应包含：
 
 ```text
 healthy
 ```
 
-## 5. 常用操作
+`Started` 只表示容器进程已经启动；`healthy` 表示服务健康检查已经通过。
 
-查看日志：
+## 6. 服务响应验证
+
+验证 MySQL：
 
 ```powershell
-docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml logs --tail 100 mysql
+docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_PASSWORD" mysqladmin ping -h 127.0.0.1 -u"$MYSQL_USER" --silent'
 ```
 
-持续查看日志：
+预期返回：
+
+```text
+mysqld is alive
+```
+
+验证 RabbitMQ：
+
+```powershell
+docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml exec -T rabbitmq rabbitmq-diagnostics -q ping
+```
+
+预期返回：
+
+```text
+Ping succeeded
+```
+
+验证 Redis：
+
+```powershell
+docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml exec -T redis redis-cli ping
+```
+
+预期返回：
+
+```text
+PONG
+```
+
+RabbitMQ 管理界面：
+
+```text
+http://127.0.0.1:15672
+```
+
+使用 `.env.local` 中配置的 RabbitMQ 用户和密码登录，不要将凭据写入浏览器地址或提交到仓库。
+
+## 7. 常用操作
+
+查看三个服务最近 100 行日志：
+
+```powershell
+docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml logs --tail 100 mysql rabbitmq redis
+```
+
+持续查看单个服务日志：
 
 ```powershell
 docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml logs -f mysql
+docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml logs -f rabbitmq
+docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml logs -f redis
 ```
 
-停止 MySQL，但保留容器：
+停止全部服务，但保留容器和数据：
 
 ```powershell
-docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml stop mysql
+docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml stop
 ```
 
-重新启动已停止的 MySQL：
+重新启动已经停止且仍然存在的容器：
 
 ```powershell
-docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml start mysql
+docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml start
 ```
 
-删除容器和网络，但保留数据卷：
+重启单个服务：
+
+```powershell
+docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml restart redis
+```
+
+`restart` 只重启当前容器，不负责应用新的 Compose 配置。
+
+修改 Compose 或环境变量后，应使用以下形式应用变更：
+
+```powershell
+docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml up -d redis
+```
+
+删除容器和网络，但保留命名数据卷：
 
 ```powershell
 docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml down
 ```
 
-## 6. 数据持久化与清理
+执行 `down` 后不能使用 `start` 恢复已经被删除的容器，应重新执行：
 
-MySQL 数据保存在命名数据卷：
-
-```text
-mdop-local_mysql-data
+```powershell
+docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml up -d
 ```
 
-执行普通的 `down` 后，数据卷仍然保留。
+## 8. 数据持久化与清理
 
-以下命令会删除容器、网络和数据卷，并永久清空本地数据库：
+本地数据保存在以下命名数据卷中：
+
+| 服务 | 命名数据卷 | 容器目录 |
+|---|---|---|
+| MySQL | `mdop-local_mysql-data` | `/var/lib/mysql` |
+| RabbitMQ | `mdop-local_rabbitmq-data` | `/var/lib/rabbitmq` |
+| Redis | `mdop-local_redis-data` | `/data` |
+
+执行普通的 `stop`、`restart` 或 `down` 后，命名数据卷仍然保留。
+
+Redis 当前启用：
+
+```text
+appendonly yes
+appendfsync everysec
+```
+
+这表示 Redis 使用 AOF 记录写操作，并以约每秒一次的策略同步到磁盘。即使启用了持久化，Redis 仍然不是核心业务事实的最终数据源。
+
+RabbitMQ 数据卷能够保存节点元数据和符合持久化条件的数据，但业务消息能否持久化还取决于后续队列、交换机和消息投递配置。
+
+以下命令会删除容器、网络和三个命名数据卷：
 
 ```powershell
 docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml down -v
 ```
 
-只有在确认本地数据库没有需要保留的数据时才能执行该命令。
+该操作会永久清空本地 MySQL、RabbitMQ 和 Redis 数据，只有在确认所有本地数据都不需要保留时才能执行。
 
-修改 MySQL 初始化账号或初始化密码后，需要删除旧数据卷并重新初始化；这些初始化变量不会自动修改已有数据库中的账号。
+初始化配置注意事项：
 
-## 7. 安全约束
+- MySQL 的初始化数据库、账号和密码只在空数据卷首次启动时生效。
+- RabbitMQ 的默认用户、密码和虚拟主机只在空节点首次初始化时生效。
+- 修改已有 MySQL 或 RabbitMQ 初始化变量，不会自动修改数据卷中的已有账号。
+- Redis 密码通过启动参数应用，修改后需要使用 `up -d redis` 重新创建 Redis 容器。
 
-- MySQL 端口只绑定到 `127.0.0.1`，不向局域网公开。
-- Spring Boot 应用使用普通账号，不使用 `root` 管理员账号。
-- 普通账号密码和管理员密码必须不同。
+不要为了处理普通配置问题直接执行 `down -v`。
+
+## 9. 安全约束
+
+本地端口只绑定到 `127.0.0.1`：
+
+| 服务 | 本地端口 | 用途 |
+|---|---:|---|
+| MySQL | `3306` | 数据库连接 |
+| RabbitMQ | `5672` | AMQP 消息连接 |
+| RabbitMQ Management | `15672` | 本地管理界面 |
+| Redis | `6379` | Redis 客户端连接 |
+
+安全要求：
+
+- Spring Boot 应用使用 MySQL 普通账号，不使用 `root`。
+- MySQL 普通账号和 `root` 密码必须不同。
+- RabbitMQ 和 Redis 使用独立密码，不与 MySQL 密码复用。
 - `.env.local`、数据库备份和运行数据不得提交。
-- 本地环境变量方案不得直接作为生产环境密钥方案。
-- 生产环境必须使用专门的 Secrets（密钥管理机制）。
+- RabbitMQ 本地管理员账号不得直接作为生产应用账号。
+- Redis 本地默认用户密码方案不得直接作为生产权限方案。
+- 本地环境变量不得直接作为生产密钥管理方案。
+- 生产环境必须使用专门的 Secrets（密钥管理机制）、最小权限账号和网络访问控制。
 
-## 8. 故障排查
+## 10. 故障排查
 
 Docker 服务无法连接时：
 
@@ -173,10 +322,26 @@ docker context show
 docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml ps
 ```
 
-查看 MySQL 最近日志：
+查看单个服务最近日志：
 
 ```powershell
 docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml logs --tail 100 mysql
+docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml logs --tail 100 rabbitmq
+docker compose --env-file deploy/env/.env.local -f deploy/compose/compose.local.yml logs --tail 100 redis
 ```
 
-如果端口 `3306` 被占用，应先查明占用程序，不要直接结束未知进程，也不要随意修改团队约定端口。
+检查本地端口占用：
+
+```powershell
+Get-NetTCPConnection -State Listen -LocalPort 3306,5672,6379,15672 -ErrorAction SilentlyContinue
+```
+
+如果端口被占用，应先查明占用程序，不要直接结束未知进程。确认确实需要更换端口后，只修改 `.env.local` 中对应的本地端口变量。
+
+服务长时间处于 `starting` 或 `unhealthy` 时：
+
+1. 查看对应服务日志。
+2. 检查 `.env.local` 是否缺少必填变量。
+3. 检查端口是否被占用。
+4. 检查 Docker Desktop 的磁盘空间和内存。
+5. 不要未经确认直接删除数据卷。

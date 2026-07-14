@@ -27,7 +27,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - mysqladmin ping -h 127.0.0.1 -u"$${MYSQL_USER}" --password="$${MYSQL_PASSWORD}" --silent
+        - MYSQL_PWD="$${MYSQL_PASSWORD}" mysqladmin ping -h 127.0.0.1 -u"$${MYSQL_USER}" --silent
       interval: 10s
       timeout: 5s
       retries: 10
@@ -36,8 +36,82 @@ services:
     networks:
       - mdop-network
 
+  rabbitmq:
+    image: ${MDOP_RABBITMQ_IMAGE:-rabbitmq:4.3.2-management}
+    container_name: ${MDOP_RABBITMQ_CONTAINER_NAME:-mdop-rabbitmq}
+    hostname: ${MDOP_RABBITMQ_HOSTNAME:-mdop-rabbitmq}
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+    environment:
+      RABBITMQ_DEFAULT_USER: ${MDOP_RABBITMQ_USER:?未设置 MDOP_RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${MDOP_RABBITMQ_PASSWORD:?未设置 MDOP_RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_VHOST: ${MDOP_RABBITMQ_VHOST:-mdop}
+      TZ: ${MDOP_TIME_ZONE:-Asia/Shanghai}
+
+    ports:
+      - "127.0.0.1:${MDOP_RABBITMQ_AMQP_PORT:-5672}:5672"
+      - "127.0.0.1:${MDOP_RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+
+    healthcheck:
+      test:
+        - CMD
+        - rabbitmq-diagnostics
+        - "-q"
+        - ping
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+    networks:
+      - mdop-network
+
+  redis:
+    image: ${MDOP_REDIS_IMAGE:-redis:8.2.7}
+    container_name: ${MDOP_REDIS_CONTAINER_NAME:-mdop-redis}
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+    environment:
+      REDISCLI_AUTH: ${MDOP_REDIS_PASSWORD:?未设置 MDOP_REDIS_PASSWORD}
+      TZ: ${MDOP_TIME_ZONE:-Asia/Shanghai}
+
+    ports:
+      - "127.0.0.1:${MDOP_REDIS_PORT:-6379}:6379"
+
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --requirepass
+      - ${MDOP_REDIS_PASSWORD:?未设置 MDOP_REDIS_PASSWORD}
+
+    volumes:
+      - redis-data:/data
+
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+    networks:
+      - mdop-network
+
 volumes:
   mysql-data:
+  rabbitmq-data:
+  redis-data:
 
 networks:
   mdop-network:
