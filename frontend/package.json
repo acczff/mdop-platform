@@ -1,0 +1,16 @@
+{
+  "name": "@mdop/frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @mdop/admin run dev",
+    "test": "pnpm --filter @mdop/admin run test:unit --run",
+    "type-check": "pnpm --filter @mdop/admin run type-check",
+    "build": "pnpm --filter @mdop/admin run build"
+  },
+  "packageManager": "pnpm@11.13.0",
+  "engines": {
+    "node": ">=24.18.0 <25",
+    "pnpm": "11.13.0"
+  }
+}
