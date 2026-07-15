@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.io.IOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -81,5 +82,17 @@ class MdopApplicationTests extends MdopInfrastructureTestBase {
         assertThat(result.getExitCode()).isZero();
         assertThat(result.getStdout()).contains("PONG");
         assertThat(REDIS.getFirstMappedPort()).isPositive();
+    }
+
+    @Test
+    void infoEndpointShouldRejectAnonymousRequest() throws Exception {
+        mockMvc.perform(get("/actuator/info"))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void infoEndpointShouldAllowAuthenticatedRequest() throws Exception {
+        mockMvc.perform(get("/actuator/info").with(user("i0-security-test")))
+            .andExpect(status().isOk());
     }
 }
