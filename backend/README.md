@@ -27,4 +27,10 @@
 
 执行测试需要 Java 25 和正在运行的 Docker Engine，但不需要提前启动本地 Compose 服务。
 
+## 最小安全基线
+
+`mdop-security` 负责 Spring Security 配置，`mdop-boot` 负责装配与集成测试。`/actuator/health` 允许匿名健康探测，其余 HTTP 接口默认需要认证。
+
+当前只建立公开与受保护接口的边界，不实现用户、角色、登录、JWT 或数据权限。`mdop-boot` 使用仅测试范围的 `spring-security-test` 验证匿名请求会被拒绝，以及临时测试身份可以访问受保护接口。
+
 模块职责和依赖规则以 [I0 工程基线方案](../docs/project/I0工程基线方案.md) 为准。
