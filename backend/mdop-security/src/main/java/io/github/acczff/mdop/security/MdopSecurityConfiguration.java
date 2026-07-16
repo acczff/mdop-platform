@@ -10,10 +10,13 @@ public class MdopSecurityConfiguration {
 
     @Bean
     SecurityFilterChain mdopSecurityFilterChain(HttpSecurity http) throws Exception {
-        http.authorizeHttpRequests(authorize -> authorize
-            .requestMatchers("/actuator/health").permitAll()
-            .anyRequest().authenticated()
-        );
+        http.authorizeHttpRequests(
+                authorize ->
+                        authorize
+                                .requestMatchers("/actuator/health")
+                                .permitAll()
+                                .anyRequest()
+                                .authenticated());
 
         return http.build();
     }

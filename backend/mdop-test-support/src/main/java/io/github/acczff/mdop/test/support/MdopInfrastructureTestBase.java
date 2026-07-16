@@ -1,7 +1,6 @@
 package io.github.acczff.mdop.test.support;
 
 import java.util.UUID;
-
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -25,21 +24,21 @@ public abstract class MdopInfrastructureTestBase {
     /**
      * MySQL 参与 Spring Boot 服务连接，以便自动配置 DataSource 和 Flyway。
      */
-    @Container
-    @ServiceConnection
-    protected static final MySQLContainer MYSQL = new MySQLContainer("mysql:8.4.10")
-        .withDatabaseName("mdop_test")
-        .withUsername("mdop_" + randomCredential().substring(0, 12))
-        .withPassword(randomCredential());
+    @Container @ServiceConnection
+    protected static final MySQLContainer MYSQL =
+            new MySQLContainer("mysql:8.4.10")
+                    .withDatabaseName("mdop_test")
+                    .withUsername("mdop_" + randomCredential().substring(0, 12))
+                    .withPassword(randomCredential());
 
     /**
      * 当前只验证 RabbitMQ 节点可用性，尚未接入消息生产、消费或业务事件。
      */
     @Container
     protected static final RabbitMQContainer RABBITMQ =
-        new RabbitMQContainer("rabbitmq:4.3.2-management")
-            .withAdminUser("mdop_" + randomCredential().substring(0, 12))
-            .withAdminPassword(randomCredential());
+            new RabbitMQContainer("rabbitmq:4.3.2-management")
+                    .withAdminUser("mdop_" + randomCredential().substring(0, 12))
+                    .withAdminPassword(randomCredential());
 
     /**
      * 当前只验证 Redis 可用性。REDISCLI_AUTH 使容器内 redis-cli 自动认证，
@@ -47,14 +46,10 @@ public abstract class MdopInfrastructureTestBase {
      */
     @Container
     protected static final GenericContainer<?> REDIS =
-        new GenericContainer<>("redis:8.2.7")
-            .withExposedPorts(REDIS_PORT)
-            .withEnv("REDISCLI_AUTH", REDIS_PASSWORD)
-            .withCommand(
-                "redis-server",
-                "--requirepass",
-                REDIS_PASSWORD
-            );
+            new GenericContainer<>("redis:8.2.7")
+                    .withExposedPorts(REDIS_PORT)
+                    .withEnv("REDISCLI_AUTH", REDIS_PASSWORD)
+                    .withCommand("redis-server", "--requirepass", REDIS_PASSWORD);
 
     /**
      * 生成仅在当前测试进程中使用的临时凭据，不读取本地环境配置。
