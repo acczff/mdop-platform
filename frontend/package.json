@@ -6,11 +6,19 @@
     "dev": "pnpm --filter @mdop/admin run dev",
     "test": "pnpm --filter @mdop/admin run test:unit --run",
     "type-check": "pnpm --filter @mdop/admin run type-check",
-    "build": "pnpm --filter @mdop/admin run build"
+    "build": "pnpm --filter @mdop/admin run build",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "lint": "pnpm --filter @mdop/admin run lint",
+    "lint:fix": "pnpm --filter @mdop/admin run lint:fix",
+    "verify": "pnpm run format:check && pnpm run lint && pnpm run test && pnpm run build"
   },
   "packageManager": "pnpm@11.13.0",
   "engines": {
     "node": ">=24.18.0 <25",
     "pnpm": "11.13.0"
+  },
+  "devDependencies": {
+    "prettier": "3.9.5"
   }
 }
