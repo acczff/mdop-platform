@@ -27,6 +27,18 @@
 
 执行测试需要 Java 25 和正在运行的 Docker Engine，但不需要提前启动本地 Compose 服务。
 
+## 后端质量门禁
+
+从仓库根目录执行完整后端验证：
+
+```powershell
+.\backend\mvnw.cmd -f .\backend\pom.xml verify
+```
+
+该命令会检查 Java 和 Maven 版本、依赖收敛、启动模块依赖边界与 Java 格式，并运行后端测试、生成 JaCoCo 覆盖率报告。共享 Testcontainers 回归继续使用随机宿主机端口和运行时临时凭据，不依赖 `.env.local` 或本机固定容器。
+
+当前覆盖率仅生成报告，不设置失败阈值。`mdop-boot` 报告入口位于 `backend/mdop-boot/target/site/jacoco/index.html`。
+
 ## 最小安全基线
 
 `mdop-security` 负责 Spring Security 配置，`mdop-boot` 负责装配与集成测试。`/actuator/health` 允许匿名健康探测，其余 HTTP 接口默认需要认证。
