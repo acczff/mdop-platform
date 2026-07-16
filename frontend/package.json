@@ -8,7 +8,9 @@
     "type-check": "pnpm --filter @mdop/admin run type-check",
     "build": "pnpm --filter @mdop/admin run build",
     "format": "prettier . --write",
-    "format:check": "prettier . --check"
+    "format:check": "prettier . --check",
+    "lint": "pnpm --filter @mdop/admin run lint",
+    "lint:fix": "pnpm --filter @mdop/admin run lint:fix"
   },
   "packageManager": "pnpm@11.13.0",
   "engines": {
