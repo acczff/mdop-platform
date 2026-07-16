@@ -103,6 +103,7 @@
                   <version>[3.9.11,4)</version>
                   <message>MDOP 后端构建必须使用 Maven 3.9.11 或更高的 3.x 版本。</message>
                 </requireMavenVersion>
+                <dependencyConvergence/>
               </rules>
             </configuration>
           </execution>
