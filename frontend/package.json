@@ -10,7 +10,8 @@
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "lint": "pnpm --filter @mdop/admin run lint",
-    "lint:fix": "pnpm --filter @mdop/admin run lint:fix"
+    "lint:fix": "pnpm --filter @mdop/admin run lint:fix",
+    "verify": "pnpm run format:check && pnpm run lint && pnpm run test && pnpm run build"
   },
   "packageManager": "pnpm@11.13.0",
   "engines": {
