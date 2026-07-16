@@ -104,6 +104,13 @@
                   <message>MDOP 后端构建必须使用 Maven 3.9.11 或更高的 3.x 版本。</message>
                 </requireMavenVersion>
                 <dependencyConvergence/>
+                <bannedDependencies>
+                  <excludes>
+                    <exclude>io.github.acczff.mdop:mdop-boot</exclude>
+                  </excludes>
+                  <searchTransitive>true</searchTransitive>
+                  <message>除启动装配模块自身外，其他模块禁止依赖 mdop-boot。</message>
+                </bannedDependencies>
               </rules>
             </configuration>
           </execution>
