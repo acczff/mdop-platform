@@ -38,12 +38,17 @@ Java 版本会影响编译、CI、容器和依赖兼容性
 
 ## 约束措施
 
+当前已经落实：
+
 - Maven Compiler 将 `release` 固定为 `25`。
 - Maven Enforcer 将构建所需 Java 版本限制为 `[25,26)`。
 - Maven Wrapper 固定 Maven 版本。
+- 本地构建和 Pull Request 合并前验证使用 Java 25。
+
+后续建立对应交付能力时必须落实：
+
 - CI 明确安装 Eclipse Temurin JDK 25。
-- Docker 运行镜像明确使用兼容的 JRE 25。
-- 所有 Pull Request 必须通过 Java 25 环境的构建和测试。
+- 应用 Docker 镜像明确使用兼容的 JRE 25。
 
 ## 重新评估条件
 

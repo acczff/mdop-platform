@@ -37,6 +37,12 @@
 
 该命令会检查 Java 和 Maven 版本、依赖收敛、启动模块依赖边界与 Java 格式，并运行后端测试、生成 JaCoCo 覆盖率报告。共享 Testcontainers 回归继续使用随机宿主机端口和运行时临时凭据，不依赖 `.env.local` 或本机固定容器。
 
+需要同时验证后端和前端时，使用仓库级入口：
+
+```powershell
+.\mdop.cmd verify
+```
+
 当前覆盖率仅生成报告，不设置失败阈值。`mdop-boot` 报告入口位于 `backend/mdop-boot/target/site/jacoco/index.html`。
 
 ## 最小安全基线
