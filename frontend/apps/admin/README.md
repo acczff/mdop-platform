@@ -34,13 +34,13 @@ src
 统一从 `frontend` 工作区根目录执行：
 
 ```powershell
-pnpm run dev
-pnpm run format:check
-pnpm run lint
-pnpm run test
-pnpm run type-check
-pnpm run build
-pnpm run verify
+pnpm.cmd run dev
+pnpm.cmd run format:check
+pnpm.cmd run lint
+pnpm.cmd run test
+pnpm.cmd run type-check
+pnpm.cmd run build
+pnpm.cmd run verify
 ```
 
 不要在 `apps/admin` 内创建独立锁文件；整个前端工作区统一使用 `frontend/pnpm-lock.yaml`。

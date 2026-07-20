@@ -15,12 +15,12 @@
 - `docs/<description>`：文档调整
 - `chore/<description>`：工程维护
 
-推荐提交信息采用 Conventional Commits，例如：
+推荐提交信息采用 Conventional Commits（约定式提交），保留固定的英文类型和可选范围，说明部分使用中文。例如：
 
 ```text
-feat(wms): add purchase receipt domain model
-fix(security): reject expired access tokens
-docs: clarify I0 completion criteria
+feat(wms): 建立采购收货领域模型
+fix(security): 拒绝过期访问令牌
+docs: 明确 I0 完成定义
 ```
 
 ## 完成定义

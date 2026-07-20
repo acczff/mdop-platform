@@ -31,21 +31,21 @@ admin 应用的职责、源码结构和验证方式见 [apps/admin/README.md](ap
 
 ```powershell
 corepack enable pnpm
-pnpm install
+pnpm.cmd install
 ```
 
 ## 常用命令
 
 ```powershell
-pnpm run dev
-pnpm run format
-pnpm run format:check
-pnpm run lint
-pnpm run lint:fix
-pnpm run test
-pnpm run type-check
-pnpm run build
-pnpm run verify
+pnpm.cmd run dev
+pnpm.cmd run format
+pnpm.cmd run format:check
+pnpm.cmd run lint
+pnpm.cmd run lint:fix
+pnpm.cmd run test
+pnpm.cmd run type-check
+pnpm.cmd run build
+pnpm.cmd run verify
 ```
 
 - `dev`：启动 admin 开发服务器。
@@ -62,13 +62,13 @@ pnpm run verify
 
 ## 已完成验证
 
-- `pnpm run dev`：开发服务器能够在本机启动并显示 MDOP 管理端应用壳。
-- `pnpm run format:check`：Prettier 格式检查通过。
-- `pnpm run lint`：ESLint 静态检查通过，无警告或错误。
-- `pnpm run test`：1 个 Vitest 测试文件、1 个测试用例通过。
-- `pnpm run type-check`：TypeScript 与 Vue 类型检查通过。
-- `pnpm run build`：Vite 生产构建通过。
-- `pnpm run verify`：格式检查、静态检查、单元测试、类型检查和生产构建全部通过。
+- `pnpm.cmd run dev`：开发服务器能够在本机启动并显示 MDOP 管理端应用壳。
+- `pnpm.cmd run format:check`：Prettier 格式检查通过。
+- `pnpm.cmd run lint`：ESLint 静态检查通过，无警告或错误。
+- `pnpm.cmd run test`：1 个 Vitest 测试文件、1 个测试用例通过。
+- `pnpm.cmd run type-check`：TypeScript 与 Vue 类型检查通过。
+- `pnpm.cmd run build`：Vite 生产构建通过。
+- `pnpm.cmd run verify`：格式检查、静态检查、单元测试、类型检查和生产构建全部通过。
 
 ## 当前边界
 
