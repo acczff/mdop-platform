@@ -45,6 +45,12 @@
 
 当前覆盖率仅生成报告，不设置失败阈值。`mdop-boot` 报告入口位于 `backend/mdop-boot/target/site/jacoco/index.html`。
 
+## 仓库主数据
+
+I1.1 已在 `mdop-master-data` 实现仓库主数据后端闭环，统一接口前缀为 `/api/master-data/warehouses`。当前能力包括创建、详情、分页筛选、启停、受控修改、审计、乐观并发控制和统一错误响应；不包含删除接口、前端页面、库区、库位或库存业务。
+
+数据库结构由 `db/migration/masterdata/V202607210001__create_mdm_warehouse.sql` 管理。完整业务边界、字段、接口和验收标准见 [I1.1 仓库主数据方案](../docs/project/I1.1仓库主数据方案.md)。
+
 ## 最小安全基线
 
 `mdop-security` 负责 Spring Security 配置，`mdop-boot` 负责装配与集成测试。`/actuator/health` 允许匿名健康探测，其余 HTTP 接口默认需要认证。
