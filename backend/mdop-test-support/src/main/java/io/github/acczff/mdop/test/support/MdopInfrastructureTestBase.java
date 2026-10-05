@@ -34,9 +34,9 @@ public abstract class MdopInfrastructureTestBase {
                     .withPassword(randomCredential());
 
     /**
-     * 当前只验证 RabbitMQ 节点可用性，尚未接入消息生产、消费或业务事件。
+     * RabbitMQ 使用独立凭据和随机端口，供健康检查与真实消息回归测试使用。
      */
-    @Container
+    @Container @ServiceConnection
     protected static final RabbitMQContainer RABBITMQ =
             new RabbitMQContainer("rabbitmq:4.3.2-management")
                     .withAdminUser("mdop_" + randomCredential().substring(0, 12))

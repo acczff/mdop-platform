@@ -1,4 +1,10 @@
 spring:
+  rabbitmq:
+    host: 127.0.0.1
+    port: ${MDOP_RABBITMQ_AMQP_PORT}
+    virtual-host: ${MDOP_RABBITMQ_VHOST}
+    username: ${MDOP_RABBITMQ_USER}
+    password: ${MDOP_RABBITMQ_PASSWORD}
   datasource:
     url: "jdbc:mysql://127.0.0.1:${MDOP_MYSQL_PORT}/${MDOP_MYSQL_DATABASE}"
     username: "${MDOP_MYSQL_USER}"
@@ -7,6 +13,10 @@ spring:
 logging:
   level:
     io.github.acczff.mdop: DEBUG
+
+mdop:
+  messaging:
+    enabled: true
 
 management:
   endpoint:
