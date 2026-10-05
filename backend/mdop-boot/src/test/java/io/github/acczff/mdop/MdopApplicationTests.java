@@ -37,6 +37,96 @@ class MdopApplicationTests extends MdopInfrastructureTestBase {
 
     @Autowired private Environment environment;
 
+    @Test
+    void fractionalVersionsShouldBeRejectedWithoutChangingWarehouse() throws Exception {
+        long id = insertWarehouse("WH-FRACTION", "版本测试", "RAW_MATERIAL", "GENERAL", "ENABLED");
+        for (String version : new String[] {"0.9", "0.0", "1e-1"}) {
+            mockMvc.perform(
+                            put("/api/master-data/warehouses/{id}/status", id)
+                                    .with(user("review").roles("ADMIN"))
+                                    .with(csrf())
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(
+                                            "{\"status\":\"DISABLED\",\"version\":"
+                                                    + version
+                                                    + "}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+            mockMvc.perform(
+                            put("/api/master-data/warehouses/{id}", id)
+                                    .with(user("review").roles("ADMIN"))
+                                    .with(csrf())
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(
+                                            "{\"name\":\"不应保存\",\"purpose\":\"RAW_MATERIAL\",\"form\":\"PHYSICAL\",\"managementCategory\":\"GENERAL\",\"version\":"
+                                                    + version
+                                                    + "}"))
+                    .andExpect(status().isBadRequest());
+        }
+        assertThat(
+                        jdbcTemplate.queryForObject(
+                                "SELECT version FROM mdm_warehouse WHERE id=?", Long.class, id))
+                .isZero();
+        assertThat(
+                        jdbcTemplate.queryForObject(
+                                "SELECT status FROM mdm_warehouse WHERE id=?", String.class, id))
+                .isEqualTo("ENABLED");
+    }
+
+    @Test
+    void normalizedEmptyNameShouldBeRejectedOnCreateAndUpdate() throws Exception {
+        String body =
+                "{\"code\":\"WH-EMPTY\",\"name\":\"\\u0000\",\"purpose\":\"RAW_MATERIAL\",\"form\":\"PHYSICAL\",\"managementCategory\":\"GENERAL\",\"version\":0}";
+        mockMvc.perform(
+                        post("/api/master-data/warehouses")
+                                .with(user("review").roles("ADMIN"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        long id = insertWarehouse("WH-NAME", "原名称", "RAW_MATERIAL", "GENERAL", "ENABLED");
+        mockMvc.perform(
+                        put("/api/master-data/warehouses/{id}", id)
+                                .with(user("review").roles("ADMIN"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isBadRequest());
+        assertThat(
+                        jdbcTemplate.queryForObject(
+                                "SELECT name FROM mdm_warehouse WHERE id=?", String.class, id))
+                .isEqualTo("原名称");
+        assertThat(
+                        jdbcTemplate.queryForObject(
+                                "SELECT COUNT(*) FROM mdm_warehouse WHERE code='WH-EMPTY'",
+                                Integer.class))
+                .isZero();
+    }
+
+    @Test
+    void excessivePageOffsetShouldReturnValidationProblem() throws Exception {
+        mockMvc.perform(
+                        get("/api/master-data/warehouses")
+                                .with(user("review"))
+                                .param("page", "2147483647")
+                                .param("size", "100"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void authenticatedReaderCannotChangeMasterData() throws Exception {
+        mockMvc.perform(
+                        post("/api/master-data/warehouses")
+                                .with(user("reader"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"code\":\"WH-READ\",\"name\":\"只读\",\"purpose\":\"RAW_MATERIAL\",\"form\":\"PHYSICAL\",\"managementCategory\":\"GENERAL\"}"))
+                .andExpect(status().isForbidden());
+    }
+
     @BeforeEach
     void clearWarehouseData() {
         jdbcTemplate.update("DELETE FROM mdm_warehouse");
@@ -56,7 +146,7 @@ class MdopApplicationTests extends MdopInfrastructureTestBase {
 
         mockMvc.perform(
                         get("/api/master-data/warehouses")
-                                .with(user("i1-api-test"))
+                                .with(user("i1-api-test").roles("ADMIN"))
                                 .param("keyword", "原料")
                                 .param("purpose", "RAW_MATERIAL")
                                 .param("status", "ENABLED")
@@ -72,7 +162,7 @@ class MdopApplicationTests extends MdopInfrastructureTestBase {
 
         mockMvc.perform(
                         get("/api/master-data/warehouses")
-                                .with(user("i1-api-test"))
+                                .with(user("i1-api-test").roles("ADMIN"))
                                 .param("keyword", "%"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(0))
@@ -99,7 +189,7 @@ class MdopApplicationTests extends MdopInfrastructureTestBase {
 
         mockMvc.perform(
                         get("/api/master-data/warehouses")
-                                .with(user("i1-api-test"))
+                                .with(user("i1-api-test").roles("ADMIN"))
                                 .param("form", "LOGICAL")
                                 .param("managementCategory", "HAZARDOUS_CHEMICAL"))
                 .andExpect(status().isOk())
@@ -112,7 +202,9 @@ class MdopApplicationTests extends MdopInfrastructureTestBase {
     void warehouseDetailShouldReturnActiveWarehouse() throws Exception {
         long id = insertWarehouse("WH-RAW-01", "常规原料仓", "RAW_MATERIAL", "GENERAL", "ENABLED");
 
-        mockMvc.perform(get("/api/master-data/warehouses/{id}", id).with(user("i1-api-test")))
+        mockMvc.perform(
+                        get("/api/master-data/warehouses/{id}", id)
+                                .with(user("i1-api-test").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id))
                 .andExpect(jsonPath("$.code").value("WH-RAW-01"))
@@ -234,7 +326,7 @@ class MdopApplicationTests extends MdopInfrastructureTestBase {
 
     @Test
     void infoEndpointShouldRejectAnonymousRequest() throws Exception {
-        mockMvc.perform(get("/actuator/info")).andExpect(status().isForbidden());
+        mockMvc.perform(get("/actuator/info")).andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -259,7 +351,7 @@ class MdopApplicationTests extends MdopInfrastructureTestBase {
 
         mockMvc.perform(
                         post("/api/master-data/warehouses")
-                                .with(user("i1-api-test"))
+                                .with(user("i1-api-test").roles("ADMIN"))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(requestBody))
                 .andExpect(status().isForbidden());
@@ -267,7 +359,7 @@ class MdopApplicationTests extends MdopInfrastructureTestBase {
         var result =
                 mockMvc.perform(
                                 post("/api/master-data/warehouses")
-                                        .with(user("i1-api-test"))
+                                        .with(user("i1-api-test").roles("ADMIN"))
                                         .with(csrf())
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(requestBody))
@@ -298,7 +390,7 @@ class MdopApplicationTests extends MdopInfrastructureTestBase {
 
         mockMvc.perform(
                         put("/api/master-data/warehouses/{id}", id)
-                                .with(user("i1-api-test"))
+                                .with(user("i1-api-test").roles("ADMIN"))
                                 .with(csrf())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
@@ -332,7 +424,7 @@ class MdopApplicationTests extends MdopInfrastructureTestBase {
 
         mockMvc.perform(
                         put("/api/master-data/warehouses/{id}/status", id)
-                                .with(user("i1-api-test"))
+                                .with(user("i1-api-test").roles("ADMIN"))
                                 .with(csrf())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
@@ -348,7 +440,7 @@ class MdopApplicationTests extends MdopInfrastructureTestBase {
 
         mockMvc.perform(
                         put("/api/master-data/warehouses/{id}", id)
-                                .with(user("i1-api-test"))
+                                .with(user("i1-api-test").roles("ADMIN"))
                                 .with(csrf())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
@@ -375,7 +467,7 @@ class MdopApplicationTests extends MdopInfrastructureTestBase {
 
         mockMvc.perform(
                         put("/api/master-data/warehouses/{id}", id)
-                                .with(user("i1-api-test"))
+                                .with(user("i1-api-test").roles("ADMIN"))
                                 .with(csrf())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
@@ -413,7 +505,7 @@ class MdopApplicationTests extends MdopInfrastructureTestBase {
 
         mockMvc.perform(
                         put("/api/master-data/warehouses/{id}", id)
-                                .with(user("i1-api-test"))
+                                .with(user("i1-api-test").roles("ADMIN"))
                                 .with(csrf())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
@@ -444,14 +536,14 @@ class MdopApplicationTests extends MdopInfrastructureTestBase {
     void invalidEnumAndPaginationShouldReturnValidationProblem() throws Exception {
         mockMvc.perform(
                         get("/api/master-data/warehouses")
-                                .with(user("i1-api-test"))
+                                .with(user("i1-api-test").roles("ADMIN"))
                                 .param("purpose", "UNKNOWN"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
 
         mockMvc.perform(
                         get("/api/master-data/warehouses")
-                                .with(user("i1-api-test"))
+                                .with(user("i1-api-test").roles("ADMIN"))
                                 .param("page", "0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
@@ -460,7 +552,7 @@ class MdopApplicationTests extends MdopInfrastructureTestBase {
 
         mockMvc.perform(
                         put("/api/master-data/warehouses/{id}/status", id)
-                                .with(user("i1-api-test"))
+                                .with(user("i1-api-test").roles("ADMIN"))
                                 .with(csrf())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
@@ -480,7 +572,7 @@ class MdopApplicationTests extends MdopInfrastructureTestBase {
 
         mockMvc.perform(
                         post("/api/master-data/warehouses")
-                                .with(user("i1-api-test"))
+                                .with(user("i1-api-test").roles("ADMIN"))
                                 .with(csrf())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
@@ -502,7 +594,9 @@ class MdopApplicationTests extends MdopInfrastructureTestBase {
 
     @Test
     void warehouseMissingOrSoftDeletedShouldReturnNotFoundProblem() throws Exception {
-        mockMvc.perform(get("/api/master-data/warehouses/{id}", 999999L).with(user("i1-api-test")))
+        mockMvc.perform(
+                        get("/api/master-data/warehouses/{id}", 999999L)
+                                .with(user("i1-api-test").roles("ADMIN")))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.code").value("WAREHOUSE_NOT_FOUND"));
@@ -513,7 +607,7 @@ class MdopApplicationTests extends MdopInfrastructureTestBase {
 
         mockMvc.perform(
                         get("/api/master-data/warehouses/{id}", deletedId)
-                                .with(user("i1-api-test")))
+                                .with(user("i1-api-test").roles("ADMIN")))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("WAREHOUSE_NOT_FOUND"));
     }
@@ -522,7 +616,7 @@ class MdopApplicationTests extends MdopInfrastructureTestBase {
     void warehouseValidationShouldReturnProblemDetail() throws Exception {
         mockMvc.perform(
                         post("/api/master-data/warehouses")
-                                .with(user("i1-api-test"))
+                                .with(user("i1-api-test").roles("ADMIN"))
                                 .with(csrf())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(

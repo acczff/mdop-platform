@@ -7,6 +7,7 @@
 ```powershell
 .\mdop.cmd verify
 .\mdop.cmd start
+.\mdop.cmd start -BackendPort 8081
 .\mdop.cmd status
 .\mdop.cmd stop
 ```
@@ -25,10 +26,14 @@
 - Windows PowerShell 5.1 或更高版本；
 - Java 25；
 - Node.js `>=24.18.0 <25`；
-- pnpm `11.13.0`，命令名为 `pnpm.cmd`；
+- Corepack；`scripts/pnpm.cmd` 在前端工作区执行锁定版本的 pnpm，不依赖全局 pnpm 或临时适配文件；
 - `start`、`status` 和 `stop` 使用 `deploy/env/.env.local`；
 - Docker Desktop 已启动，Docker Engine 可访问；
-- 后端端口 `8080` 和前端端口 `5173` 未被其他程序占用。
+- 配置的后端端口和前端端口 `5173` 未被其他程序占用。模板使用 `MDOP_BACKEND_PORT=8081`，命令行 `-BackendPort` 优先，没有任何配置时保留兼容默认值 `8080`。
+
+`start` 与 `verify` 统一使用 `MDOP_JAVA_HOME`（未配置则使用 `JAVA_HOME`）和 `MDOP_NODE_HOME`（未配置则发现 PATH 中的 Node）。检查 Java 25、Node 24.18+ 与 packageManager 中的 pnpm 精确版本；设置只影响当前进程与子进程。存在 `.env.local` 时读取其中的工具链路径，但测试数据库仍由 Testcontainers 创建。
+
+启动需要 `MDOP_ADMIN_PASSWORD`。前端代理目标自动继承实际后端端口，手动启动前端时可设置 `MDOP_BACKEND_URL`，默认目标为 `http://127.0.0.1:8081`。
 
 ## `verify` 验证边界
 
@@ -36,7 +41,7 @@
 
 ```powershell
 .\backend\mvnw.cmd -f .\backend\pom.xml verify
-pnpm.cmd --dir .\frontend run verify
+.\scripts\pnpm.cmd run verify
 ```
 
 后端完整验证包含共享 Testcontainers 测试。测试容器使用随机宿主机端口和运行时临时凭据，不读取 `.env.local`，也不要求预先启动本机固定 Compose 容器。
@@ -58,7 +63,7 @@ pnpm.cmd --dir .\frontend run verify
 
 | 项目 | 位置 |
 |---|---|
-| 后端地址 | `http://127.0.0.1:8080` |
+| 后端地址 | `http://127.0.0.1:<配置端口>` |
 | 前端地址 | `http://127.0.0.1:5173` |
 | 应用日志 | `logs/local/` |
 | 运行状态 | `tmp/mdop-local-state.json` |

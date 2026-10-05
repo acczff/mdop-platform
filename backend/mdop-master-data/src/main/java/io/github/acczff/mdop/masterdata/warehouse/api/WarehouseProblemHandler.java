@@ -23,9 +23,22 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice(assignableTypes = WarehouseController.class)
+@org.springframework.core.annotation.Order(-10)
 public class WarehouseProblemHandler {
 
     private static final String VALIDATION_FAILED = "VALIDATION_FAILED";
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ProblemDetail> handleInvalidArgument(
+            IllegalArgumentException exception, HttpServletRequest request) {
+        return response(
+                problem(
+                        HttpStatus.BAD_REQUEST,
+                        "请求参数校验失败",
+                        exception.getMessage(),
+                        VALIDATION_FAILED,
+                        request));
+    }
 
     @ExceptionHandler(WarehouseException.class)
     public ResponseEntity<ProblemDetail> handleWarehouseException(

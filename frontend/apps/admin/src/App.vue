@@ -1,19 +1,120 @@
+<script setup lang="ts">
+import { onMounted, onUnmounted, ref } from 'vue'
+import { ApiError, request, refreshCsrf, type Session } from './api'
+import './style.css'
+const session = ref<Session | null>(null)
+const loading = ref(true)
+const busy = ref(false)
+const error = ref('')
+const username = ref('admin')
+const password = ref('')
+function expired() {
+  session.value = null
+  error.value = '登录已过期，请重新登录。'
+}
+async function restore() {
+  try {
+    session.value = await request<Session>('/api/auth/me')
+    await refreshCsrf()
+  } catch (e) {
+    error.value =
+      e instanceof ApiError && e.status === 401 ? '' : (e as Error).message
+  } finally {
+    loading.value = false
+  }
+}
+async function login() {
+  busy.value = true
+  error.value = ''
+  try {
+    await refreshCsrf()
+    await request('/api/auth/login', {
+      method: 'POST',
+      body: new URLSearchParams({
+        username: username.value,
+        password: password.value,
+      }),
+    })
+    password.value = ''
+    await refreshCsrf()
+    session.value = await request<Session>('/api/auth/me')
+  } catch (e) {
+    error.value = (e as Error).message
+  } finally {
+    busy.value = false
+  }
+}
+async function logout() {
+  busy.value = true
+  error.value = ''
+  try {
+    await request('/api/auth/logout', { method: 'POST' })
+    session.value = null
+    password.value = ''
+    await refreshCsrf()
+  } catch (e) {
+    error.value = (e as Error).message
+  } finally {
+    busy.value = false
+  }
+}
+onMounted(() => {
+  window.addEventListener('session-expired', expired)
+  void restore()
+})
+onUnmounted(() => window.removeEventListener('session-expired', expired))
+</script>
 <template>
-  <main class="app-shell">
-    <h1>MDOP 管理端</h1>
-    <p>I0 前端工程基线已就绪。</p>
+  <main v-if="loading" class="login"><p role="status">正在连接 MDOP…</p></main>
+  <main v-else-if="!session" class="login">
+    <form class="login-card" @submit.prevent="login">
+      <span class="brand">MDOP <small>制造运营平台</small></span>
+      <h1>登录工作台</h1>
+      <p class="muted">管理仓库、维护基础资料，开始采购收货。</p>
+      <p v-if="error" role="alert" class="error">{{ error }}</p>
+      <label
+        >账号<input
+          v-model="username"
+          name="username"
+          autocomplete="username"
+          required
+          maxlength="64"
+      /></label>
+      <label
+        >密码<input
+          v-model="password"
+          name="password"
+          type="password"
+          autocomplete="current-password"
+          required
+      /></label>
+      <button class="primary" :disabled="busy">
+        {{ busy ? '正在登录…' : '登录' }}
+      </button>
+      <p class="hint">使用本项目本地环境配置中的账号与密码。</p>
+    </form>
   </main>
+  <div v-else class="layout">
+    <aside class="sidebar">
+      <div class="brand">MDOP<small>制造运营平台</small></div>
+      <p class="nav-caption">仓储工作台</p>
+      <nav aria-label="主导航">
+        <RouterLink to="/warehouses">仓库管理</RouterLink
+        ><RouterLink to="/catalog">收货基础资料</RouterLink
+        ><RouterLink to="/receiving">采购收货</RouterLink>
+      </nav>
+      <p class="sidebar-note">从主数据到业务记录<br />每次操作均可追溯</p>
+    </aside>
+    <div class="workspace">
+      <header class="topbar">
+        <span>制造运营 / 仓储</span>
+        <div>
+          {{ session.username }}
+          <button :disabled="busy" @click="logout">退出登录</button>
+        </div>
+      </header>
+      <p v-if="error" role="alert" class="error">{{ error }}</p>
+      <RouterView :authorities="session.authorities" />
+    </div>
+  </div>
 </template>
-
-<style scoped>
-.app-shell {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 48px 24px;
-  font-family: system-ui, sans-serif;
-}
-
-h1 {
-  margin-bottom: 16px;
-}
-</style>

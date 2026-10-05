@@ -1,3 +1,8 @@
+mdop:
+  auth:
+    username: testadmin
+    password: test-only-password-12345
+
 logging:
   level:
     io.github.acczff.mdop: INFO

@@ -1,12 +1,12 @@
 # MDOP Admin
 
-`@mdop/admin` 是 MDOP 统一管理端应用。I0 只建立可启动、可测试、可类型检查和可生产构建的前端工程基线。
+`@mdop/admin` 是 MDOP 统一管理端应用。当前提供会话登录、仓库管理、收货基础资料和采购收货操作页面。
 
 ## 技术组成
 
 - Vue 3：管理端视图框架。
 - TypeScript：启用严格类型检查。
-- Vue Router：已完成最小装配，当前没有业务路由。
+- Vue Router：提供仓库管理、基础资料与采购收货三个业务路由。
 - Pinia：已完成最小装配，当前没有业务 Store（状态仓库）。
 - Vite：开发服务器和生产构建工具。
 - Vitest 与 Vue Test Utils：单元测试和组件挂载测试。
@@ -17,17 +17,25 @@
 ```text
 src
 ├─ __tests__
-│  └─ App.spec.ts
+│  ├─ App.spec.ts
+│  ├─ Warehouses.spec.ts
+│  ├─ Receiving.spec.ts
+│  └─ Quantity.spec.ts
 ├─ router
 │  └─ index.ts
 ├─ App.vue
+├─ api.ts
+├─ quantity.ts
+├─ receiving.ts
+├─ style.css
+├─ views/
 └─ main.ts
 ```
 
 - `main.ts`：创建 Vue 应用并装配 Pinia、Vue Router。
-- `router/index.ts`：声明空路由表，为后续经过确认的页面保留入口。
-- `App.vue`：仅显示 MDOP 管理端 I0 应用壳。
-- `App.spec.ts`：验证应用壳标题和基线说明能够正确渲染。
+- `router/index.ts`：维护业务路由和默认跳转。
+- `App.vue`：管理会话恢复、登录、退出和应用导航。
+- `App.spec.ts`：验证登录请求与会话过期处理；其他组件测试覆盖仓库冲突和收货提交确认。
 
 ## 运行与验证
 
@@ -47,7 +55,8 @@ pnpm.cmd run verify
 
 ## 当前边界
 
-- 不实现登录页、菜单、完整 IAM、JWT 或数据权限。
-- 不实现真实 API 客户端或业务状态管理。
-- 不创建 WMS 业务页面。
+- 已实现登录、退出、会话恢复、导航、仓库管理和采购收货页面；完整 IAM、用户授权管理和 JWT 不在本切片范围内。
+- `api.ts` 统一发送同源请求、处理 CSRF、会话过期和错误；写请求失败不会自动重发。收货提交使用固定的单据幂等键。
+- 草稿编辑与提交分开，已提交记录只读。库存数量以十进制字符串传输，剩余量使用六位定点整数计算。
+- 基础资料当前仅支持新建与查询；正式 ERP/QMS 消息、差异处理、序列号和冲正页面尚未实现。
 - 共享能力只在职责确认后进入 `packages/*`，不从旧项目复制页面和 Store。

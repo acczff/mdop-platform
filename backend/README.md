@@ -47,7 +47,20 @@
 
 ## 仓库主数据
 
-I1.1 已在 `mdop-master-data` 实现仓库主数据后端闭环，统一接口前缀为 `/api/master-data/warehouses`。当前能力包括创建、详情、分页筛选、启停、受控修改、审计、乐观并发控制和统一错误响应；不包含删除接口、前端页面、库区、库位或库存业务。
+`mdop-master-data` 实现仓库主数据后端闭环，统一接口前缀为 `/api/master-data/warehouses`。当前能力包括创建、详情、分页筛选、启停、受控修改、审计、乐观并发控制和统一错误响应；不包含删除接口。已修复小数版本号、规范化空名称及超大分页偏移的校验问题。
+
+## 会话与收货切片
+
+- `GET /api/auth/csrf` 获取令牌；`POST /api/auth/login` 使用表单账号密码与 CSRF；`GET /api/auth/me` 查询身份；`POST /api/auth/logout` 退出。登录后令牌轮换，客户端重新获取。
+- 当前单个启动配置账号是 ADMIN，密码运行时编码后保存在内存；不是完整 IAM。仓库与基础资料写操作要求 ADMIN；收货接口支持设计中的细粒度操作权限，并检查目标仓库授权（ADMIN 可访问全部仓库）。
+- `/api/master-data/suppliers|materials|locations` 提供新建和查询；策略创建后暂不支持修改。库位区域限定为收货暂存、待检或存储。
+- `/api/v1/wms/arrival-notices` 和 `/receipts` 按 WMS 设计提供任务、草稿与提交。保存草稿不产生库存；提交时锁定通知和收货单，条件更新累计数量，按固定库存维度顺序锁余额，原子写流水、操作记录和 Outbox。
+- 到货通知只能通过 `local`/`test` 下的 `/api/local/erp-arrivals` 本地模拟适配器创建，来源固定为 `ERP_SIMULATOR`。正式消息 Inbox 尚待实现。
+- 两个新迁移：`V202610050001`（3 张主数据表）和 `V202610050002`（8 张收货表）。已有仓库迁移保持不变。
+- 收货、通知、库存与流水的数量以十进制字符串返回；前端按文本输入和定点整数计算剩余量，保留 `DECIMAL(18,6)` 精度，不经 JavaScript Number 转换。
+- Outbox 包含事件版本、来源、TraceId、收货/通知/供应商快照，状态保持 PENDING。未实现实际 MQ 发布，未将外部系统可用性纳入收货事务。
+
+集成测试验证草稿与提交分离、分批收货、超收、幂等、不可变收货、批次/库位、操作及仓库权限、并发竞争、真实数据库写失败回滚。故障注入仅在临时测试表上增加约束并在 finally 中移除；不会修改本地 Compose 数据库。
 
 数据库结构由 `db/migration/masterdata/V202607210001__create_mdm_warehouse.sql` 管理。完整业务边界、字段、接口和验收标准见 [I1.1 仓库主数据方案](../docs/project/I1.1仓库主数据方案.md)。
 

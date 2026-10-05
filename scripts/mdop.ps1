@@ -2,7 +2,10 @@
 param(
     [Parameter(Position = 0)]
     [ValidateSet('verify', 'start', 'status', 'stop')]
-    [string] $Action = 'verify'
+    [string] $Action = 'verify',
+
+    [ValidateRange(1, 65535)]
+    [int] $BackendPort = 8080
 )
 
 Set-StrictMode -Version Latest
@@ -18,7 +21,6 @@ $stateFile = Join-Path $repoRoot 'tmp\mdop-local-state.json'
 $logDirectory = Join-Path $repoRoot 'logs\local'
 $frontendAppRoot = Join-Path $frontendRoot 'apps\admin'
 $frontendViteScript = Join-Path $frontendAppRoot 'node_modules\vite\bin\vite.js'
-$backendPort = 8080
 $frontendPort = 5173
 
 function Invoke-CheckedCommand {
@@ -83,6 +85,48 @@ function Import-DotEnv {
 
         [Environment]::SetEnvironmentVariable($name, $value, 'Process')
     }
+}
+
+function Initialize-Toolchain {
+    # Process-only configuration: never modify the user's global Java/Node setup.
+    if (Test-Path -LiteralPath $envFile -PathType Leaf) {
+        Import-DotEnv -Path $envFile
+    }
+    $jdkDirectory = $env:MDOP_JAVA_HOME
+    if ([string]::IsNullOrWhiteSpace($jdkDirectory)) { $jdkDirectory = $env:JAVA_HOME }
+    if ([string]::IsNullOrWhiteSpace($jdkDirectory)) {
+        throw 'Set MDOP_JAVA_HOME in deploy/env/.env.local to a JDK 25 installation.'
+    }
+    $script:javaCommand = Join-Path $jdkDirectory 'bin\java.exe'
+    if (-not (Test-Path -LiteralPath $javaCommand -PathType Leaf)) {
+        throw "JDK executable not found: $javaCommand"
+    }
+    $env:JAVA_HOME = $jdkDirectory
+    $env:Path = "$(Join-Path $jdkDirectory 'bin');$env:Path"
+    $javaVersion = & $javaCommand --version | Out-String
+    if ($LASTEXITCODE -ne 0 -or $javaVersion -notmatch '(?m)^(openjdk|java) 25[.\s]') {
+        throw 'MDOP requires JDK 25 for both build and runtime.'
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:MDOP_NODE_HOME)) {
+        $env:Path = "$env:MDOP_NODE_HOME;$env:Path"
+    }
+    $script:nodeCommand = (Get-Command 'node.exe' -ErrorAction Stop).Source
+    $env:MDOP_NODE_HOME = Split-Path -Parent $nodeCommand
+    $nodeVersion = (& $nodeCommand --version).TrimStart('v')
+    if ([version]$nodeVersion -lt [version]'24.18.0' -or [version]$nodeVersion -ge [version]'25.0.0') {
+        throw 'MDOP requires Node >=24.18.0 and <25.'
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $env:MDOP_NODE_HOME 'corepack.cmd'))) {
+        throw 'Corepack must be installed alongside Node.'
+    }
+    $script:pnpmCommand = Join-Path $PSScriptRoot 'pnpm.cmd'
+    $env:Path = "$PSScriptRoot;$env:MDOP_NODE_HOME;$env:Path"
+    $pnpmVersion = & $pnpmCommand --version
+    $expected = (Get-Content (Join-Path $frontendRoot 'package.json') -Raw | ConvertFrom-Json).packageManager.Split('@')[-1]
+    if ($LASTEXITCODE -ne 0 -or "$pnpmVersion".Trim() -ne $expected) {
+        throw "Corepack must resolve pnpm $expected from frontend/package.json."
+    }
+    Write-Host "==> Toolchain: Java 25; Node $nodeVersion; pnpm $expected"
 }
 
 function Assert-PortAvailable {
@@ -405,18 +449,20 @@ function Start-Mdop {
     }
 
     $dockerCommand = (Get-Command 'docker.exe' -ErrorAction Stop).Source
-    $javaCommand = (Get-Command 'java.exe' -ErrorAction Stop).Source
-    $nodeCommand = (Get-Command 'node.exe' -ErrorAction Stop).Source
-    $pnpmCommand = (Get-Command 'pnpm.cmd' -ErrorAction Stop).Source
-
-    Import-DotEnv -Path $envFile
+    Initialize-Toolchain
+    if (-not $script:portWasSpecified -and $env:MDOP_BACKEND_PORT) {
+        $backendPort = [int]$env:MDOP_BACKEND_PORT
+        if ($backendPort -lt 1 -or $backendPort -gt 65535) { throw 'Invalid MDOP_BACKEND_PORT.' }
+    }
+    $env:MDOP_BACKEND_URL = "http://127.0.0.1:$backendPort"
 
     foreach (
         $requiredVariable in @(
             'MDOP_MYSQL_PORT',
             'MDOP_MYSQL_DATABASE',
             'MDOP_MYSQL_USER',
-            'MDOP_MYSQL_PASSWORD'
+            'MDOP_MYSQL_PASSWORD',
+            'MDOP_ADMIN_PASSWORD'
         )
     ) {
         $value = [Environment]::GetEnvironmentVariable(
@@ -610,6 +656,7 @@ function Start-Mdop {
             schemaVersion = 1
             startedAtUtc = [DateTime]::UtcNow.ToString('o')
             backend = [ordered]@{
+                port = $backendPort
                 processId = $backendProcess.Id
                 startTimeUtcTicks = $backendProcess.StartTime.ToUniversalTime().Ticks
                 standardOutputLog = $backendStandardOutput
@@ -674,6 +721,7 @@ function Start-Mdop {
     }
 }
 
+$script:portWasSpecified = $PSBoundParameters.ContainsKey('BackendPort')
 try {
     switch ($Action) {
 
@@ -682,7 +730,7 @@ try {
         }
 
         'verify' {
-            $pnpmCommand = (Get-Command 'pnpm.cmd' -ErrorAction Stop).Source
+            Initialize-Toolchain
 
             Invoke-CheckedCommand `
                 -Description 'Backend Maven verify' `
