@@ -27,14 +27,15 @@ admin 应用的职责、源码结构和验证方式见 [apps/admin/README.md](ap
 
 ## 首次准备
 
-在 `frontend` 目录执行：
+在仓库根目录执行（无需修改全局 Corepack 安装）：
 
 ```powershell
-corepack enable pnpm
-pnpm.cmd install
+.\scripts\pnpm.cmd install --frozen-lockfile
 ```
 
 ## 常用命令
+
+推荐使用根目录 `.\mdop.cmd verify` 或 `.\scripts\pnpm.cmd run <动作>`，以保证嵌套 pnpm 命令使用相同版本。手动运行 `dev` 前将 `scripts` 目录加入当前终端 PATH；后端代理由 `MDOP_BACKEND_URL` 指定，默认端口 8081。
 
 ```powershell
 pnpm.cmd run dev

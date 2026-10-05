@@ -209,10 +209,14 @@ public class Warehouse {
     }
 
     private static String requireText(String value, String fieldName) {
-        if (value == null || value.isBlank()) {
+        String normalized = value == null ? "" : value.trim().strip();
+        if (normalized.isBlank()) {
             throw new IllegalArgumentException(fieldName + "不能为空");
         }
-        return value.trim();
+        if (normalized.codePoints().anyMatch(Character::isISOControl)) {
+            throw new IllegalArgumentException(fieldName + "不能包含控制字符");
+        }
+        return normalized;
     }
 
     public Long getId() {

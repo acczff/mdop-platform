@@ -20,6 +20,10 @@
 
   <dependencies>
     <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-test</artifactId>
+    </dependency>
+    <dependency>
       <groupId>io.github.acczff.mdop</groupId>
       <artifactId>mdop-common</artifactId>
     </dependency>

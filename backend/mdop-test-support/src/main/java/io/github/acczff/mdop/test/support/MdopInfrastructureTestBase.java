@@ -16,6 +16,8 @@ import org.testcontainers.rabbitmq.RabbitMQContainer;
  * 共享静态容器，并由 Testcontainers 在测试结束后自动清理。</p>
  */
 @Testcontainers
+@org.springframework.test.annotation.DirtiesContext(
+        classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 public abstract class MdopInfrastructureTestBase {
 
     private static final int REDIS_PORT = 6379;

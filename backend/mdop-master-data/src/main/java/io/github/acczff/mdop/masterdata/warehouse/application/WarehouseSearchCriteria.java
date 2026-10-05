@@ -23,6 +23,9 @@ public record WarehouseSearchCriteria(
         if (size < 1 || size > 100) {
             throw new IllegalArgumentException("每页数量必须在1到100之间");
         }
+        if ((long) (page - 1) * size > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("分页偏移超出支持范围，请缩小查询范围");
+        }
     }
 
     private static String normalizeKeyword(String value) {

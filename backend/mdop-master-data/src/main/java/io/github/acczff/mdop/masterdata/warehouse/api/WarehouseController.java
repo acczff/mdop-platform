@@ -13,6 +13,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
 import java.net.URI;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,6 +38,7 @@ public class WarehouseController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<WarehouseResponse> create(
             @Valid @RequestBody CreateWarehouseRequest request) {
         Warehouse warehouse =
@@ -75,6 +77,7 @@ public class WarehouseController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public WarehouseResponse update(
             @PathVariable @Positive Long id, @Valid @RequestBody UpdateWarehouseRequest request) {
         return WarehouseResponse.from(
@@ -89,6 +92,7 @@ public class WarehouseController {
     }
 
     @PutMapping("/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
     public WarehouseResponse changeStatus(
             @PathVariable @Positive Long id,
             @Valid @RequestBody ChangeWarehouseStatusRequest request) {
