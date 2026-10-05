@@ -1,4 +1,9 @@
 spring:
+  rabbitmq:
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
   jackson:
     deserialization:
       accept-float-as-int: false
@@ -30,6 +35,8 @@ spring:
           time_zone: UTC
 
 mdop:
+  messaging:
+    enabled: false
   auth:
     username: ${MDOP_ADMIN_USERNAME:admin}
     password: ${MDOP_ADMIN_PASSWORD:}

@@ -102,6 +102,11 @@ onUnmounted(() => window.removeEventListener('session-expired', expired))
         <RouterLink to="/warehouses">仓库管理</RouterLink
         ><RouterLink to="/catalog">收货基础资料</RouterLink
         ><RouterLink to="/receiving">采购收货</RouterLink>
+        <RouterLink
+          v-if="session.authorities.includes('ROLE_ADMIN')"
+          to="/messages"
+          >消息管理</RouterLink
+        >
       </nav>
       <p class="sidebar-note">从主数据到业务记录<br />每次操作均可追溯</p>
     </aside>

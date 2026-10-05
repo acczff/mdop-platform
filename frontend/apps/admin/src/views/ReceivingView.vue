@@ -260,16 +260,36 @@ function openSimulator() {
   formError.value = ''
   simulator.value = true
 }
+let arrivalEvent:
+  { body: string; messageId: string; occurredAt: string } | undefined
 async function importNotice() {
   busy.value = true
   formError.value = ''
   try {
-    await request('/api/local/erp-arrivals', {
+    const body = JSON.stringify({ ...notice, warehouseId: warehouseId.value })
+    if (!arrivalEvent || arrivalEvent.body !== body)
+      arrivalEvent = {
+        body,
+        messageId: crypto.randomUUID(),
+        occurredAt: new Date().toISOString(),
+      }
+    await request('/api/local/erp-messages', {
       method: 'POST',
-      body: JSON.stringify({ ...notice, warehouseId: warehouseId.value }),
+      body: JSON.stringify({
+        messageId: arrivalEvent.messageId,
+        eventType: 'ArrivalNoticeCreated',
+        eventVersion: 1,
+        sourceSystem: 'ERP',
+        occurredAt: arrivalEvent.occurredAt,
+        traceId: arrivalEvent.messageId,
+        aggregateType: 'ArrivalNotice',
+        aggregateId: notice.externalNoticeNo,
+        payload: JSON.parse(body),
+      }),
     })
     simulator.value = false
-    message.value = '本地模拟到货通知已创建'
+    message.value =
+      '到货消息已发送，稍后刷新查看通知；处理结果可在消息管理中查询。'
     await load()
   } catch (e) {
     formError.value = (e as Error).message

@@ -46,6 +46,10 @@ public class ReceivingService {
     }
 
     public ArrivalDetail simulateArrival(ArrivalInput input) {
+        return receiveArrival("ERP_SIMULATOR", input);
+    }
+
+    public ArrivalDetail receiveArrival(String sourceSystem, ArrivalInput input) {
         access.requireWarehouse(input.warehouseId());
         catalog.requireReceivingWarehouse(input.warehouseId());
         catalog.supplier(input.supplierId());
@@ -53,7 +57,8 @@ public class ReceivingService {
         String purchase = required(input.purchaseOrderNo(), "采购订单号", 64);
         long id =
                 insert(
-                        "INSERT INTO wms_arrival_notice(source_system,external_notice_no,purchase_order_no,supplier_id,warehouse_id,created_by,created_at) VALUES ('ERP_SIMULATOR',?,?,?,?,?,?)",
+                        "INSERT INTO wms_arrival_notice(source_system,external_notice_no,purchase_order_no,supplier_id,warehouse_id,created_by,created_at) VALUES (?,?,?,?,?,?,?)",
+                        required(sourceSystem, "来源系统", 32),
                         number,
                         purchase,
                         input.supplierId(),
