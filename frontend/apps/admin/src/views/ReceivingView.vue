@@ -320,8 +320,7 @@ onMounted(loadFoundation)
     </p>
     <p v-if="message" class="success" role="status">{{ message }}</p>
     <p class="hint">
-      当前阶段：数量 / 批次收货。ERP/QMS
-      消息等待后续投递接入；不提供质检放行、冲正或直接修改库存。
+      收货后进入待检库存；质检、上架、冲正和退货请前往对应页面。库存数量通过业务单据更新，保留完整流水。
     </p>
     <section class="panel">
       <div class="filters">
