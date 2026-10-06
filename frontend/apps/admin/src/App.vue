@@ -102,6 +102,14 @@ onUnmounted(() => window.removeEventListener('session-expired', expired))
         <RouterLink
           v-if="
             session.authorities.includes('ROLE_ADMIN') ||
+            session.authorities.includes('wms:inventory:read')
+          "
+          to="/inventory"
+          >库存与追溯</RouterLink
+        >
+        <RouterLink
+          v-if="
+            session.authorities.includes('ROLE_ADMIN') ||
             session.authorities.includes('wms:return:read')
           "
           to="/purchase-returns"

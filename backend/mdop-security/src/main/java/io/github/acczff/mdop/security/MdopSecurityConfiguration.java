@@ -49,6 +49,7 @@ public class MdopSecurityConfiguration {
                             && !java.util.Set.of(
                                             "warehouse:read",
                                             "wms:arrival:read",
+                                            "wms:inventory:read",
                                             "wms:receipt:create",
                                             "wms:receipt:submit",
                                             "wms:correction:read",

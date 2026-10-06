@@ -12,6 +12,10 @@ const router = createRouter({
     { path: '/messages', component: () => import('../views/MessagesView.vue') },
     { path: '/quality', component: () => import('../views/QualityView.vue') },
     {
+      path: '/inventory',
+      component: () => import('../views/InventoryView.vue'),
+    },
+    {
       path: '/purchase-returns',
       component: () => import('../views/PurchaseReturnsView.vue'),
     },
