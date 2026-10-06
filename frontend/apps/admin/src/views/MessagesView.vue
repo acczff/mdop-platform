@@ -60,6 +60,7 @@ const names: Record<string, string> = {
   DEAD: '死信',
 }
 const eventNames: Record<string, string> = {
+  PurchaseReturnConfirmed: 'ERP采购退货反馈',
   PurchaseReceiptConfirmed: 'ERP收货反馈',
   IncomingInspectionRequested: 'QMS检验请求',
   PurchaseReceiptReversed: 'ERP收货冲正',

@@ -113,5 +113,6 @@ public final class ReceivingModels {
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal changeQty,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal afterQty,
             String transactionType,
-            Long reversedTransactionId) {}
+            Long reversedTransactionId,
+            Long purchaseReturnId) {}
 }

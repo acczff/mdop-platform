@@ -44,6 +44,7 @@ public class MessagingConfiguration {
                 qms,
                 BindingBuilder.bind(erp).to(exchange).with("PurchaseReceiptConfirmed"),
                 BindingBuilder.bind(erp).to(exchange).with("PurchaseReceiptReversed"),
+                BindingBuilder.bind(erp).to(exchange).with("PurchaseReturnConfirmed"),
                 BindingBuilder.bind(qms).to(exchange).with("IncomingInspectionCancelled"),
                 BindingBuilder.bind(qms).to(exchange).with("IncomingInspectionRequested"));
     }

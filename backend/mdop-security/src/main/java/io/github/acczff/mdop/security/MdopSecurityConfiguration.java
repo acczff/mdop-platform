@@ -55,13 +55,21 @@ public class MdopSecurityConfiguration {
                                             "wms:correction:create",
                                             "wms:correction:approve",
                                             "wms:quality:read",
-                                            "wms:putaway:confirm")
+                                            "wms:putaway:confirm",
+                                            "wms:return:read",
+                                            "wms:return:create",
+                                            "wms:return:approve",
+                                            "wms:return:confirm")
                                     .contains(authority))
                         throw new IllegalArgumentException("操作账号包含不受支持的权限");
                 if (authorities.contains("wms:correction:approve")
                         && (authorities.contains("wms:correction:create")
                                 || authorities.contains("wms:receipt:submit")))
                     throw new IllegalArgumentException("审批账号不能同时配置申请或收货提交权限");
+                if (authorities.contains("wms:return:approve")
+                        && (authorities.contains("wms:return:create")
+                                || authorities.contains("wms:return:confirm")))
+                    throw new IllegalArgumentException("退货审批账号不能同时配置申请或实际退货确认权限");
                 manager.createUser(
                         User.withUsername(operator.username())
                                 .password(encoder.encode(operator.password()))
