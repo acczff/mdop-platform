@@ -41,6 +41,8 @@ export interface Receipt {
   arrivalId: number
   status: string
   version: number
+  correctionStatus?: string
+  downstreamStage?: string
 }
 export interface ReceiptLine {
   arrivalItemId: number

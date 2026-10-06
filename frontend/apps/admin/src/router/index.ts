@@ -11,6 +11,10 @@ const router = createRouter({
     { path: '/catalog', component: () => import('../views/CatalogView.vue') },
     { path: '/messages', component: () => import('../views/MessagesView.vue') },
     {
+      path: '/corrections',
+      component: () => import('../views/CorrectionsView.vue'),
+    },
+    {
       path: '/receiving',
       component: () => import('../views/ReceivingView.vue'),
     },

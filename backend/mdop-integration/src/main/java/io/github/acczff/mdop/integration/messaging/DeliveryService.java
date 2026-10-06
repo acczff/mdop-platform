@@ -361,7 +361,7 @@ public class DeliveryService {
 
     public List<Map<String, Object>> results() {
         return db.sql(
-                        "SELECT o.message_id,o.event_type,o.aggregate_id,o.status,r.target_system,r.received_at FROM wms_outbox o LEFT JOIN integration_simulated_result r ON r.message_id=o.message_id ORDER BY o.occurred_at DESC,o.message_id LIMIT 100")
+                        "SELECT o.message_id,o.event_type,o.aggregate_id,o.status,r.target_system,r.received_at,s.state AS downstream_state FROM wms_outbox o LEFT JOIN integration_simulated_result r ON r.message_id=o.message_id LEFT JOIN integration_simulated_receipt_state s ON s.target_system=r.target_system AND s.receipt_id=o.aggregate_id ORDER BY o.occurred_at DESC,o.message_id LIMIT 100")
                 .query()
                 .listOfRows();
     }

@@ -433,7 +433,11 @@ onMounted(loadFoundation)
           <span
             >{{ r.receiptNo }}
             <span class="badge" :class="{ disabled: r.status === 'DRAFT' }">{{
-              r.status === 'DRAFT' ? '草稿' : '已提交'
+              r.correctionStatus === 'REVERSED'
+                ? '已冲正'
+                : r.status === 'DRAFT'
+                  ? '草稿'
+                  : '已提交'
             }}</span></span
           ><button :disabled="busy" @click="openReceipt(r.id)">
             {{ r.status === 'DRAFT' ? '查看 / 编辑草稿' : '查看流水' }}

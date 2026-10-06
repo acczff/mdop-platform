@@ -38,7 +38,11 @@ public class SimulatorListener {
         EventEnvelope event;
         try {
             event = json.readValue(message.getBody(), EventEnvelope.class);
-            if (!expected.equals(event.eventType())
+            String compensation =
+                    target.equals("ERP")
+                            ? "PurchaseReceiptReversed"
+                            : "IncomingInspectionCancelled";
+            if (!(expected.equals(event.eventType()) || compensation.equals(event.eventType()))
                     || event.eventVersion() != 1
                     || !"WMS".equals(event.sourceSystem())) throw new IllegalArgumentException();
             Long.parseLong(event.aggregateId());
@@ -53,6 +57,17 @@ public class SimulatorListener {
                         event.eventType(),
                         Long.parseLong(event.aggregateId()),
                         json.writeValueAsString(event))
+                .update();
+        boolean reversed =
+                event.eventType().equals("PurchaseReceiptReversed")
+                        || event.eventType().equals("IncomingInspectionCancelled");
+        db.sql(
+                        "INSERT INTO integration_simulated_receipt_state(target_system,receipt_id,state) VALUES (?,?,?) ON DUPLICATE KEY UPDATE state=IF(state='REVERSED' OR ?='REVERSED','REVERSED','RECEIVED')")
+                .params(
+                        target,
+                        Long.parseLong(event.aggregateId()),
+                        reversed ? "REVERSED" : "RECEIVED",
+                        reversed ? "REVERSED" : "RECEIVED")
                 .update();
     }
 }

@@ -38,6 +38,7 @@ class MessagingTests extends MdopInfrastructureTestBase {
     @Autowired ObjectMapper json;
     @Autowired EventPublisher publisher;
     @Autowired DeliveryService delivery;
+    @Autowired SimulatorListener simulator;
     @Autowired org.springframework.amqp.rabbit.core.RabbitTemplate rabbit;
     long warehouse, supplier, material, location;
 
@@ -210,6 +211,70 @@ class MessagingTests extends MdopInfrastructureTestBase {
                                 java.math.BigDecimal.class,
                                 warehouse))
                 .isZero();
+        var reversal =
+                create(
+                        "/api/v1/wms/corrections/reversals",
+                        Map.of(
+                                "idempotencyKey",
+                                UUID.randomUUID().toString(),
+                                "receiptId",
+                                receipt,
+                                "reason",
+                                "消息补偿验收"));
+        mvc.perform(
+                        post("/api/v1/wms/corrections/" + reversal.get("id").asLong() + "/decision")
+                                .with(user("reviewer").roles("ADMIN"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        json.writeValueAsString(
+                                                Map.of(
+                                                        "idempotencyKey",
+                                                        UUID.randomUUID().toString(),
+                                                        "version",
+                                                        0,
+                                                        "decision",
+                                                        "APPROVE",
+                                                        "reason",
+                                                        "确认冲正"))))
+                .andExpect(status().isOk());
+        delivery.dispatch(DeliveryService.Direction.OUTBOX);
+        await().atMost(Duration.ofSeconds(15))
+                .untilAsserted(
+                        () ->
+                                assertThat(
+                                                count(
+                                                        "SELECT COUNT(*) FROM integration_simulated_receipt_state WHERE receipt_id=? AND state='REVERSED'",
+                                                        receipt))
+                                        .isEqualTo(2));
+        // A delayed original event must never resurrect the cancelled downstream business.
+        for (String original :
+                db.queryForList(
+                        "SELECT message_id FROM wms_outbox WHERE aggregate_id=? AND event_type IN ('PurchaseReceiptConfirmed','IncomingInspectionRequested')",
+                        String.class,
+                        receipt)) {
+            var late = delivery.outgoing(original);
+            publisher.publish(late);
+            var message =
+                    new org.springframework.amqp.core.Message(
+                            json.writeValueAsString(late)
+                                    .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            if (late.eventType().equals("PurchaseReceiptConfirmed")) simulator.erp(message);
+            else simulator.qms(message);
+        }
+        await().atMost(Duration.ofSeconds(15))
+                .untilAsserted(
+                        () ->
+                                assertThat(
+                                                count(
+                                                        "SELECT COUNT(*) FROM integration_simulated_result WHERE aggregate_id=?",
+                                                        receipt))
+                                        .isEqualTo(4));
+        assertThat(
+                        count(
+                                "SELECT COUNT(*) FROM integration_simulated_receipt_state WHERE receipt_id=? AND state='REVERSED'",
+                                receipt))
+                .isEqualTo(2);
     }
 
     @Test
