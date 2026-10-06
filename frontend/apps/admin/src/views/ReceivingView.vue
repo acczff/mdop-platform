@@ -447,9 +447,10 @@ onMounted(loadFoundation)
     </section>
     <section class="panel">
       <div class="panel-body">
-        <h2>待检库存</h2>
+        <h2>库存余额</h2>
         <p class="hint">
-          最近 100 条库存维度；当前库存均为待检，不可用于领料或销售。
+          最近 100
+          条库存维度；待检与不合格库存不可用，合格库存上架后才计入可用数量。
         </p>
       </div>
       <div class="table-wrap">
@@ -459,6 +460,7 @@ onMounted(loadFoundation)
               <th>物料</th>
               <th>库位</th>
               <th>批次</th>
+              <th>质量状态</th>
               <th>现有数量</th>
               <th>可用数量</th>
             </tr>
@@ -478,11 +480,20 @@ onMounted(loadFoundation)
                 }}
               </td>
               <td>{{ b.batchNo || '—' }}</td>
+              <td>
+                {{
+                  b.qualityStatus === 'QUALIFIED'
+                    ? '合格'
+                    : b.qualityStatus === 'REJECTED'
+                      ? '不合格'
+                      : '待检'
+                }}
+              </td>
               <td>{{ b.onHandQty }}</td>
               <td>{{ b.availableQty }}</td>
             </tr>
             <tr v-if="!balances.length">
-              <td colspan="5" class="empty">暂无待检库存</td>
+              <td colspan="6" class="empty">暂无库存</td>
             </tr>
           </tbody>
         </table>

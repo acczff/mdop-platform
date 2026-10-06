@@ -99,6 +99,14 @@ onUnmounted(() => window.removeEventListener('session-expired', expired))
       <div class="brand">MDOP<small>制造运营平台</small></div>
       <p class="nav-caption">仓储工作台</p>
       <nav aria-label="主导航">
+        <RouterLink
+          v-if="
+            session.authorities.includes('ROLE_ADMIN') ||
+            session.authorities.includes('wms:quality:read')
+          "
+          to="/quality"
+          >质检与上架</RouterLink
+        >
         <RouterLink to="/warehouses">仓库管理</RouterLink
         ><RouterLink to="/catalog">收货基础资料</RouterLink
         ><RouterLink to="/receiving">采购收货</RouterLink>

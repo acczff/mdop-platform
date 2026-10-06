@@ -53,7 +53,9 @@ public class MdopSecurityConfiguration {
                                             "wms:receipt:submit",
                                             "wms:correction:read",
                                             "wms:correction:create",
-                                            "wms:correction:approve")
+                                            "wms:correction:approve",
+                                            "wms:quality:read",
+                                            "wms:putaway:confirm")
                                     .contains(authority))
                         throw new IllegalArgumentException("操作账号包含不受支持的权限");
                 if (authorities.contains("wms:correction:approve")
