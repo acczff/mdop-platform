@@ -59,6 +59,12 @@ const names: Record<string, string> = {
   FAILED: '失败待重试',
   DEAD: '死信',
 }
+const eventNames: Record<string, string> = {
+  PurchaseReceiptConfirmed: 'ERP收货反馈',
+  IncomingInspectionRequested: 'QMS检验请求',
+  PurchaseReceiptReversed: 'ERP收货冲正',
+  IncomingInspectionCancelled: 'QMS检验取消',
+}
 let sequence = 0
 async function load() {
   const current = ++sequence
@@ -272,11 +278,7 @@ onMounted(load)
             <tr v-for="item in results" :key="item.message_id">
               <td>{{ item.aggregate_id }}</td>
               <td>
-                {{
-                  item.event_type === 'PurchaseReceiptConfirmed'
-                    ? 'ERP收货反馈'
-                    : 'QMS检验请求'
-                }}
+                {{ eventNames[item.event_type] || item.event_type }}
               </td>
               <td>{{ names[item.status] }}</td>
               <td>

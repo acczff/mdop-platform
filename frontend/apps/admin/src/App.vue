@@ -103,6 +103,14 @@ onUnmounted(() => window.removeEventListener('session-expired', expired))
         ><RouterLink to="/catalog">收货基础资料</RouterLink
         ><RouterLink to="/receiving">采购收货</RouterLink>
         <RouterLink
+          v-if="
+            session.authorities.includes('ROLE_ADMIN') ||
+            session.authorities.includes('wms:correction:read')
+          "
+          to="/corrections"
+          >差异与冲正</RouterLink
+        >
+        <RouterLink
           v-if="session.authorities.includes('ROLE_ADMIN')"
           to="/messages"
           >消息管理</RouterLink
@@ -119,7 +127,10 @@ onUnmounted(() => window.removeEventListener('session-expired', expired))
         </div>
       </header>
       <p v-if="error" role="alert" class="error">{{ error }}</p>
-      <RouterView :authorities="session.authorities" />
+      <RouterView
+        :authorities="session.authorities"
+        :username="session.username"
+      />
     </div>
   </div>
 </template>

@@ -74,7 +74,9 @@ public final class ReceivingModels {
             String creationKey,
             String creationHash,
             String submitKey,
-            long version) {}
+            long version,
+            String correctionStatus,
+            String downstreamStage) {}
 
     public record Item(
             long id,
@@ -109,5 +111,7 @@ public final class ReceivingModels {
             long balanceId,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal beforeQty,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal changeQty,
-            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal afterQty) {}
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal afterQty,
+            String transactionType,
+            Long reversedTransactionId) {}
 }
