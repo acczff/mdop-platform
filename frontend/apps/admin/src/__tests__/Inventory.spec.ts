@@ -102,3 +102,37 @@ it('shows return provenance and clears stale results when a search fails', async
   expect(view.text()).not.toContain('退货 RT-3')
   expect(view.text()).not.toContain('8.000001')
 })
+
+it('shows material issue provenance with source and target links instead of empty receipt fields', async () => {
+  mock()
+  const view = mount(InventoryView, { props: { authorities: ['ROLE_ADMIN'] } })
+  await flushPromises()
+  vi.mocked(request).mockResolvedValueOnce({
+    items: [
+      {
+        id: 10,
+        transaction_type: 'ISSUE_IN',
+        issue_id: 4,
+        source_balance_id: 7,
+        target_balance_id: 8,
+        before_qty: '0',
+        change_qty: '5',
+        after_qty: '5',
+      },
+    ],
+    page: 0,
+    totalPages: 1,
+    totalElements: 1,
+  })
+  await view
+    .findAll('button')
+    .find((b) => b.text() === '查看流水')!
+    .trigger('click')
+  await flushPromises()
+  expect(view.text()).toContain('领料 MI-4')
+  expect(view.text()).toContain('线边入库')
+  expect(view.text()).toContain('来源库存 #7')
+  expect(view.text()).toContain('目标库存 #8')
+  expect(view.text()).not.toContain('到货：')
+  expect(view.text()).not.toContain('采购：')
+})
