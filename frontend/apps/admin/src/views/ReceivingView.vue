@@ -58,6 +58,9 @@ const eligibleLocations = computed(() =>
 )
 const readonly = computed(() => current.value?.receipt.status === 'SUBMITTED')
 async function loadFoundation() {
+  clearSelection()
+  arrivals.value = []
+  balances.value = []
   loading.value = true
   error.value = ''
   try {
@@ -91,9 +94,21 @@ async function loadFoundation() {
   }
 }
 let generation = 0
+function clearSelection() {
+  selected.value = null
+  history.value = []
+  current.value = null
+  lines.value = []
+  ledger.value = []
+  editor.value = false
+  confirmSubmit.value = false
+}
 async function load() {
-  if (!warehouseId.value) return
   const currentGeneration = ++generation
+  clearSelection()
+  arrivals.value = []
+  balances.value = []
+  if (!warehouseId.value) return
   loading.value = true
   error.value = ''
   try {
@@ -123,6 +138,7 @@ async function switchWarehouse() {
   await load()
 }
 async function selectArrival(id: number) {
+  clearSelection()
   busy.value = true
   error.value = ''
   try {
@@ -155,6 +171,7 @@ function addLine() {
     })
 }
 function newDraft() {
+  if (busy.value || loading.value || editor.value || simulator.value) return
   current.value = null
   lines.value = []
   addLine()
@@ -165,6 +182,7 @@ function newDraft() {
   editor.value = true
 }
 async function openReceipt(id: number) {
+  if (busy.value || loading.value || editor.value || simulator.value) return
   busy.value = true
   error.value = ''
   try {
@@ -309,14 +327,20 @@ onMounted(loadFoundation)
       </div>
       <button
         v-if="simEnabled"
-        :disabled="!warehouseId || busy"
+        :disabled="!warehouseId || busy || loading || editor || simulator"
         @click="openSimulator"
       >
         本地模拟 ERP 到货
       </button>
     </div>
     <p v-if="error" class="error" role="alert">
-      {{ error }} <button @click="loadFoundation">重新加载</button>
+      {{ error }}
+      <button
+        :disabled="busy || loading || editor || simulator"
+        @click="loadFoundation"
+      >
+        重新加载
+      </button>
     </p>
     <p v-if="message" class="success" role="status">{{ message }}</p>
     <p class="hint">
@@ -327,7 +351,7 @@ onMounted(loadFoundation)
         <label
           >查看仓库<select
             v-model="warehouseId"
-            :disabled="busy || loading"
+            :disabled="busy || loading || editor || simulator"
             @change="switchWarehouse"
           >
             <option :value="0" disabled>请先建立仓库</option>
@@ -335,7 +359,11 @@ onMounted(loadFoundation)
               {{ w.name }}{{ w.status === 'DISABLED' ? '（停用）' : '' }}
             </option>
           </select></label
-        ><button :disabled="loading || busy" @click="load">刷新</button
+        ><button
+          :disabled="loading || busy || editor || simulator"
+          @click="load"
+        >
+          刷新</button
         ><span class="hint">最近 100 条到货通知</span>
       </div>
       <div class="table-wrap">
@@ -363,7 +391,10 @@ onMounted(loadFoundation)
                 <span class="badge">{{ arrivalStatuses[a.status] }}</span>
               </td>
               <td>
-                <button :disabled="busy" @click="selectArrival(a.id)">
+                <button
+                  :disabled="busy || loading || editor || simulator"
+                  @click="selectArrival(a.id)"
+                >
                   查看与收货
                 </button>
               </td>
@@ -391,6 +422,9 @@ onMounted(loadFoundation)
             class="primary"
             :disabled="
               busy ||
+              loading ||
+              editor ||
+              simulator ||
               selected.arrival.status === 'RECEIVED' ||
               !eligibleLocations.length
             "
@@ -438,7 +472,10 @@ onMounted(loadFoundation)
                   ? '草稿'
                   : '已提交'
             }}</span></span
-          ><button :disabled="busy" @click="openReceipt(r.id)">
+          ><button
+            :disabled="busy || loading || editor || simulator"
+            @click="openReceipt(r.id)"
+          >
             {{ r.status === 'DRAFT' ? '查看 / 编辑草稿' : '查看流水' }}
           </button>
         </div>

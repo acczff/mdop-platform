@@ -109,6 +109,20 @@ it('keeps reservation contents for a safe retry after an uncertain response', as
   await flushPromises()
   expect(dialog.text()).toContain('请求超时')
   expect(dialog.get('fieldset').attributes()).toHaveProperty('disabled')
+  expect(view.findAll('select')[0]!.attributes()).toHaveProperty('disabled')
+  expect(view.findAll('select')[1]!.attributes()).toHaveProperty('disabled')
+  expect(
+    view
+      .findAll('button')
+      .find((b) => b.text() === '刷新')!
+      .attributes(),
+  ).toHaveProperty('disabled')
+  expect(
+    view
+      .findAll('button')
+      .find((b) => b.text() === '预占库存')!
+      .attributes(),
+  ).toHaveProperty('disabled')
   const body = vi.mocked(request).mock.calls.slice(-1)[0]![1]!.body
   expect(JSON.parse(body as string)).toEqual({
     balanceId: 7,

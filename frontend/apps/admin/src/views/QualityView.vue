@@ -46,12 +46,14 @@ const busy = ref(false),
   reference = ref(''),
   reason = ref(''),
   resultKey = ref(crypto.randomUUID())
+const pending = ref<{ path: string; body: string }>()
 const targets = computed(() =>
   locations.value.filter(
     (l) => l.warehouseId === warehouseId.value && l.areaType === 'STORAGE',
   ),
 )
 async function load() {
+  if (pending.value) return
   selected.value = undefined
   lines.value = []
   receipts.value = []
@@ -69,6 +71,9 @@ async function load() {
   }
 }
 async function select(receipt: Receipt) {
+  if (pending.value) return
+  selected.value = undefined
+  lines.value = []
   busy.value = true
   error.value = ''
   message.value = ''
@@ -94,13 +99,13 @@ async function select(receipt: Receipt) {
   }
 }
 async function inspect() {
-  if (!selected.value) return
+  if (!selected.value || busy.value) return
   busy.value = true
   error.value = ''
   message.value = ''
   try {
-    await request('/api/local/qms-results', {
-      method: 'POST',
+    pending.value ??= {
+      path: '/api/local/qms-results',
       body: JSON.stringify({
         idempotencyKey: resultKey.value,
         receiptId: selected.value.id,
@@ -113,7 +118,12 @@ async function inspect() {
           rejectedQty: l.bad,
         })),
       }),
+    }
+    await request(pending.value.path, {
+      method: 'POST',
+      body: pending.value.body,
     })
+    pending.value = undefined
     await load()
     message.value = '质检结果已接收。合格品上架后才增加可用库存。'
   } catch (e) {
@@ -123,24 +133,39 @@ async function inspect() {
   }
 }
 async function putaway(line: Line) {
+  if (busy.value) return
+  const path = `/api/v1/wms/quality/items/${line.id}/putaway`
+  if (pending.value && pending.value.path !== path) return
   busy.value = true
   error.value = ''
   message.value = ''
   try {
-    await request(`/api/v1/wms/quality/items/${line.id}/putaway`, {
-      method: 'POST',
+    pending.value ??= {
+      path,
       body: JSON.stringify({
         idempotencyKey: line.key,
         locationId: line.destination,
       }),
+    }
+    await request(pending.value.path, {
+      method: 'POST',
+      body: pending.value.body,
     })
+    pending.value = undefined
     if (selected.value) await select(selected.value)
-    message.value = '上架成功，合格数量已转为可用库存。'
+    message.value = '上架已记账；冻结库存仍不可用，详情以库存查询为准。'
   } catch (e) {
     error.value = (e as Error).message
   } finally {
     busy.value = false
   }
+}
+async function verifyResult() {
+  if (busy.value) return
+  pending.value = undefined
+  await load()
+  message.value =
+    '已重新查询。放弃页面重试不撤销已成功的业务，请核对单据与库存。'
 }
 onMounted(async () => {
   try {
@@ -168,8 +193,16 @@ onMounted(async () => {
     </header>
     <p v-if="error" role="alert" class="error">{{ error }}</p>
     <p v-if="message" role="status">{{ message }}</p>
+    <p v-if="pending" class="hint">
+      处理结果尚未确认，内容已锁定，可重试原请求。
+      <button :disabled="busy" @click="verifyResult">放弃重试并刷新核对</button>
+    </p>
     <label
-      >仓库<select v-model="warehouseId" :disabled="busy" @change="load">
+      >仓库<select
+        v-model="warehouseId"
+        :disabled="busy || !!pending"
+        @change="load"
+      >
         <option v-for="w in warehouses" :key="w.id" :value="w.id">
           {{ w.name }}
         </option>
@@ -199,7 +232,9 @@ onMounted(async () => {
           </td>
           <td>{{ r.reference_no || '—' }}</td>
           <td>
-            <button :disabled="busy" @click="select(r)">查看 / 处理</button>
+            <button :disabled="busy || !!pending" @click="select(r)">
+              查看 / 处理
+            </button>
           </td>
         </tr>
       </tbody>
@@ -217,14 +252,14 @@ onMounted(async () => {
             v-model="reference"
             required
             maxlength="64"
-            :disabled="busy"
+            :disabled="busy || !!pending"
         /></label>
         <label
           >判定说明<input
             v-model="reason"
             required
             maxlength="500"
-            :disabled="busy"
+            :disabled="busy || !!pending"
         /></label>
         <div v-for="line in lines" :key="line.id" class="quality-line">
           <strong>{{ line.material_code }} · {{ line.material_name }}</strong
@@ -238,7 +273,7 @@ onMounted(async () => {
               min="0"
               step="0.000001"
               required
-              :disabled="busy"
+              :disabled="busy || !!pending"
           /></label>
           <label
             >不合格数量<input
@@ -247,7 +282,7 @@ onMounted(async () => {
               min="0"
               step="0.000001"
               required
-              :disabled="busy"
+              :disabled="busy || !!pending"
           /></label>
         </div>
         <button class="primary" :disabled="busy">接收模拟质检结果</button>
@@ -267,14 +302,25 @@ onMounted(async () => {
         >
         <template v-else-if="canPutaway && Number(line.qualified_qty) > 0">
           <label
-            >目标库位<select v-model="line.destination" :disabled="busy">
+            >目标库位<select
+              v-model="line.destination"
+              :disabled="busy || !!pending"
+            >
               <option :value="0">请选择正式存储库位</option>
               <option v-for="l in targets" :key="l.id" :value="l.id">
                 {{ l.code }} · {{ l.name }}
               </option>
             </select></label
           >
-          <button :disabled="busy || !line.destination" @click="putaway(line)">
+          <button
+            :disabled="
+              busy ||
+              !line.destination ||
+              (!!pending &&
+                pending.path !== `/api/v1/wms/quality/items/${line.id}/putaway`)
+            "
+            @click="putaway(line)"
+          >
             确认整行上架
           </button>
         </template>
