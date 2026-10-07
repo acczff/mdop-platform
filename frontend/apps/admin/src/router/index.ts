@@ -3,6 +3,10 @@ import { createRouter, createWebHistory } from 'vue-router'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    {
+      path: '/cross-transfers',
+      component: () => import('../views/CrossTransfersView.vue'),
+    },
     { path: '/sales', component: () => import('../views/SalesView.vue') },
     {
       path: '/finished-goods',
