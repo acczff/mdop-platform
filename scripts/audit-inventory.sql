@@ -47,4 +47,13 @@ WHERE x.warehouse_id<>s.warehouse_id OR s.warehouse_id<>d.warehouse_id
  OR s.location_id=d.location_id OR s.material_id<>d.material_id OR s.supplier_id<>d.supplier_id
  OR s.batch_no<>d.batch_no OR s.date_code<>d.date_code
  OR NOT(s.production_date<=>d.production_date) OR NOT(s.expiry_date<=>d.expiry_date)
- OR s.quality_status<>d.quality_status OR s.owner_type<>d.owner_type OR s.owner_id<>d.owner_id;
+ OR s.quality_status<>d.quality_status OR s.owner_type<>d.owner_type OR s.owner_id<>d.owner_id
+UNION ALL
+SELECT 'count_ledger',COUNT(*) FROM wms_stock_count c LEFT JOIN wms_inventory_transaction t ON t.count_id=c.id
+WHERE (c.status='APPROVED' AND c.counted_qty<>c.snapshot_qty AND
+ (t.id IS NULL OR t.balance_id<>c.balance_id OR t.before_qty<>c.snapshot_qty OR t.after_qty<>c.counted_qty
+ OR t.change_qty<>c.counted_qty-c.snapshot_qty OR t.transaction_type<>CASE WHEN c.counted_qty>c.snapshot_qty THEN 'COUNT_GAIN' ELSE 'COUNT_LOSS' END))
+ OR ((c.status<>'APPROVED' OR c.counted_qty=c.snapshot_qty) AND t.id IS NOT NULL)
+UNION ALL
+SELECT 'count_review',COUNT(*) FROM wms_stock_count c JOIN wms_inventory_balance b ON b.id=c.balance_id
+WHERE c.warehouse_id<>b.warehouse_id OR (c.status='APPROVED' AND (c.reviewed_by IS NULL OR c.reviewed_by=c.created_by OR c.reviewed_at IS NULL));
