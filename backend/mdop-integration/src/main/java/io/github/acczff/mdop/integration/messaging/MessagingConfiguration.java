@@ -12,6 +12,7 @@ public class MessagingConfiguration {
     public static final String EXCHANGE = "mdop.events.v1";
     public static final String ARRIVALS = "mdop.wms.arrivals.v1";
     public static final String ERP = "mdop.simulator.erp.v1";
+    public static final String MES = "mdop.simulator.mes.v1";
     public static final String QMS = "mdop.simulator.qms.v1";
 
     @Bean
@@ -39,7 +40,21 @@ public class MessagingConfiguration {
         var exchange = new DirectExchange(EXCHANGE, true, false);
         var erp = QueueBuilder.durable(ERP).build();
         var qms = QueueBuilder.durable(QMS).build();
+        var mes =
+                QueueBuilder.durable(MES)
+                        .deadLetterExchange("mdop.dead.v1")
+                        .deadLetterRoutingKey("mes-result")
+                        .build();
+        var mesDead = QueueBuilder.durable(MES + ".dead").build();
         return new Declarables(
+                mes,
+                mesDead,
+                BindingBuilder.bind(mesDead)
+                        .to(new DirectExchange("mdop.dead.v1", true, false))
+                        .with("mes-result"),
+                BindingBuilder.bind(mes).to(exchange).with("MaterialIssued"),
+                BindingBuilder.bind(mes).to(exchange).with("ProductionConsumed"),
+                BindingBuilder.bind(mes).to(exchange).with("ProductionMaterialReturned"),
                 erp,
                 qms,
                 BindingBuilder.bind(erp).to(exchange).with("PurchaseReceiptConfirmed"),

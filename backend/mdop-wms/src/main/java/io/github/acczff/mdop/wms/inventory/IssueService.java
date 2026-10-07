@@ -39,6 +39,7 @@ public class IssueService {
     private final CurrentActorProvider actor;
     private final Clock clock;
     private final ObjectMapper json;
+    private final ProductionEvents feedback;
 
     public IssueService(
             JdbcClient db,
@@ -46,19 +47,21 @@ public class IssueService {
             CatalogService catalog,
             CurrentActorProvider actor,
             Clock clock,
-            ObjectMapper json) {
+            ObjectMapper json,
+            ProductionEvents feedback) {
         this.db = db;
         this.access = access;
         this.catalog = catalog;
         this.actor = actor;
         this.clock = clock;
         this.json = json;
+        this.feedback = feedback;
     }
 
     private static final String SELECT =
             """
         SELECT d.id,d.demand_no,d.work_order_no,d.warehouse_id,d.target_warehouse_id,d.material_id,
-        CAST(d.quantity AS CHAR) AS quantity,d.status,d.source_balance_id,d.target_location_id,d.target_balance_id,
+        CAST(d.quantity AS CHAR) AS quantity,CAST(d.consumed_qty AS CHAR) AS consumed_qty,CAST(d.returned_qty AS CHAR) AS returned_qty,CAST(d.quantity-d.consumed_qty-d.returned_qty AS CHAR) AS remaining_qty,d.status,d.source_balance_id,d.target_location_id,d.target_balance_id,
         d.created_by,d.created_at,d.reserved_by,d.reserved_at,d.closed_by,d.closed_at,d.cancel_reason,
         m.code AS material_code,m.name AS material_name,m.unit,s.name AS warehouse_name,w.name AS target_warehouse_name,
         b.batch_no,l.name AS source_location,t.name AS target_location
@@ -262,7 +265,7 @@ public class IssueService {
                 .params(amount, amount, n(source, "id"))
                 .update();
         db.sql(
-                        "UPDATE wms_inventory_balance SET on_hand_qty=on_hand_qty+?,available_qty=available_qty+? WHERE id=?")
+                        "UPDATE wms_inventory_balance SET on_hand_qty=on_hand_qty+?,production_qty=production_qty+? WHERE id=?")
                 .params(amount, amount, n(target, "id"))
                 .update();
         event(d, source, "CONSUME", amount.negate());
@@ -272,6 +275,7 @@ public class IssueService {
                         "UPDATE wms_material_issue SET status='ISSUED',target_balance_id=?,closed_by=?,closed_at=? WHERE id=?")
                 .params(n(target, "id"), actor.currentActor(), now(), id)
                 .update();
+        feedback.record(id, "MaterialIssued", "", amount);
         return detail(id);
     }
 
@@ -325,7 +329,7 @@ public class IssueService {
             throw conflict("过期库存不允许领料，请取消预占");
     }
 
-    private void eligibleWarehouses(long source, long target) {
+    void eligibleWarehouses(long source, long target) {
         catalog.requireReceivingWarehouse(source);
         catalog.requireReceivingWarehouse(target);
         String a =
@@ -350,7 +354,7 @@ public class IssueService {
             find("SELECT id FROM mdm_warehouse WHERE id=? FOR UPDATE", id);
     }
 
-    private Map<String, Object> locked(long id) {
+    Map<String, Object> locked(long id) {
         var d =
                 find(
                         "SELECT warehouse_id,target_warehouse_id FROM wms_material_issue WHERE id=?",

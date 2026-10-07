@@ -20,6 +20,7 @@ interface Stock {
   on_hand_qty: string
   available_qty: string
   reserved_qty: string
+  production_qty: string
 }
 interface Ledger {
   id: number
@@ -32,6 +33,8 @@ interface Ledger {
   after_qty: string
   reversed_transaction_id: number | null
   purchase_return_id: number | null
+  consumption_id: number | null
+  production_return_id: number | null
   issue_id: number | null
   count_id: number | null
   transfer_id: number | null
@@ -57,6 +60,9 @@ const qualityNames: Record<string, string> = {
   REJECTED: '不合格',
 }
 const types: Record<string, string> = {
+  CONSUMPTION: '生产消耗',
+  PROD_RETURN_OUT: '线边退料发出',
+  PROD_RETURN_IN: '生产退料入库',
   ISSUE_OUT: '领料发出',
   ISSUE_IN: '线边入库',
   COUNT_GAIN: '盘盈',
@@ -366,7 +372,10 @@ onMounted(async () => {
               <td>{{ s.on_hand_qty }}</td>
               <td>
                 {{ s.available_qty
-                }}<small class="muted">预占 {{ s.reserved_qty || '0' }}</small>
+                }}<small class="muted"
+                  >预占 {{ s.reserved_qty || '0' }} · 生产占用
+                  {{ s.production_qty || '0' }}</small
+                >
               </td>
               <td>
                 <button :disabled="busy" @click="trace(s)">查看流水</button>
@@ -456,7 +465,14 @@ onMounted(async () => {
                 }}</small>
               </td>
               <td>
-                <template v-if="t.issue_id">领料 MI-{{ t.issue_id }}</template>
+                <template v-if="t.issue_id"
+                  >领料 MI-{{ t.issue_id
+                  }}<small v-if="t.consumption_id"
+                    >消耗 PC-{{ t.consumption_id }}</small
+                  ><small v-if="t.production_return_id"
+                    >退料 PR-{{ t.production_return_id }}</small
+                  ></template
+                >
                 <template v-else-if="t.count_id"
                   >盘点 CT-{{ t.count_id }}</template
                 ><template v-else-if="t.transfer_id"

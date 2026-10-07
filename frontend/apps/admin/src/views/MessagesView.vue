@@ -22,6 +22,7 @@ const results = ref<
     message_id: string
     event_type: string
     aggregate_id: number
+    aggregate_type: string
     status: string
     target_system: string | null
     received_at: string | null
@@ -60,6 +61,9 @@ const names: Record<string, string> = {
   DEAD: '死信',
 }
 const eventNames: Record<string, string> = {
+  MaterialIssued: 'MES发料反馈',
+  ProductionConsumed: 'MES消耗记账结果',
+  ProductionMaterialReturned: 'MES退料反馈',
   PurchaseReturnConfirmed: 'ERP采购退货反馈',
   PurchaseReceiptConfirmed: 'ERP收货反馈',
   IncomingInspectionRequested: 'QMS检验请求',
@@ -269,7 +273,7 @@ onMounted(load)
         <table>
           <thead>
             <tr>
-              <th>收货记录</th>
+              <th>业务单据</th>
               <th>反馈类型</th>
               <th>发布状态</th>
               <th>模拟端接收</th>
@@ -277,7 +281,13 @@ onMounted(load)
           </thead>
           <tbody>
             <tr v-for="item in results" :key="item.message_id">
-              <td>{{ item.aggregate_id }}</td>
+              <td>
+                {{
+                  item.aggregate_type === 'MaterialIssue'
+                    ? '领料 MI-'
+                    : '收货 #'
+                }}{{ item.aggregate_id }}
+              </td>
               <td>
                 {{ eventNames[item.event_type] || item.event_type }}
               </td>
@@ -291,7 +301,7 @@ onMounted(load)
               </td>
             </tr>
             <tr v-if="!results.length">
-              <td colspan="4">暂无收货反馈</td>
+              <td colspan="4">暂无业务反馈</td>
             </tr>
           </tbody>
         </table>
@@ -300,7 +310,7 @@ onMounted(load)
     <section v-if="rejections.length" class="panel">
       <h2>已隔离消息</h2>
       <p class="hint">
-        无效契约或同一编号内容冲突的消息保留在到货死信队列。核对源系统后修正并重新发送，不能直接重放无效内容。
+        无效契约或同一编号内容冲突的消息保留在对应业务死信队列。核对源系统后修正并重新发送，不能直接重放无效内容。
       </p>
       <ul>
         <li v-for="item in rejections" :key="item.fingerprint">
