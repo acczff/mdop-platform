@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import java.util.*;
+import java.util.concurrent.*;
 import org.junit.jupiter.api.*;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -19,6 +20,70 @@ class FinishedGoodsTests extends InventoryScenarioSupport {
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean java.time.Clock clock;
 
     long fg, inspection, storage;
+
+    private <T> List<T> concurrentRetry(Callable<T> operation) throws Exception {
+        var gate = new CountDownLatch(1);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            List<Future<T>> jobs = new ArrayList<>();
+            for (int i = 0; i < 2; i++) {
+                jobs.add(
+                        pool.submit(
+                                () -> {
+                                    gate.await();
+                                    return operation.call();
+                                }));
+            }
+            gate.countDown();
+            return List.of(
+                    jobs.get(0).get(30, TimeUnit.SECONDS), jobs.get(1).get(30, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void concurrentRetriesAtEveryStepKeepOneReceiptAndOneSetOfLedgers() throws Exception {
+        finishedWarehouse();
+        var body = demand();
+        var ids =
+                concurrentRetry(
+                        () ->
+                                postAs("/api/local/finished-receipts", body, admin(), 201)
+                                        .get("id")
+                                        .asLong());
+        assertThat(ids.get(0)).isEqualTo(ids.get(1));
+        long id = ids.get(0);
+        String event = key();
+        for (String step : List.of("receive", "quality", "putaway")) {
+            concurrentRetry(
+                    () -> {
+                        switch (step) {
+                            case "receive" -> receive(id, 200);
+                            case "quality" -> quality(id, "QUALIFIED", event, 200);
+                            default -> putaway(id, 200);
+                        }
+                        return true;
+                    });
+        }
+        var receipt = read("/api/v1/wms/finished-receipts/" + id);
+        assertThat(receipt.get("status").asText()).isEqualTo("STORED");
+        assertThat(qty(receipt.get("received_balance_id").asLong())).isZero();
+        assertThat(qty(receipt.get("quality_balance_id").asLong())).isZero();
+        assertThat(qty(receipt.get("stored_balance_id").asLong()))
+                .isEqualByComparingTo("10.123456");
+        assertThat(stock(receipt.get("stored_balance_id").asLong(), "available_qty"))
+                .isEqualByComparingTo("10.123456");
+        assertThat(
+                        db.queryForObject(
+                                "SELECT COUNT(*) FROM wms_inventory_transaction WHERE finished_receipt_id=?",
+                                Long.class,
+                                id))
+                .isEqualTo(5);
+        assertThat(
+                        db.queryForObject(
+                                "SELECT COUNT(*) FROM wms_outbox WHERE aggregate_type='FinishedReceipt' AND aggregate_id=?",
+                                Long.class,
+                                id))
+                .isEqualTo(3);
+    }
 
     @Test
     void shanghaiMidnightAcceptsTodayButRejectsTomorrowAndExpiredQualification() throws Exception {
@@ -62,18 +127,23 @@ class FinishedGoodsTests extends InventoryScenarioSupport {
         receive(id, 200);
         quality(id, "QUALIFIED", key(), 200);
         putaway(id, 200);
-        delivery.dispatch(
-                io.github.acczff.mdop.integration.messaging.DeliveryService.Direction.OUTBOX);
         org.awaitility.Awaitility.await()
                 .atMost(java.time.Duration.ofSeconds(15))
                 .untilAsserted(
-                        () ->
-                                assertThat(
-                                                db.queryForObject(
-                                                        "SELECT COUNT(*) FROM integration_warehouse_result WHERE aggregate_type='FinishedReceipt' AND aggregate_id=?",
-                                                        Long.class,
-                                                        id))
-                                        .isEqualTo(3));
+                        () -> {
+                            // The scheduler is disabled in this test. Simulate successive batches
+                            // so earlier scenarios cannot starve this receipt beyond the 20-row
+                            // limit.
+                            delivery.dispatch(
+                                    io.github.acczff.mdop.integration.messaging.DeliveryService
+                                            .Direction.OUTBOX);
+                            assertThat(
+                                            db.queryForObject(
+                                                    "SELECT COUNT(*) FROM integration_warehouse_result WHERE aggregate_type='FinishedReceipt' AND aggregate_id=?",
+                                                    Long.class,
+                                                    id))
+                                    .isEqualTo(3);
+                        });
         String message =
                 db.queryForObject(
                         "SELECT message_id FROM wms_outbox WHERE aggregate_type='FinishedReceipt' AND aggregate_id=? AND event_type='FinishedGoodsPutaway'",

@@ -5,6 +5,60 @@ import { request } from '../api'
 vi.mock('../api', () => ({ request: vi.fn() }))
 vi.mock('vue-router', () => ({ useRoute: () => ({ query: { issueId: '1' } }) }))
 afterEach(() => vi.resetAllMocks())
+
+it('does not mix late records from a failed query into another issue', async () => {
+  let finishOldReturn!: (value: unknown) => void
+  vi.mocked(request).mockImplementation(async (path) => {
+    if (path.includes('capabilities')) return { enabled: false }
+    if (path.includes('/production-reversals'))
+      return { items: [], totalPages: 0 }
+    if (path.includes('/feedback')) return []
+    if (path.includes('/issues/1/records?returns=false'))
+      throw new Error('消耗查询失败')
+    if (path.includes('/issues/1/records?returns=true'))
+      return new Promise((resolve) => {
+        finishOldReturn = resolve
+      })
+    if (path.includes('/records')) return { items: [], totalPages: 0, page: 0 }
+    return {
+      id: path.endsWith('/1') ? 1 : 2,
+      warehouse_id: 1,
+      work_order_no: 'WORK-ORDER',
+      status: 'ISSUED',
+      material_name: '物料',
+      quantity: '10',
+    }
+  })
+  const view = mount(ProductionView, {
+    props: { authorities: ['ROLE_ADMIN'] },
+    global: { stubs: { RouterLink: true } },
+  })
+  await flushPromises()
+  expect(view.text()).toContain('消耗查询失败')
+  await view.get('input[placeholder="输入 MI- 后的编号"]').setValue('2')
+  await view.get('form.filters').trigger('submit')
+  await flushPromises()
+  expect(view.text()).toContain('MI-2')
+  finishOldReturn({
+    items: [
+      {
+        id: 99,
+        event_no: 'OLD-ISSUE-RETURN',
+        status: 'PENDING',
+        quantity: '2',
+      },
+    ],
+    page: 0,
+    totalPages: 1,
+  })
+  await flushPromises()
+  expect(view.text()).not.toContain('OLD-ISSUE-RETURN')
+  expect(view.findAll('button').some((b) => b.text() === '确认实物退回')).toBe(
+    false,
+  )
+  view.unmount()
+})
+
 function setup(authorities = ['ROLE_ADMIN']) {
   vi.mocked(request).mockImplementation(async (path) => {
     if (path.includes('/production-reversals'))

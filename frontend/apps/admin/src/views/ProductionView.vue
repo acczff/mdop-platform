@@ -126,16 +126,23 @@ async function load() {
   )
   if (current.status !== 'ISSUED')
     throw new Error('仅已发料单可进入生产消耗与退料')
+  const [currentConsumptions, currentReturns, currentFeedback] =
+    await Promise.all([
+      request<Page<RecordRow>>(
+        `/api/v1/wms/production/issues/${current.id}/records?returns=false&page=0&size=20`,
+      ),
+      request<Page<RecordRow>>(
+        `/api/v1/wms/production/issues/${current.id}/records?returns=true&page=0&size=20`,
+      ),
+      request<Feedback[]>(
+        `/api/integration/material-issues/${current.id}/feedback`,
+      ),
+    ])
+  // Publish one complete issue snapshot; late results from failed loads cannot mutate it.
   issue.value = current
-  await Promise.all([
-    records(false),
-    records(true),
-    request<Feedback[]>(
-      `/api/integration/material-issues/${current.id}/feedback`,
-    ).then((r) => {
-      feedback.value = r
-    }),
-  ])
+  consumptions.value = currentConsumptions
+  returns.value = currentReturns
+  feedback.value = currentFeedback
 }
 async function open(
   type: 'consume' | 'request' | 'confirm' | 'cancel',
