@@ -49,6 +49,7 @@ interface Event {
 type Action =
   'create' | 'approve' | 'reject' | 'cancel' | 'ship' | 'receive' | 'history'
 const warehouses = ref<Warehouse[]>([]),
+  warehousesReady = ref(false),
   warehouse = ref(0),
   result = ref<Page<Transfer>>()
 const busy = ref(false),
@@ -151,12 +152,33 @@ async function load(page = 0) {
   result.value = undefined
   modal.value = undefined
   row.value = undefined
+  if (!warehousesReady.value) {
+    // Publish only a complete list; failed pagination must be retryable from page one.
+    const complete: Warehouse[] = []
+    for (let p = 1; ; p++) {
+      const data = await request<Page<Warehouse>>(
+        `/api/master-data/warehouses?page=${p}&size=100`,
+      )
+      complete.push(
+        ...data.items.filter(
+          (w) =>
+            access(w.id) &&
+            ['RAW_MATERIAL', 'FINISHED_GOODS'].includes(w.purpose),
+        ),
+      )
+      if (p >= data.totalPages) break
+    }
+    warehouses.value = complete
+    warehouse.value = complete[0]?.id || 0
+    warehousesReady.value = true
+  }
   if (warehouse.value)
     result.value = await request(
       `/api/v1/wms/cross-transfers?warehouseId=${warehouse.value}&page=${page}&size=20`,
     )
 }
 async function open(action: Action, r?: Transfer) {
+  if (modal.value) return
   await perform(async () => {
     modal.value = undefined
     row.value = undefined
@@ -240,26 +262,7 @@ async function submit() {
     await load(result.value?.page || 0)
   })
 }
-onMounted(
-  () =>
-    void perform(async () => {
-      for (let page = 1; ; page++) {
-        const data = await request<Page<Warehouse>>(
-          `/api/master-data/warehouses?page=${page}&size=100`,
-        )
-        warehouses.value.push(
-          ...data.items.filter(
-            (w) =>
-              access(w.id) &&
-              ['RAW_MATERIAL', 'FINISHED_GOODS'].includes(w.purpose),
-          ),
-        )
-        if (page >= data.totalPages) break
-      }
-      warehouse.value = warehouses.value[0]?.id || 0
-      await load()
-    }),
-)
+onMounted(() => void perform(() => load()))
 </script>
 <template>
   <main class="page">
@@ -275,6 +278,7 @@ onMounted(
         class="primary"
         :disabled="
           busy ||
+          !!modal ||
           !warehouse ||
           warehouses.find((w) => w.id === warehouse)?.status !== 'ENABLED'
         "

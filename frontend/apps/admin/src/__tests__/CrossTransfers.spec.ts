@@ -156,6 +156,11 @@ it('creates decimal transfer only after acknowledgement and freezes uncertain re
     reason: '补货',
   })
   expect(d.get('fieldset').attributes()).toHaveProperty('disabled')
+  const create = v.findAll('button').find((b) => b.text() === '申请调拨')!
+  expect(create.attributes()).toHaveProperty('disabled')
+  await create.trigger('click')
+  await flushPromises()
+  expect(d.get('fieldset').attributes()).toHaveProperty('disabled')
   await d.get('form').trigger('submit')
   await flushPromises()
   const writes = vi
@@ -164,6 +169,43 @@ it('creates decimal transfer only after acknowledgement and freezes uncertain re
   expect(writes[1]).toEqual(writes[0])
   expect(v.find('[role="dialog"]').exists()).toBe(false)
 })
+it.each([1, 2])(
+  'retries failed warehouse page %s without publishing partial options',
+  async (page) => {
+    if (page === 2)
+      vi.mocked(request).mockResolvedValueOnce({
+        items: [
+          {
+            id: 99,
+            name: '未加载完整的仓库',
+            purpose: 'RAW_MATERIAL',
+            status: 'ENABLED',
+          },
+        ],
+        totalPages: 2,
+      })
+    vi.mocked(request).mockRejectedValueOnce(new Error('仓库列表暂不可用'))
+    const v = setup()
+    await flushPromises()
+    expect(v.text()).toContain('仓库列表暂不可用')
+    expect(v.get('select').findAll('option')).toHaveLength(0)
+    expect(
+      v
+        .findAll('button')
+        .find((b) => b.text() === '申请调拨')!
+        .attributes(),
+    ).toHaveProperty('disabled')
+    await v
+      .findAll('button')
+      .find((b) => b.text() === '刷新记录')!
+      .trigger('click')
+    await flushPromises()
+    expect(v.text()).not.toContain('仓库列表暂不可用')
+    expect(v.text()).not.toContain('未加载完整的仓库')
+    expect(v.get('select').findAll('option')).toHaveLength(3)
+    expect(v.text()).toContain('WT-7')
+  },
+)
 it('clears old warehouse records on load failure and allows recovery', async () => {
   const v = setup()
   await flushPromises()
