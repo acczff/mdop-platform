@@ -25,6 +25,12 @@ public class CrossTransferService {
             @NotBlank @Pattern(regexp = "[A-Za-z0-9_-]{1,64}") String idempotencyKey,
             @NotBlank @Size(max = 500) String reason) {}
 
+    public record Receive(
+            @NotBlank @Pattern(regexp = "[A-Za-z0-9_-]{1,64}") String idempotencyKey,
+            @NotNull @DecimalMin(value = "0", inclusive = false) @Digits(integer = 12, fraction = 6)
+                    BigDecimal quantity,
+            @NotBlank @Size(max = 500) String reason) {}
+
     private final JdbcClient db;
     private final ReceivingAccess access;
     private final CatalogService catalog;
@@ -52,7 +58,8 @@ public class CrossTransferService {
         SELECT d.id,d.source_warehouse_id,d.target_warehouse_id,d.source_balance_id,d.target_location_id,d.target_balance_id,
         d.reason,d.status,d.created_by,d.created_at,d.reviewed_by,d.reviewed_at,d.shipped_by,d.shipped_at,d.received_by,d.received_at,
         CAST(d.quantity AS CHAR) AS quantity,
-        CAST(CAST(IF(d.status='IN_TRANSIT',d.quantity,0) AS DECIMAL(18,6)) AS CHAR) AS in_transit_qty,
+        CAST(d.received_qty AS CHAR) AS received_qty,
+        CAST(CAST(IF(d.status='IN_TRANSIT',d.quantity-d.received_qty,0) AS DECIMAL(18,6)) AS CHAR) AS in_transit_qty,
         m.code AS material_code,m.name AS material_name,m.unit,b.batch_no,
         s.name AS source_warehouse,t.name AS target_warehouse,l.name AS target_location
         FROM wms_cross_transfer d JOIN wms_inventory_balance b ON b.id=d.source_balance_id
@@ -92,7 +99,7 @@ public class CrossTransferService {
     public List<Map<String, Object>> history(long id) {
         detail(id);
         return db.sql(
-                        "SELECT id,action_type,reason,created_by,created_at FROM wms_cross_transfer_action WHERE cross_transfer_id=? ORDER BY id")
+                        "SELECT a.id,a.action_type,a.reason,a.created_by,a.created_at,r.id AS receipt_id,CAST(r.quantity AS CHAR) AS quantity,CAST(r.cumulative_qty AS CHAR) AS cumulative_qty,CAST(r.remaining_qty AS CHAR) AS remaining_qty FROM wms_cross_transfer_action a LEFT JOIN wms_cross_transfer_receipt r ON r.action_id=a.id WHERE a.cross_transfer_id=? ORDER BY a.id")
                 .param(id)
                 .query()
                 .listOfRows();
@@ -156,6 +163,7 @@ public class CrossTransferService {
     }
 
     public Map<String, Object> act(long id, String type, Action in) {
+        if (type.equals("RECEIVE")) return receive(id, in, null);
         var ref = one("SELECT * FROM wms_cross_transfer WHERE id=?", id);
         long sw = n(ref, "source_warehouse_id"), tw = n(ref, "target_warehouse_id");
         access.requireWarehouse(type.equals("RECEIVE") ? tw : sw);
@@ -209,34 +217,89 @@ public class CrossTransferService {
                 eligible(source);
                 targetStorage(n(d, "target_location_id"), tw);
                 reservation(d, source, "CONSUME");
-                ledger(source, q(d, "quantity").negate(), id, "CROSS_OUT");
+                ledger(source, q(d, "quantity").negate(), id, "CROSS_OUT", null);
                 db.sql(
                                 "UPDATE wms_cross_transfer SET status='IN_TRANSIT',shipped_by=?,shipped_at=? WHERE id=?")
                         .params(actor.currentActor(), now(), id)
                         .update();
             }
-            case "RECEIVE" -> {
-                requireStatus(status, "IN_TRANSIT");
-                catalog.requireReceivingWarehouse(tw);
-                // Receiving does not depend on the source warehouse remaining enabled after
-                // shipment.
-                samePurpose(sw, tw);
-                targetStorage(n(d, "target_location_id"), tw);
-                notExpired(source);
-                var destination = destination(d, source);
-                db.sql(
-                                "UPDATE wms_inventory_balance SET on_hand_qty=on_hand_qty+?,available_qty=IF(active_freeze_id IS NULL,available_qty+?,0) WHERE id=?")
-                        .params(q(d, "quantity"), q(d, "quantity"), n(destination, "id"))
-                        .update();
-                ledger(destination, q(d, "quantity"), id, "CROSS_IN");
-                db.sql(
-                                "UPDATE wms_cross_transfer SET status='RECEIVED',target_balance_id=?,received_by=?,received_at=? WHERE id=?")
-                        .params(n(destination, "id"), actor.currentActor(), now(), id)
-                        .update();
-            }
             default -> throw new IllegalArgumentException("Unsupported action");
         }
         record(id, type, in, digest);
+        return detail(id);
+    }
+
+    public Map<String, Object> receive(long id, Receive in) {
+        return receive(id, new Action(in.idempotencyKey(), in.reason()), in.quantity());
+    }
+
+    private Map<String, Object> receive(long id, Action in, BigDecimal requested) {
+        var ref = one("SELECT * FROM wms_cross_transfer WHERE id=?", id);
+        long sw = n(ref, "source_warehouse_id"), tw = n(ref, "target_warehouse_id");
+        access.requireWarehouse(tw);
+        lockWarehouses(sw, tw);
+        var d = one("SELECT * FROM wms_cross_transfer WHERE id=? FOR UPDATE", id);
+        // Preserve the digest of legacy full receipts so historic uncertain requests still replay.
+        var values =
+                new ArrayList<Object>(
+                        List.of(id, "RECEIVE", actor.currentActor(), in.reason().trim()));
+        if (requested != null) values.add(requested.stripTrailingZeros().toPlainString());
+        String digest = hash(values);
+        var old =
+                db.sql("SELECT payload_hash FROM wms_cross_transfer_action WHERE request_key=?")
+                        .param(in.idempotencyKey())
+                        .query(String.class)
+                        .optional();
+        if (old.isPresent()) {
+            if (!digest.equals(old.get())) throw conflict("幂等键已用于不同收货，请核对原记录");
+            return detail(id);
+        }
+        requireStatus(d.get("status").toString(), "IN_TRANSIT");
+        if (requested == null && q(d, "received_qty").signum() != 0)
+            throw conflict("已发生分批收货，请使用分批收货接口填写本次实收数量");
+        BigDecimal amount = requested == null ? q(d, "quantity") : requested;
+        BigDecimal cumulative = q(d, "received_qty").add(amount),
+                remaining = q(d, "quantity").subtract(cumulative);
+        if (amount.signum() <= 0 || remaining.signum() < 0) throw conflict("实收数量必须大于零且不能超过剩余在途数量");
+        catalog.requireReceivingWarehouse(tw);
+        samePurpose(sw, tw);
+        targetStorage(n(d, "target_location_id"), tw);
+        var source = balance(n(d, "source_balance_id"));
+        notExpired(source);
+        var destination = destination(d, source);
+        if (d.get("target_balance_id") != null && n(d, "target_balance_id") != n(destination, "id"))
+            throw conflict("目标库存维度已变化，请核对已有收货记录");
+        db.sql(
+                        "UPDATE wms_inventory_balance SET on_hand_qty=on_hand_qty+?,available_qty=IF(active_freeze_id IS NULL,available_qty+?,0) WHERE id=?")
+                .params(amount, amount, n(destination, "id"))
+                .update();
+        record(id, "RECEIVE", in, digest);
+        long actionId =
+                db.sql("SELECT id FROM wms_cross_transfer_action WHERE request_key=?")
+                        .param(in.idempotencyKey())
+                        .query(Long.class)
+                        .single();
+        db.sql(
+                        "INSERT INTO wms_cross_transfer_receipt(cross_transfer_id,action_id,target_balance_id,quantity,cumulative_qty,remaining_qty) VALUES (?,?,?,?,?,?)")
+                .params(id, actionId, n(destination, "id"), amount, cumulative, remaining)
+                .update();
+        long receiptId =
+                db.sql("SELECT id FROM wms_cross_transfer_receipt WHERE action_id=?")
+                        .param(actionId)
+                        .query(Long.class)
+                        .single();
+        ledger(destination, amount, id, "CROSS_IN", receiptId);
+        boolean complete = remaining.signum() == 0;
+        db.sql(
+                        "UPDATE wms_cross_transfer SET received_qty=?,target_balance_id=?,status=?,received_by=?,received_at=? WHERE id=?")
+                .params(
+                        cumulative,
+                        n(destination, "id"),
+                        complete ? "RECEIVED" : "IN_TRANSIT",
+                        complete ? actor.currentActor() : null,
+                        complete ? now() : null,
+                        id)
+                .update();
         return detail(id);
     }
 
@@ -264,9 +327,10 @@ public class CrossTransferService {
                 .update();
     }
 
-    private void ledger(Map<String, Object> b, BigDecimal delta, long id, String type) {
+    private void ledger(
+            Map<String, Object> b, BigDecimal delta, long id, String type, Long receiptId) {
         db.sql(
-                        "INSERT INTO wms_inventory_transaction(balance_id,before_qty,change_qty,after_qty,created_by,created_at,transaction_type,cross_transfer_id) VALUES (?,?,?,?,?,?,?,?)")
+                        "INSERT INTO wms_inventory_transaction(balance_id,before_qty,change_qty,after_qty,created_by,created_at,transaction_type,cross_transfer_id,cross_transfer_receipt_id) VALUES (?,?,?,?,?,?,?,?,?)")
                 .params(
                         n(b, "id"),
                         q(b, "on_hand_qty"),
@@ -275,7 +339,8 @@ public class CrossTransferService {
                         actor.currentActor(),
                         now(),
                         type,
-                        id)
+                        id,
+                        receiptId)
                 .update();
     }
 

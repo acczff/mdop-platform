@@ -29,6 +29,7 @@ interface Stock {
 }
 interface Ledger {
   id: number
+  cross_transfer_receipt_id?: number | null
   cross_transfer_id?: number | null
   sales_order_id?: number | null
   finished_receipt_id?: number | null
@@ -505,9 +506,12 @@ onMounted(async () => {
               </td>
               <td>
                 <template v-if="t.cross_transfer_id"
-                  >跨仓 WT-{{ t.cross_transfer_id }}</template
+                  >跨仓 WT-{{ t.cross_transfer_id
+                  }}<small v-if="t.cross_transfer_receipt_id"
+                    >收货 CR-{{ t.cross_transfer_receipt_id }}</small
+                  ></template
                 >
-                <template v-if="t.sales_order_id"
+                <template v-else-if="t.sales_order_id"
                   >销售 SO-{{ t.sales_order_id }}</template
                 ><template v-else-if="t.finished_receipt_id"
                   >成品 FG-{{ t.finished_receipt_id }}</template

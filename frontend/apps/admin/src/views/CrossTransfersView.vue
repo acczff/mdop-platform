@@ -16,6 +16,7 @@ interface Transfer {
   batch_no: string
   unit: string
   quantity: string
+  received_qty: string
   in_transit_qty: string
   status: string
   created_by: string
@@ -45,6 +46,10 @@ interface Event {
   reason: string
   created_by: string
   created_at: string
+  receipt_id: number | null
+  quantity: string | null
+  cumulative_qty: string | null
+  remaining_qty: string | null
 }
 type Action =
   'create' | 'approve' | 'reject' | 'cancel' | 'ship' | 'receive' | 'history'
@@ -80,7 +85,7 @@ const names: Record<string, string> = {
   REJECT: '驳回',
   CANCEL: '取消',
   SHIP: '实际发出',
-  RECEIVE: '整批收货',
+  RECEIVE: '实收登记',
 }
 const titles: Record<Action, string> = {
   create: '申请跨仓调拨',
@@ -88,7 +93,7 @@ const titles: Record<Action, string> = {
   reject: '驳回申请',
   cancel: '取消调拨',
   ship: '确认源仓实际发出',
-  receive: '确认目标仓整批收货',
+  receive: '登记目标仓实收',
   history: '调拨操作记录',
 }
 function allowed(p: string) {
@@ -96,6 +101,15 @@ function allowed(p: string) {
     props.authorities.includes('ROLE_ADMIN') ||
     props.authorities.includes(`wms:cross-transfer:${p}`)
   )
+}
+function statusName(r: Transfer) {
+  return r.status === 'IN_TRANSIT' && Number(r.received_qty) > 0
+    ? '部分收货（在途）'
+    : names[r.status]
+}
+function micros(value: string) {
+  const [whole, fraction = ''] = value.split('.')
+  return BigInt(whole!) * 1000000n + BigInt(fraction.padEnd(6, '0'))
 }
 function access(id: number) {
   return (
@@ -207,6 +221,8 @@ async function open(action: Action, r?: Transfer) {
     }
     if (r) {
       row.value = await request(`/api/v1/wms/cross-transfers/${r.id}`)
+      if (action !== 'history' && !can(row.value!, action))
+        throw new Error('单据状态或操作权限已变化，请刷新后重试')
       if (action === 'history')
         history.value = await request(
           `/api/v1/wms/cross-transfers/${r.id}/history`,
@@ -236,11 +252,20 @@ async function submit() {
           Number(quantity.value) <= 0)
       )
         throw new Error('请选择库存和目标库位，填写大于零且最多六位小数的数量')
+      if (modal.value === 'receive') {
+        if (
+          !/^\d{1,12}(\.\d{1,6})?$/.test(quantity.value) ||
+          micros(quantity.value) <= 0n
+        )
+          throw new Error('请填写大于零且最多六位小数的实收数量')
+        if (micros(quantity.value) > micros(row.value!.in_transit_qty))
+          throw new Error('实收数量不能超过剩余在途数量')
+      }
       frozen.value = {
         url:
           modal.value === 'create'
             ? '/api/v1/wms/cross-transfers'
-            : `/api/v1/wms/cross-transfers/${row.value!.id}/${modal.value}`,
+            : `/api/v1/wms/cross-transfers/${row.value!.id}/${modal.value === 'receive' ? 'receipts' : modal.value}`,
         body: JSON.stringify(
           modal.value === 'create'
             ? {
@@ -250,7 +275,13 @@ async function submit() {
                 quantity: quantity.value,
                 reason: reason.value.trim(),
               }
-            : { idempotencyKey: key.value, reason: reason.value.trim() },
+            : {
+                idempotencyKey: key.value,
+                reason: reason.value.trim(),
+                ...(modal.value === 'receive'
+                  ? { quantity: quantity.value }
+                  : {}),
+              },
         ),
       }
     }
@@ -258,7 +289,7 @@ async function submit() {
       method: 'POST',
       body: frozen.value.body,
     })
-    notice.value = `WT-${saved.id} 操作成功：${names[saved.status]}`
+    notice.value = `WT-${saved.id} 操作成功：${statusName(saved)}`
     await load(result.value?.page || 0)
   })
 }
@@ -270,7 +301,7 @@ onMounted(() => void perform(() => load()))
       <div>
         <h1>跨仓调拨</h1>
         <p class="muted">
-          双人审批后预占，源仓实际发出转在途，目标仓整批收货后入账。
+          双人审批后整单发出，目标仓分批实收、逐笔入账，收齐后完结。
         </p>
       </div>
       <button
@@ -312,7 +343,7 @@ onMounted(() => void perform(() => load()))
               <th>单号 / 状态</th>
               <th>物料 / 批次</th>
               <th>源仓 → 目标仓</th>
-              <th>调拨 / 在途</th>
+              <th>调拨 / 已收 / 在途</th>
               <th>申请人 / 原因</th>
               <th>操作</th>
             </tr>
@@ -320,7 +351,7 @@ onMounted(() => void perform(() => load()))
           <tbody>
             <tr v-for="r in result?.items" :key="r.id">
               <td>
-                WT-{{ r.id }}<small>{{ names[r.status] }}</small>
+                WT-{{ r.id }}<small>{{ statusName(r) }}</small>
               </td>
               <td>
                 {{ r.material_name
@@ -332,7 +363,8 @@ onMounted(() => void perform(() => load()))
               </td>
               <td>
                 {{ r.quantity }} {{ r.unit
-                }}<small>在途 {{ r.in_transit_qty }}</small>
+                }}<small>已收 {{ r.received_qty }}</small
+                ><small>在途 {{ r.in_transit_qty }}</small>
               </td>
               <td>
                 {{ r.created_by }}<small>{{ r.reason }}</small>
@@ -404,7 +436,8 @@ onMounted(() => void perform(() => load()))
         <p v-if="row">
           {{ row.material_name }} / {{ row.batch_no }} · {{ row.quantity }}
           {{ row.unit }}<br />{{ row.source_warehouse }} →
-          {{ row.target_warehouse }} / {{ row.target_location }}
+          {{ row.target_warehouse }} / {{ row.target_location }} <br />累计已收
+          {{ row.received_qty }} · 剩余在途 {{ row.in_transit_qty }}
         </p>
         <template v-if="modal === 'history'"
           ><ol>
@@ -412,6 +445,10 @@ onMounted(() => void perform(() => load()))
               {{ names[e.action_type] }} · {{ e.created_by }} ·
               {{ e.created_at }}
               <p>{{ e.reason }}</p>
+              <p v-if="e.receipt_id">
+                收货 CR-{{ e.receipt_id }} · 本次 {{ e.quantity }} · 累计
+                {{ e.cumulative_qty }} · 剩余在途 {{ e.remaining_qty }}
+              </p>
             </li>
           </ol>
           <p v-if="row">
@@ -473,9 +510,19 @@ onMounted(() => void perform(() => load()))
             <p v-if="modal === 'ship'" class="hint">
               仅在货物实际离开源仓后确认。确认后全量转入在途，不能取消。
             </p>
-            <p v-if="modal === 'receive'" class="hint">
-              仅在目标仓已收到整批货物后确认。如有短少、损坏或过期，请保留在途记录等待异常处理。
-            </p>
+            <template v-if="modal === 'receive'">
+              <p class="hint">
+                只登记本次实际到仓且符合入库条件的数量，未收数量继续在途。短少、损坏或过期部分保留在途，等待异常处理。
+              </p>
+              <label
+                >本次实收数量<input
+                  v-model="quantity"
+                  inputmode="decimal"
+                  required
+                  pattern="[0-9]{1,12}(\.[0-9]{1,6})?"
+                  placeholder="最多六位小数"
+              /></label>
+            </template>
             <label
               >操作原因<textarea
                 v-model="reason"

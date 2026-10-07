@@ -4,6 +4,146 @@ import CrossTransfersView from '../views/CrossTransfersView.vue'
 import { request } from '../api'
 vi.mock('../api', () => ({ request: vi.fn() }))
 afterEach(() => vi.resetAllMocks())
+
+it('requires explicit actual receipt quantity and rejects precision or excess before writing', async () => {
+  const v = setup('IN_TRANSIT')
+  await flushPromises()
+  await v
+    .findAll('button')
+    .find((b) => b.text() === '登记目标仓实收')!
+    .trigger('click')
+  await flushPromises()
+  const d = v.get('[role="dialog"]')
+  expect(d.get('input[inputmode="decimal"]').element).toHaveProperty(
+    'value',
+    '',
+  )
+  await d.get('textarea').setValue('按实际数量收货')
+  await d.get('input[type="checkbox"]').setValue(true)
+  for (const amount of ['', '0', '1.1234567', '1.123457']) {
+    await d.get('input[inputmode="decimal"]').setValue(amount)
+    await d.get('form').trigger('submit')
+    await flushPromises()
+    expect(
+      vi.mocked(request).mock.calls.filter(([, o]) => o?.method === 'POST'),
+    ).toHaveLength(0)
+  }
+  await d.get('input[inputmode="decimal"]').setValue('0.123456')
+  vi.mocked(request).mockResolvedValueOnce({
+    ...row,
+    status: 'IN_TRANSIT',
+    received_qty: '0.123456',
+    in_transit_qty: '1.000000',
+  })
+  await d.get('form').trigger('submit')
+  await flushPromises()
+  const write = vi
+    .mocked(request)
+    .mock.calls.find(([, o]) => o?.method === 'POST')!
+  expect(write[0]).toBe('/api/v1/wms/cross-transfers/7/receipts')
+  expect(JSON.parse(write[1]!.body as string)).toMatchObject({
+    quantity: '0.123456',
+  })
+  expect(v.text()).toContain('操作成功：部分收货（在途）')
+})
+
+it('compares large six-decimal quantities without floating point rounding', async () => {
+  const v = setup('IN_TRANSIT')
+  await flushPromises()
+  vi.mocked(request).mockResolvedValueOnce({
+    ...row,
+    status: 'IN_TRANSIT',
+    in_transit_qty: '999999999999.000001',
+  })
+  await v
+    .findAll('button')
+    .find((b) => b.text() === '登记目标仓实收')!
+    .trigger('click')
+  await flushPromises()
+  const d = v.get('[role="dialog"]')
+  await d.get('textarea').setValue('大数精度')
+  await d.get('input[type="checkbox"]').setValue(true)
+  await d.get('input[inputmode="decimal"]').setValue('999999999999.000002')
+  await d.get('form').trigger('submit')
+  await flushPromises()
+  expect(d.text()).toContain('不能超过剩余在途数量')
+  expect(
+    vi.mocked(request).mock.calls.filter(([, o]) => o?.method === 'POST'),
+  ).toHaveLength(0)
+})
+
+it('preserves the receipt quantity and request key after a failed response', async () => {
+  const v = setup('IN_TRANSIT')
+  await flushPromises()
+  await v
+    .findAll('button')
+    .find((b) => b.text() === '登记目标仓实收')!
+    .trigger('click')
+  await flushPromises()
+  const d = v.get('[role="dialog"]')
+  await d.get('textarea').setValue('部分到货')
+  await d.get('input[type="checkbox"]').setValue(true)
+  await d.get('input[inputmode="decimal"]').setValue('0.123456')
+  vi.mocked(request).mockRejectedValueOnce(new Error('响应超时'))
+  await d.get('form').trigger('submit')
+  await flushPromises()
+  expect(d.get('fieldset').attributes()).toHaveProperty('disabled')
+  expect(v.get('select').attributes()).toHaveProperty('disabled')
+  await d.get('form').trigger('submit')
+  await flushPromises()
+  const writes = vi
+    .mocked(request)
+    .mock.calls.filter(([, o]) => o?.method === 'POST')
+  expect(writes).toHaveLength(2)
+  expect(writes[1]).toEqual(writes[0])
+})
+
+it('shows each receipt snapshot and refuses a stale completed receipt action', async () => {
+  const v = setup('IN_TRANSIT')
+  await flushPromises()
+  vi.mocked(request).mockResolvedValueOnce({
+    ...row,
+    status: 'RECEIVED',
+    received_qty: row.quantity,
+    in_transit_qty: '0.000000',
+  })
+  await v
+    .findAll('button')
+    .find((b) => b.text() === '登记目标仓实收')!
+    .trigger('click')
+  await flushPromises()
+  expect(v.text()).toContain('单据状态或操作权限已变化')
+  expect(v.find('[role="dialog"]').exists()).toBe(false)
+  vi.mocked(request)
+    .mockResolvedValueOnce({
+      ...row,
+      status: 'IN_TRANSIT',
+      received_qty: '0.123456',
+      in_transit_qty: '1.000000',
+    })
+    .mockResolvedValueOnce([
+      {
+        id: 4,
+        action_type: 'RECEIVE',
+        receipt_id: 12,
+        quantity: '0.123456',
+        cumulative_qty: '0.123456',
+        remaining_qty: '1.000000',
+        reason: '分批到仓',
+        created_by: 'receiver',
+        created_at: '2026-10-07',
+      },
+    ])
+  await v
+    .findAll('button')
+    .find((b) => b.text() === '调拨操作记录')!
+    .trigger('click')
+  await flushPromises()
+  const history = v.get('[role="dialog"]').text()
+  expect(history).toContain('收货 CR-12')
+  expect(history).toContain('本次 0.123456')
+  expect(history).toContain('剩余在途 1.000000')
+})
 const row = {
   id: 7,
   source_warehouse_id: 1,
@@ -17,7 +157,8 @@ const row = {
   material_code: 'M1',
   batch_no: 'B1',
   quantity: '1.123456',
-  in_transit_qty: '0.000000',
+  received_qty: '0.000000',
+  in_transit_qty: '1.123456',
   unit: '件',
   status: 'PENDING',
   created_by: 'creator',
@@ -112,14 +253,14 @@ it('enforces separate reviewer and side-specific action visibility', async () =>
     'wms:warehouse:1',
   ])
   await flushPromises()
-  expect(source.text()).not.toContain('确认目标仓整批收货')
+  expect(source.text()).not.toContain('登记目标仓实收')
   source.unmount()
   const target = setup('IN_TRANSIT', 'target', [
     'wms:cross-transfer:receive',
     'wms:warehouse:2',
   ])
   await flushPromises()
-  expect(target.text()).toContain('确认目标仓整批收货')
+  expect(target.text()).toContain('登记目标仓实收')
   expect(target.text()).not.toContain('确认源仓实际发出')
 })
 it('creates decimal transfer only after acknowledgement and freezes uncertain retries', async () => {

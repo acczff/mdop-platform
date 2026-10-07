@@ -19,6 +19,231 @@ import tools.jackson.databind.JsonNode;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class CrossTransferTests extends InventoryScenarioSupport {
+    Map<String, Object> receipt(String amount, String requestKey) {
+        return Map.of("idempotencyKey", requestKey, "quantity", amount, "reason", "分批实收");
+    }
+
+    long shipped(String amount) throws Exception {
+        long stock = ready()[0];
+        destination();
+        long id = create(stock, amount);
+        act(id, "approve", reviewer(), 200);
+        act(id, "ship", admin(), 200);
+        return id;
+    }
+
+    void audit() throws Exception {
+        for (var check :
+                db.queryForList(
+                        java.nio.file.Files.readString(
+                                java.nio.file.Path.of("../../scripts/audit-inventory.sql"))))
+            assertThat(((Number) check.get("mismatch_count")).longValue())
+                    .as(check.get("check_name").toString())
+                    .isZero();
+    }
+
+    @Test
+    void partialReceiptsKeepRemainingInTransitAndFrozenDestinationUnavailable() throws Exception {
+        long id = shipped("12.123456");
+        var first =
+                postAs(
+                        URL + "/" + id + "/receipts",
+                        receipt("2.123456", key()),
+                        target("receive"),
+                        200);
+        long dest = first.get("target_balance_id").asLong();
+        assertThat(first.get("status").asText()).isEqualTo("IN_TRANSIT");
+        assertThat(first.get("received_qty").asText()).isEqualTo("2.123456");
+        assertThat(first.get("in_transit_qty").asText()).isEqualTo("10.000000");
+        assertThat(first.get("received_by").isNull()).isTrue();
+        assertThat(qty(dest)).isEqualByComparingTo("2.123456");
+        audit();
+        act(id, "cancel", admin(), 409);
+        act(id, "ship", admin(), 409);
+        act(id, "receive", target("receive"), 409);
+        postAs(
+                "/api/v1/wms/freezes",
+                Map.of("balanceId", dest, "idempotencyKey", key(), "reason", "目标批次复核"),
+                admin(),
+                201);
+        var last =
+                postAs(URL + "/" + id + "/receipts", receipt("10", key()), target("receive"), 200);
+        assertThat(last.get("status").asText()).isEqualTo("RECEIVED");
+        assertThat(last.get("in_transit_qty").asText()).isEqualTo("0.000000");
+        assertThat(last.get("received_by").asText()).isEqualTo("receiver");
+        assertThat(qty(dest)).isEqualByComparingTo("12.123456");
+        assertThat(stock(dest, "available_qty")).isZero();
+        var history = read(URL + "/" + id + "/history");
+        assertThat(history).hasSize(5);
+        assertThat(history.get(3).get("quantity").asText()).isEqualTo("2.123456");
+        assertThat(history.get(4).get("remaining_qty").asText()).isEqualTo("0.000000");
+        assertThat(
+                        db.queryForObject(
+                                "SELECT COUNT(*) FROM wms_inventory_transaction WHERE cross_transfer_id=?",
+                                Long.class,
+                                id))
+                .isEqualTo(3);
+        audit();
+    }
+
+    @Test
+    void partialReceiptRejectsOverReceiptInvalidQuantityAndWrongScope() throws Exception {
+        long id = shipped("1.123456");
+        for (String amount : List.of("0", "-1", "0.0000001", "1000000000000"))
+            postAs(URL + "/" + id + "/receipts", receipt(amount, key()), target("receive"), 400);
+        postAs(
+                URL + "/" + id + "/receipts",
+                Map.of("idempotencyKey", key(), "reason", "缺少实收数量"),
+                admin(),
+                400);
+        postAs(URL + "/" + id + "/receipts", receipt("1.123457", key()), target("receive"), 409);
+        postAs(
+                URL + "/" + id + "/receipts",
+                receipt("1", key()),
+                operator("source", "wms:cross-transfer:receive"),
+                403);
+        postAs(URL + "/" + id + "/receipts", receipt("1", key()), target("read"), 403);
+        mvc.perform(
+                        post(URL + "/" + id + "/receipts")
+                                .with(admin())
+                                .contentType("application/json")
+                                .content(json.writeValueAsString(receipt("1", key()))))
+                .andExpect(status().isForbidden());
+        postAs(URL + "/" + id + "/receipts", receipt("1", key()), target("receive"), 200);
+        postAs(URL + "/" + id + "/receipts", receipt("0.123457", key()), target("receive"), 409);
+        postAs(URL + "/" + id + "/receipts", receipt("0.123456", key()), target("receive"), 200);
+        postAs(URL + "/" + id + "/receipts", receipt("0.000001", key()), target("receive"), 409);
+        audit();
+    }
+
+    @Test
+    void receiptReplayBindsQuantityActorAndReasonAfterLaterReceipts() throws Exception {
+        long id = shipped("10");
+        String requestKey = key();
+        var first = receipt("2", requestKey);
+        postAs(URL + "/" + id + "/receipts", first, target("receive"), 200);
+        postAs(
+                URL + "/" + id + "/receipts",
+                receipt("2.000000", requestKey),
+                target("receive"),
+                200);
+        postAs(URL + "/" + id + "/receipts", receipt("3", requestKey), target("receive"), 409);
+        postAs(URL + "/" + id + "/receipts", first, admin(), 409);
+        postAs(
+                URL + "/" + id + "/receipts",
+                Map.of("quantity", "2", "idempotencyKey", requestKey, "reason", "其他原因"),
+                target("receive"),
+                409);
+        postAs(URL + "/" + id + "/receipts", receipt("8", key()), target("receive"), 200);
+        assertThat(
+                        postAs(URL + "/" + id + "/receipts", first, target("receive"), 200)
+                                .get("received_qty")
+                                .asText())
+                .isEqualTo("10.000000");
+        assertThat(
+                        db.queryForObject(
+                                "SELECT COUNT(*) FROM wms_cross_transfer_receipt WHERE cross_transfer_id=?",
+                                Long.class,
+                                id))
+                .isEqualTo(2);
+        audit();
+    }
+
+    @Test
+    void concurrentDifferentReceiptsCannotOverReceiveAndDuplicatesApplyOnce() throws Exception {
+        long id = shipped("10");
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var gate = new CountDownLatch(1);
+            var jobs = new ArrayList<Future<Integer>>();
+            for (int i = 0; i < 2; i++)
+                jobs.add(
+                        pool.submit(
+                                () -> {
+                                    gate.await();
+                                    return mvc.perform(
+                                                    post(URL + "/" + id + "/receipts")
+                                                            .with(target("receive"))
+                                                            .with(csrf())
+                                                            .contentType("application/json")
+                                                            .content(
+                                                                    json.writeValueAsString(
+                                                                            receipt("6", key()))))
+                                            .andReturn()
+                                            .getResponse()
+                                            .getStatus();
+                                }));
+            gate.countDown();
+            assertThat(
+                            List.of(
+                                    jobs.get(0).get(20, TimeUnit.SECONDS),
+                                    jobs.get(1).get(20, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder(200, 409);
+            var body = receipt("4", key());
+            var repeats = new ArrayList<Future<JsonNode>>();
+            for (int i = 0; i < 2; i++)
+                repeats.add(
+                        pool.submit(
+                                () ->
+                                        postAs(
+                                                URL + "/" + id + "/receipts",
+                                                body,
+                                                target("receive"),
+                                                200)));
+            for (var result : repeats)
+                assertThat(result.get(20, TimeUnit.SECONDS).get("status").asText())
+                        .isEqualTo("RECEIVED");
+        }
+        assertThat(
+                        db.queryForObject(
+                                "SELECT COUNT(*) FROM wms_cross_transfer_receipt WHERE cross_transfer_id=?",
+                                Long.class,
+                                id))
+                .isEqualTo(2);
+        audit();
+    }
+
+    @Test
+    void receiptPersistenceFailureRollsBackBalanceActionAndProgress() throws Exception {
+        long id = shipped("10");
+        var body = receipt("3", key());
+        db.execute(
+                "ALTER TABLE wms_cross_transfer_receipt ADD CONSTRAINT ck_partial_failure CHECK(cross_transfer_id<>"
+                        + id
+                        + ")");
+        try {
+            postAs(URL + "/" + id + "/receipts", body, target("receive"), 503);
+        } finally {
+            db.execute("ALTER TABLE wms_cross_transfer_receipt DROP CHECK ck_partial_failure");
+        }
+        assertThat(read(URL + "/" + id).get("received_qty").asText()).isEqualTo("0.000000");
+        assertThat(read(URL + "/" + id + "/history")).hasSize(3);
+        assertThat(
+                        db.queryForObject(
+                                "SELECT COUNT(*) FROM wms_inventory_balance WHERE warehouse_id=?",
+                                Long.class,
+                                targetWarehouse))
+                .isZero();
+        postAs(URL + "/" + id + "/receipts", body, target("receive"), 200);
+        audit();
+    }
+
+    @Test
+    void laterReceiptRechecksExpiryAndDestinationButAllowsDisabledSource() throws Exception {
+        long id = shipped("10");
+        postAs(URL + "/" + id + "/receipts", receipt("3", key()), target("receive"), 200);
+        long source = read(URL + "/" + id).get("source_balance_id").asLong();
+        var body = receipt("7", key());
+        db.update("UPDATE wms_inventory_balance SET expiry_date='2000-01-01' WHERE id=?", source);
+        postAs(URL + "/" + id + "/receipts", body, target("receive"), 409);
+        db.update("UPDATE wms_inventory_balance SET expiry_date='2099-12-31' WHERE id=?", source);
+        db.update("UPDATE mdm_warehouse SET status='DISABLED' WHERE id=?", targetWarehouse);
+        postAs(URL + "/" + id + "/receipts", body, target("receive"), 409);
+        db.update("UPDATE mdm_warehouse SET status='ENABLED' WHERE id=?", targetWarehouse);
+        db.update("UPDATE mdm_warehouse SET status='DISABLED' WHERE id=?", warehouse);
+        postAs(URL + "/" + id + "/receipts", body, target("receive"), 200);
+        audit();
+    }
+
     @Test
     void freezeBlocksApprovedDispatchAndReleaseOfReservationStaysFrozen() throws Exception {
         long b = ready()[0];

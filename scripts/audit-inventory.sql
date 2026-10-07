@@ -173,10 +173,10 @@ WHERE (d.status='SHIPPED' AND o.message_id IS NULL) OR (d.status<>'SHIPPED' AND 
 UNION ALL
 SELECT 'cross_transfer_ledger_and_transit',COUNT(*) FROM wms_cross_transfer d LEFT JOIN
  (SELECT cross_transfer_id,COUNT(*) n,SUM(change_qty) qty FROM wms_inventory_transaction WHERE cross_transfer_id IS NOT NULL GROUP BY cross_transfer_id)t ON t.cross_transfer_id=d.id
-WHERE COALESCE(t.n,0)<>CASE WHEN d.status='RECEIVED' THEN 2 WHEN d.status='IN_TRANSIT' THEN 1 ELSE 0 END
- OR COALESCE(t.qty,0)+IF(d.status='IN_TRANSIT',d.quantity,0)<>0
+WHERE COALESCE(t.n,0)<>IF(d.status IN ('IN_TRANSIT','RECEIVED'),1,0)+(SELECT COUNT(*) FROM wms_cross_transfer_receipt r WHERE r.cross_transfer_id=d.id)
+ OR COALESCE(t.qty,0)+IF(d.status='IN_TRANSIT',d.quantity-d.received_qty,0)<>0
  OR (d.status IN ('IN_TRANSIT','RECEIVED') AND NOT EXISTS(SELECT 1 FROM wms_inventory_transaction l WHERE l.cross_transfer_id=d.id AND l.transaction_type='CROSS_OUT' AND l.balance_id=d.source_balance_id AND l.change_qty=-d.quantity))
- OR (d.status='RECEIVED' AND NOT EXISTS(SELECT 1 FROM wms_inventory_transaction l WHERE l.cross_transfer_id=d.id AND l.transaction_type='CROSS_IN' AND l.balance_id=d.target_balance_id AND l.change_qty=d.quantity))
+ OR d.received_qty<>COALESCE((SELECT SUM(l.change_qty) FROM wms_inventory_transaction l WHERE l.cross_transfer_id=d.id AND l.transaction_type='CROSS_IN'),0)
 UNION ALL
 SELECT 'cross_transfer_dimensions',COUNT(*) FROM wms_cross_transfer d JOIN wms_inventory_balance s ON s.id=d.source_balance_id LEFT JOIN wms_inventory_balance t ON t.id=d.target_balance_id JOIN mdm_location l ON l.id=d.target_location_id
 WHERE d.source_warehouse_id<>s.warehouse_id OR d.target_warehouse_id<>l.warehouse_id OR l.area_type<>'STORAGE'
@@ -194,6 +194,22 @@ SELECT 'cross_transfer_actions',COUNT(*) FROM wms_cross_transfer d WHERE
  OR (d.status IN ('IN_TRANSIT','RECEIVED') AND NOT EXISTS(SELECT 1 FROM wms_cross_transfer_action a WHERE a.cross_transfer_id=d.id AND a.action_type='SHIP' AND a.created_by=d.shipped_by))
  OR (d.status='RECEIVED' AND NOT EXISTS(SELECT 1 FROM wms_cross_transfer_action a WHERE a.cross_transfer_id=d.id AND a.action_type='RECEIVE' AND a.created_by=d.received_by))
  OR (d.status='CANCELLED' AND NOT EXISTS(SELECT 1 FROM wms_cross_transfer_action a WHERE a.cross_transfer_id=d.id AND a.action_type='CANCEL'))
+UNION ALL
+SELECT 'cross_receipt_total',COUNT(*) FROM wms_cross_transfer d
+WHERE d.received_qty<>COALESCE((SELECT SUM(r.quantity) FROM wms_cross_transfer_receipt r WHERE r.cross_transfer_id=d.id),0)
+ OR (SELECT COUNT(*) FROM wms_cross_transfer_action a WHERE a.cross_transfer_id=d.id AND a.action_type='RECEIVE')<>(SELECT COUNT(*) FROM wms_cross_transfer_receipt r WHERE r.cross_transfer_id=d.id)
+UNION ALL
+SELECT 'cross_receipt_links',COUNT(*) FROM wms_cross_transfer_receipt r
+ JOIN wms_cross_transfer d ON d.id=r.cross_transfer_id JOIN wms_cross_transfer_action a ON a.id=r.action_id
+ LEFT JOIN wms_inventory_transaction t ON t.cross_transfer_receipt_id=r.id
+WHERE a.action_type<>'RECEIVE' OR a.cross_transfer_id<>r.cross_transfer_id OR NOT(r.target_balance_id<=>d.target_balance_id)
+ OR r.cumulative_qty+r.remaining_qty<>d.quantity OR d.status NOT IN ('IN_TRANSIT','RECEIVED')
+ OR t.id IS NULL OR t.transaction_type<>'CROSS_IN' OR t.cross_transfer_id<>r.cross_transfer_id OR t.balance_id<>r.target_balance_id OR t.change_qty<>r.quantity OR t.created_by<>a.created_by
+ OR (r.remaining_qty=0 AND (d.status<>'RECEIVED' OR d.received_by<>a.created_by OR d.received_at IS NULL))
+UNION ALL
+SELECT 'cross_receipt_chain',COUNT(*) FROM
+ (SELECT quantity,cumulative_qty,COALESCE(LAG(cumulative_qty) OVER(PARTITION BY cross_transfer_id ORDER BY id),0) AS previous_qty FROM wms_cross_transfer_receipt) chain
+WHERE cumulative_qty<>previous_qty+quantity
 UNION ALL
 SELECT 'freeze_pointer',COUNT(*) FROM wms_inventory_balance b LEFT JOIN wms_stock_freeze f ON f.id=b.active_freeze_id
 WHERE b.active_freeze_id IS NOT NULL AND (f.id IS NULL OR f.balance_id<>b.id OR f.status<>'FROZEN' OR b.available_qty<>0)

@@ -69,6 +69,13 @@ public class CrossTransferController {
         return ProductionController.write(() -> service.act(id, "SHIP", in));
     }
 
+    @PostMapping("/{id}/receipts")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('wms:cross-transfer:receive')")
+    public Map<String, Object> receivePart(
+            @PathVariable @Positive long id, @Valid @RequestBody CrossTransferService.Receive in) {
+        return ProductionController.write(() -> service.receive(id, in));
+    }
+
     @PostMapping("/{id}/receive")
     @PreAuthorize("hasRole('ADMIN') or hasAuthority('wms:cross-transfer:receive')")
     public Map<String, Object> receive(
