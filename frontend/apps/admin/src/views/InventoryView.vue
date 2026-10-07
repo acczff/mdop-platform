@@ -532,6 +532,12 @@ onMounted(async () => {
 .inventory-table {
   overflow-x: auto;
 }
+.inventory-table table {
+  min-width: 1000px;
+}
+.inventory-table button {
+  white-space: nowrap;
+}
 td small {
   display: block;
   color: #6e6a80;

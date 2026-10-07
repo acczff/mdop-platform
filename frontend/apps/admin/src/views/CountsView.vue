@@ -340,6 +340,12 @@ onMounted(() =>
 .table-scroll {
   overflow-x: auto;
 }
+.table-scroll table {
+  min-width: 1000px;
+}
+.table-scroll button {
+  white-space: nowrap;
+}
 small {
   display: block;
   color: #6e6a80;
