@@ -42,7 +42,7 @@ public class InventoryService {
                CAST(b.expiry_date AS CHAR) AS expiry_date,b.quality_status,b.owner_type,b.owner_id,
                CAST(b.on_hand_qty AS CHAR) AS on_hand_qty,
                CAST(b.available_qty AS CHAR) AS available_qty,
-               CAST(b.reserved_qty AS CHAR) AS reserved_qty
+               CAST(b.reserved_qty AS CHAR) AS reserved_qty,CAST(b.production_qty AS CHAR) AS production_qty
         """;
 
     public Page search(
@@ -112,14 +112,17 @@ public class InventoryService {
                    a.external_notice_no,a.purchase_order_no,i.material_code,i.material_name,i.unit,
                    CAST(t.before_qty AS CHAR) AS before_qty,CAST(t.change_qty AS CHAR) AS change_qty,
                    CAST(t.after_qty AS CHAR) AS after_qty,t.reversed_transaction_id,t.purchase_return_id,
-                   t.created_by,t.created_at,t.transfer_id,t.count_id,t.issue_id,
-                   COALESCE(x.source_balance_id,d.source_balance_id) AS source_balance_id,COALESCE(x.target_balance_id,d.target_balance_id) AS target_balance_id
+                   t.created_by,t.created_at,t.transfer_id,t.count_id,COALESCE(t.issue_id,c.issue_id,p.issue_id) AS issue_id,t.consumption_id,t.production_return_id,
+                   COALESCE(x.source_balance_id,IF(t.production_return_id IS NOT NULL,rd.target_balance_id,d.source_balance_id)) AS source_balance_id,COALESCE(x.target_balance_id,p.target_balance_id,d.target_balance_id) AS target_balance_id
             FROM wms_inventory_transaction t LEFT JOIN wms_receipt r ON r.id=t.receipt_id
             LEFT JOIN wms_receipt_item ri ON ri.id=t.receipt_item_id
             LEFT JOIN wms_arrival_notice_item i ON i.id=ri.arrival_item_id
             LEFT JOIN wms_arrival_notice a ON a.id=r.arrival_id
             LEFT JOIN wms_stock_transfer x ON x.id=t.transfer_id
             LEFT JOIN wms_material_issue d ON d.id=t.issue_id
+            LEFT JOIN wms_production_consumption c ON c.id=t.consumption_id
+            LEFT JOIN wms_production_return p ON p.id=t.production_return_id
+            LEFT JOIN wms_material_issue rd ON rd.id=p.issue_id
             WHERE t.balance_id=? ORDER BY t.id DESC LIMIT ? OFFSET ?
             """)
                         .params(id, size, (long) page * size)

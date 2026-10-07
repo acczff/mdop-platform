@@ -1,5 +1,5 @@
--- Read-only inventory reconciliation including transfers, counts and material issues.
--- Every mismatch_count must be zero, including reservations and line-side issue pairs.
+-- Read-only inventory reconciliation including transfers, counts, material issues and production usage.
+-- Every mismatch_count must be zero, including reservations, production allocations and all paired movements.
 SELECT 'balance_vs_ledger' AS check_name,COUNT(*) AS mismatch_count
 FROM wms_inventory_balance b LEFT JOIN
  (SELECT balance_id,SUM(change_qty) AS quantity FROM wms_inventory_transaction GROUP BY balance_id) t ON t.balance_id=b.id
@@ -10,7 +10,7 @@ SELECT 'ledger_chain',COUNT(*) FROM
   FROM wms_inventory_transaction) chain WHERE before_qty<>previous_qty
 UNION ALL
 SELECT 'quality_availability',COUNT(*) FROM wms_inventory_balance b JOIN mdm_location l ON l.id=b.location_id
-WHERE b.available_qty<>CASE WHEN b.quality_status='QUALIFIED' AND l.area_type='STORAGE' THEN b.on_hand_qty-b.reserved_qty ELSE 0 END
+WHERE b.available_qty<>CASE WHEN b.quality_status='QUALIFIED' AND l.area_type='STORAGE' THEN b.on_hand_qty-b.reserved_qty-b.production_qty ELSE 0 END
 UNION ALL
 SELECT 'arrival_received_total',COUNT(*) FROM wms_arrival_notice_item a LEFT JOIN
  (SELECT i.arrival_item_id,SUM(i.quantity) AS quantity FROM wms_receipt_item i JOIN wms_receipt r ON r.id=i.receipt_id
@@ -82,4 +82,47 @@ UNION ALL
 SELECT 'issue_dimensions',COUNT(*) FROM wms_material_issue d JOIN wms_inventory_balance s ON s.id=d.source_balance_id JOIN wms_inventory_balance t ON t.id=d.target_balance_id
 WHERE s.warehouse_id<>d.warehouse_id OR t.warehouse_id<>d.target_warehouse_id OR t.location_id<>d.target_location_id OR s.material_id<>d.material_id OR s.material_id<>t.material_id OR s.supplier_id<>t.supplier_id
  OR s.batch_no<>t.batch_no OR s.date_code<>t.date_code OR NOT(s.production_date<=>t.production_date) OR NOT(s.expiry_date<=>t.expiry_date)
- OR s.quality_status<>t.quality_status OR s.owner_type<>t.owner_type OR s.owner_id<>t.owner_id;
+ OR s.quality_status<>t.quality_status OR s.owner_type<>t.owner_type OR s.owner_id<>t.owner_id
+UNION ALL
+SELECT 'production_allocation',COUNT(*) FROM wms_inventory_balance b LEFT JOIN
+ (SELECT target_balance_id,SUM(quantity-consumed_qty-returned_qty) AS qty FROM wms_material_issue WHERE status='ISSUED' GROUP BY target_balance_id) d ON d.target_balance_id=b.id
+WHERE b.production_qty<>COALESCE(d.qty,0)
+UNION ALL
+SELECT 'consumption_total',COUNT(*) FROM wms_material_issue d LEFT JOIN
+ (SELECT issue_id,SUM(quantity) AS qty FROM wms_production_consumption GROUP BY issue_id) c ON c.issue_id=d.id
+WHERE d.consumed_qty<>COALESCE(c.qty,0)
+UNION ALL
+SELECT 'production_return_total',COUNT(*) FROM wms_material_issue d LEFT JOIN
+ (SELECT issue_id,SUM(quantity) AS qty FROM wms_production_return WHERE status='RETURNED' GROUP BY issue_id) p ON p.issue_id=d.id
+WHERE d.returned_qty<>COALESCE(p.qty,0)
+UNION ALL
+SELECT 'pending_return_quota',COUNT(*) FROM wms_material_issue d JOIN
+ (SELECT issue_id,SUM(quantity) AS qty FROM wms_production_return WHERE status='PENDING' GROUP BY issue_id) p ON p.issue_id=d.id
+WHERE p.qty>d.quantity-d.consumed_qty-d.returned_qty
+UNION ALL
+SELECT 'consumption_ledger',COUNT(*) FROM wms_production_consumption c JOIN wms_material_issue d ON d.id=c.issue_id
+ LEFT JOIN wms_inventory_transaction t ON t.consumption_id=c.id
+WHERE t.id IS NULL OR t.balance_id<>d.target_balance_id OR t.transaction_type<>'CONSUMPTION' OR t.change_qty<>-c.quantity
+UNION ALL
+SELECT 'production_return_pair',COUNT(*) FROM wms_production_return p JOIN wms_material_issue d ON d.id=p.issue_id LEFT JOIN
+ (SELECT production_return_id,COUNT(*) AS n,SUM(change_qty) AS net FROM wms_inventory_transaction WHERE production_return_id IS NOT NULL GROUP BY production_return_id) t ON t.production_return_id=p.id
+WHERE (p.status='RETURNED' AND (COALESCE(t.n,0)<>2 OR t.net<>0
+ OR NOT EXISTS(SELECT 1 FROM wms_inventory_transaction l WHERE l.production_return_id=p.id AND l.transaction_type='PROD_RETURN_OUT' AND l.balance_id=d.target_balance_id AND l.change_qty=-p.quantity)
+ OR NOT EXISTS(SELECT 1 FROM wms_inventory_transaction l WHERE l.production_return_id=p.id AND l.transaction_type='PROD_RETURN_IN' AND l.balance_id=p.target_balance_id AND l.change_qty=p.quantity)))
+ OR (p.status<>'RETURNED' AND COALESCE(t.n,0)<>0)
+UNION ALL
+SELECT 'production_return_dimensions',COUNT(*) FROM wms_production_return p JOIN wms_material_issue d ON d.id=p.issue_id
+ JOIN wms_inventory_balance s ON s.id=d.target_balance_id JOIN wms_inventory_balance t ON t.id=p.target_balance_id JOIN mdm_location l ON l.id=t.location_id
+WHERE t.warehouse_id<>d.warehouse_id OR t.location_id<>p.target_location_id OR t.quality_status<>p.quality_status
+ OR l.area_type<>CASE WHEN p.quality_status='QUALIFIED' THEN 'STORAGE' ELSE 'INSPECTION' END
+ OR s.material_id<>t.material_id OR s.supplier_id<>t.supplier_id OR s.batch_no<>t.batch_no OR s.date_code<>t.date_code
+ OR NOT(s.production_date<=>t.production_date) OR NOT(s.expiry_date<=>t.expiry_date) OR s.owner_type<>t.owner_type OR s.owner_id<>t.owner_id
+UNION ALL
+SELECT 'issue_feedback',COUNT(*) FROM wms_material_issue d LEFT JOIN wms_outbox o ON o.aggregate_type='MaterialIssue' AND o.aggregate_id=d.id AND o.event_type='MaterialIssued' AND o.business_key=''
+WHERE (d.status='ISSUED' AND o.message_id IS NULL) OR (d.status<>'ISSUED' AND o.message_id IS NOT NULL)
+UNION ALL
+SELECT 'consumption_feedback',COUNT(*) FROM wms_production_consumption c LEFT JOIN wms_outbox o ON o.aggregate_type='MaterialIssue' AND o.aggregate_id=c.issue_id AND o.event_type='ProductionConsumed' AND o.business_key=CAST(c.id AS CHAR)
+WHERE o.message_id IS NULL
+UNION ALL
+SELECT 'production_return_feedback',COUNT(*) FROM wms_production_return p LEFT JOIN wms_outbox o ON o.aggregate_type='MaterialIssue' AND o.aggregate_id=p.issue_id AND o.event_type='ProductionMaterialReturned' AND o.business_key=CAST(p.id AS CHAR)
+WHERE (p.status='RETURNED' AND o.message_id IS NULL) OR (p.status<>'RETURNED' AND o.message_id IS NOT NULL);

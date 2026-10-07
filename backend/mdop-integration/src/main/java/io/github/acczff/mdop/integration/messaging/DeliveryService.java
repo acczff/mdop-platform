@@ -361,7 +361,7 @@ public class DeliveryService {
 
     public List<Map<String, Object>> results() {
         return db.sql(
-                        "SELECT o.message_id,o.event_type,o.aggregate_id,o.business_key,o.status,r.target_system,r.received_at,CASE WHEN o.event_type='PurchaseReturnConfirmed' THEN p.state ELSE s.state END AS downstream_state FROM wms_outbox o LEFT JOIN integration_simulated_result r ON r.message_id=o.message_id LEFT JOIN integration_simulated_receipt_state s ON s.target_system=r.target_system AND s.receipt_id=o.aggregate_id LEFT JOIN integration_simulated_purchase_return p ON o.event_type='PurchaseReturnConfirmed' AND CAST(p.return_id AS CHAR)=o.business_key AND r.target_system='ERP' ORDER BY o.occurred_at DESC,o.message_id LIMIT 100")
+                        "SELECT o.message_id,o.event_type,o.aggregate_type,o.aggregate_id,o.business_key,o.status,r.target_system,r.received_at,CASE WHEN o.aggregate_type='MaterialIssue' THEN IF(r.received_at IS NULL,NULL,'RECEIVED') WHEN o.event_type='PurchaseReturnConfirmed' THEN p.state ELSE s.state END AS downstream_state FROM wms_outbox o LEFT JOIN integration_simulated_result r ON r.message_id=o.message_id LEFT JOIN integration_simulated_receipt_state s ON s.target_system=r.target_system AND s.receipt_id=o.aggregate_id LEFT JOIN integration_simulated_purchase_return p ON o.event_type='PurchaseReturnConfirmed' AND CAST(p.return_id AS CHAR)=o.business_key AND r.target_system='ERP' ORDER BY o.occurred_at DESC,o.message_id LIMIT 100")
                 .query()
                 .listOfRows();
     }

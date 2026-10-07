@@ -85,7 +85,16 @@ const creating = ref(false),
   materialId = ref(0),
   quantity = ref(''),
   createBody = ref<string>()
-const history = ref<{ row: Issue; events: Event[] }>()
+const history = ref<{
+  row: Issue
+  events: Event[]
+  feedback: {
+    message_id: string
+    event_type: string
+    status: string
+    received_at: string | null
+  }[]
+}>()
 function allowed(permission: string) {
   return (
     props.authorities.includes('ROLE_ADMIN') ||
@@ -199,6 +208,10 @@ async function events(row: Issue) {
     history.value = {
       row,
       events: await request(`/api/v1/wms/issues/${row.id}/events`),
+      feedback:
+        row.status === 'ISSUED'
+          ? await request(`/api/integration/material-issues/${row.id}/feedback`)
+          : [],
     }
   })
 }
@@ -342,8 +355,17 @@ onMounted(() =>
                     取消领料
                   </button>
                   <button :disabled="busy" @click="events(row)">
-                    预占记录
+                    预占与反馈
                   </button>
+                  <RouterLink
+                    v-if="
+                      row.status === 'ISSUED' &&
+                      (props.authorities.includes('ROLE_ADMIN') ||
+                        props.authorities.includes('wms:production:read'))
+                    "
+                    :to="`/production?issueId=${row.id}`"
+                    >生产处理</RouterLink
+                  >
                 </div>
               </td>
             </tr>
@@ -526,6 +548,25 @@ onMounted(() =>
             {{ e.created_by }}
           </li>
         </ol>
+        <h3 v-if="history.feedback.length">MES 反馈</h3>
+        <p v-for="f in history.feedback" :key="f.message_id">
+          {{
+            f.event_type === 'MaterialIssued'
+              ? '发料结果'
+              : f.event_type === 'ProductionConsumed'
+                ? '消耗结果'
+                : '退料结果'
+          }}
+          ·
+          {{
+            f.status === 'PUBLISHED'
+              ? '已发布'
+              : f.status === 'FAILED' || f.status === 'DEAD'
+                ? '发送失败，请查看消息管理'
+                : '等待发布'
+          }}
+          · {{ f.received_at ? '模拟 MES 已接收' : '模拟 MES 尚未接收' }}
+        </p>
         <button @click="history = undefined">关闭</button>
       </section>
     </div>
