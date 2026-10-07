@@ -30,7 +30,7 @@
 
 ### 2026-10-07 本轮结果
 
-17 项均完成实现核对及对应回归；四条公共流程已有实现，本轮没有新增业务模型或数据库迁移。结论限于当前候选分支与本地模拟环境，不等于已合并、真实系统联调或生产验收。
+17 项均完成实现核对及对应回归；四条公共流程已有实现，本轮没有新增业务模型或数据库迁移。该次验收结论限于候选代码与本地模拟环境；随后 PR #17—#28 已合并 main（见下方交付记录），真实系统联调与生产验收尚未执行。
 
 - 后端：`mvnw.cmd -f backend/pom.xml verify` 通过，175 项测试（主数据 13 + 启动模块 162），失败、错误、跳过均为 0。真实 MySQL/RabbitMQ Testcontainers 覆盖上述主流程、事务回滚、幂等、并发、权限、消息补偿及拒绝分支。以本次运行日志为准，不累加 target 中历史探针报告。
 - 前端：`scripts/pnpm.cmd run verify` 通过，19 个测试文件、68 项测试；包含格式、ESLint、类型检查与生产构建。本轮新增 6 项用例，并强化原有领料重试及收货弹窗用例。
@@ -53,4 +53,27 @@
 
 本地证据保存在仓库忽略目录 `tmp/`：`flow-acceptance-backend.log`、`flow-frontend-verify.log`、`flow-frontend-red.log`、`flow-receiving-red.log`、`flow-acceptance-browser.jpg`、`flow-source-audit.log`、`flow-restored-audit.log`、`flow-restore-boot.log`、`flow-acceptance.sql`。自动测试与本清单纳入 Git，临时备份、环境凭据及运行日志不提交。
 
-交付分支 `acczff/wms-flow-acceptance` 基于 PR #27 的 `acczff/wms-scope-baseline`，依赖前序功能 PR，继续等待统一审批，不自动合并或升级日常环境。运输短少核销未启动；未收齐调拨继续保留已收、剩余在途与原始记录，后续处置按具体工作环境另行确认。
+原交付分支 `acczff/wms-flow-acceptance` 基于 PR #27 的 `acczff/wms-scope-baseline`。2026-10-07 按用户统一合并授权，PR #17—#28 已依次切换 main 基线并合并；未升级日常环境。运输短少核销未启动；未收齐调拨继续保留已收、剩余在途与原始记录，后续处置按具体工作环境另行确认。
+
+## 主干交付记录（2026-10-07）
+
+合并前已 fetch 并验证全部 12 个 PR head 属于验收提交 `275b02e`，没有冲突或未解决审查线程。#18 已解除草稿状态。采用 merge commit 保留历史，合并后主干 `2ec0be1` 的完整文件树与验收提交完全一致；后续文档同步不改变业务代码。
+
+当前 GitHub 账号与 PR 作者相同，没有制造独立 APPROVED 记录；仓库未配置审查保护或 CI/check/status。本次依据用户直接授权和本地验收合并，不声称远端 CI 或第三方审批通过。
+
+| PR | 原分支 | 合并提交 |
+|---|---|---|
+| [#17](https://github.com/acczff/mdop-platform/pull/17) | `acczff/warehouse-transfers` | `6d11310` |
+| [#18](https://github.com/acczff/mdop-platform/pull/18) | `acczff/inventory-counts` | `5c98054` |
+| [#19](https://github.com/acczff/mdop-platform/pull/19) | `acczff/material-issues` | `d4e5c57` |
+| [#20](https://github.com/acczff/mdop-platform/pull/20) | `acczff/production-cycle` | `403db90` |
+| [#21](https://github.com/acczff/mdop-platform/pull/21) | `acczff/production-reversals` | `a9f40d0` |
+| [#22](https://github.com/acczff/mdop-platform/pull/22) | `acczff/finished-goods-receiving` | `809cd41` |
+| [#23](https://github.com/acczff/mdop-platform/pull/23) | `acczff/sales-outbound` | `674920c` |
+| [#24](https://github.com/acczff/mdop-platform/pull/24) | `acczff/cross-warehouse-transfers` | `25b076a` |
+| [#25](https://github.com/acczff/mdop-platform/pull/25) | `acczff/inventory-freeze` | `4bd6fad` |
+| [#26](https://github.com/acczff/mdop-platform/pull/26) | `acczff/partial-transfer-receiving` | `4513dd7` |
+| [#27](https://github.com/acczff/mdop-platform/pull/27) | `acczff/wms-scope-baseline` | `0ea48a6` |
+| [#28](https://github.com/acczff/mdop-platform/pull/28) | `acczff/wms-flow-acceptance` | `2ec0be1` |
+
+分支清理前已创建并验证包含全部引用的 Git bundle，保存在本机忽略目录 `tmp/git-backups/`。仅清理已进入 main 且没有独有未交付提交的工作分支，主干和历史提交保留；后续从最新 main 建分支。数据库备份与 Git bundle 用途不同，不能相互代替。
