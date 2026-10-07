@@ -24,6 +24,7 @@ interface Reversal {
 const result = ref<Page<Reversal>>(),
   busy = ref(false),
   error = ref(''),
+  notice = ref(''),
   modal = ref<'create' | 'approve' | 'reject' | 'cancel'>(),
   row = ref<Reversal>(),
   kind = ref('CONSUMPTION'),
@@ -62,6 +63,7 @@ async function perform(fn: () => Promise<void>) {
   }
 }
 async function load(page = 0) {
+  result.value = undefined
   result.value = await request(
     `/api/v1/wms/production-reversals?issueId=${props.issueId}&page=${page}&size=20`,
   )
@@ -71,6 +73,7 @@ function open(
   item?: Reversal,
 ) {
   modal.value = action
+  notice.value = ''
   row.value = item
   reason.value = ''
   reference.value = ''
@@ -104,8 +107,13 @@ async function submit() {
       { method: 'POST', body: body.value },
     )
     modal.value = undefined
-    await load()
-    emit('changed')
+    notice.value = '冲正处理已保存。'
+    try {
+      await load()
+    } finally {
+      // A failed list refresh must not hide a completed write from the parent summary.
+      emit('changed')
+    }
   })
 }
 onMounted(() => perform(() => load()))
@@ -128,6 +136,7 @@ onMounted(() => perform(() => load()))
       整笔纠正已记录消耗或已确认退料，由另一人审批。原单与流水保留，已被后续业务使用的退料库存不能直接冲正。
     </p>
     <p v-if="error" role="alert" class="error">{{ error }}</p>
+    <p v-if="notice" role="status">{{ notice }}</p>
     <div class="table-wrap">
       <table>
         <thead>

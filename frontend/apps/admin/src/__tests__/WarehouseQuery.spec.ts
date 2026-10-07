@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import InventoryView from '../views/InventoryView.vue'
 import SalesView from '../views/SalesView.vue'
 import FinishedGoodsView from '../views/FinishedGoodsView.vue'
+import CountsView from '../views/CountsView.vue'
 import { request } from '../api'
 vi.mock('../api', () => ({ request: vi.fn() }))
 vi.mock('vue-router', () => ({ useRoute: () => ({ query: {} }) }))
@@ -62,6 +63,7 @@ it('production reversal ledger must display its original transaction reference',
 it.each([
   ['sales', SalesView],
   ['finished', FinishedGoodsView],
+  ['counts', CountsView],
 ] as const)(
   '%s warehouse query failure must clear previous warehouse documents',
   async (_kind, component) => {
@@ -87,9 +89,15 @@ it.each([
               : 'A-WAREHOUSE-DOC',
             work_order_no: 'WO-A',
             sales_order_no: 'SO-A',
-            material_name: 'M',
+            material_name: path.includes('warehouseId=2')
+              ? 'B-WAREHOUSE-DOC'
+              : 'A-WAREHOUSE-DOC',
             amount: '1',
-            status: 'OPEN',
+            status: _kind === 'counts' ? 'PENDING' : 'OPEN',
+            created_by: 'another-user',
+            snapshot_qty: '10',
+            counted_qty: '9',
+            difference: '-1',
           },
         ],
         page: 0,
@@ -109,10 +117,11 @@ it.each([
     expect(v.text()).not.toContain('A-WAREHOUSE-DOC')
     expect(v.text()).not.toContain('取消单据')
     expect(v.text()).not.toContain('确认实物收货')
+    expect(v.findAll('button').some((b) => b.text() === '审核过账')).toBe(false)
     failed = false
     await v
       .findAll('button')
-      .find((b) => b.text() === '刷新')!
+      .find((b) => b.text() === (_kind === 'counts' ? '刷新记录' : '刷新'))!
       .trigger('click')
     await flushPromises()
     expect(v.text()).toContain('B-WAREHOUSE-DOC')
