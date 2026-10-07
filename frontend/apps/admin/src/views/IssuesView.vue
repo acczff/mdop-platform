@@ -95,6 +95,9 @@ const history = ref<{
     received_at: string | null
   }[]
 }>()
+const blocked = computed(
+  () => busy.value || !!action.value || creating.value || !!history.value,
+)
 function allowed(permission: string) {
   return (
     props.authorities.includes('ROLE_ADMIN') ||
@@ -121,6 +124,7 @@ async function load(page = 0) {
   )
 }
 function newDemand() {
+  if (blocked.value) return
   demandNo.value = ''
   workOrder.value = ''
   materialId.value = materials.value[0]?.id || 0
@@ -148,6 +152,7 @@ async function create() {
   })
 }
 async function openAction(row: Issue, type: 'reserve' | 'cancel' | 'confirm') {
+  if (blocked.value) return
   await perform(async () => {
     if (type === 'reserve') {
       stocks.value = []
@@ -204,6 +209,8 @@ async function decide() {
   })
 }
 async function events(row: Issue) {
+  if (blocked.value) return
+  history.value = undefined
   await perform(async () => {
     history.value = {
       row,
@@ -258,7 +265,7 @@ onMounted(() =>
       </div>
       <button
         v-if="simulator"
-        :disabled="busy || !warehouseId || !targetWarehouseId"
+        :disabled="blocked || !warehouseId || !targetWarehouseId"
         @click="newDemand"
       >
         模拟 MES 需求
@@ -270,7 +277,7 @@ onMounted(() =>
       <label
         >原材料仓<select
           v-model="warehouseId"
-          :disabled="busy"
+          :disabled="blocked"
           @change="perform(() => load())"
         >
           <option v-for="w in sourceWarehouses" :key="w.id" :value="w.id">
@@ -281,7 +288,7 @@ onMounted(() =>
       <label
         >线边仓<select
           v-model="targetWarehouseId"
-          :disabled="busy"
+          :disabled="blocked"
           @change="perform(() => load())"
         >
           <option v-for="w in targetWarehouses" :key="w.id" :value="w.id">
@@ -289,7 +296,7 @@ onMounted(() =>
           </option>
         </select></label
       >
-      <button :disabled="busy" @click="perform(() => load())">刷新</button>
+      <button :disabled="blocked" @click="perform(() => load())">刷新</button>
     </section>
     <p v-if="!warehouseId || !targetWarehouseId" class="muted">
       请先维护原材料仓与线边仓，并配置两个仓库的数据权限。
@@ -332,14 +339,14 @@ onMounted(() =>
                 <div class="row-actions">
                   <button
                     v-if="row.status === 'OPEN' && allowed('reserve')"
-                    :disabled="busy"
+                    :disabled="blocked"
                     @click="openAction(row, 'reserve')"
                   >
                     预占库存
                   </button>
                   <button
                     v-if="row.status === 'RESERVED' && allowed('confirm')"
-                    :disabled="busy"
+                    :disabled="blocked"
                     @click="openAction(row, 'confirm')"
                   >
                     确认发料
@@ -349,12 +356,12 @@ onMounted(() =>
                       ['OPEN', 'RESERVED'].includes(row.status) &&
                       allowed('cancel')
                     "
-                    :disabled="busy"
+                    :disabled="blocked"
                     @click="openAction(row, 'cancel')"
                   >
                     取消领料
                   </button>
-                  <button :disabled="busy" @click="events(row)">
+                  <button :disabled="blocked" @click="events(row)">
                     预占与反馈
                   </button>
                   <RouterLink
@@ -378,12 +385,12 @@ onMounted(() =>
       <div v-if="result" class="pagination">
         <span>共 {{ result.totalElements }} 单</span
         ><button
-          :disabled="busy || result.page === 0"
+          :disabled="blocked || result.page === 0"
           @click="perform(() => load(result!.page - 1))"
         >
           上一页</button
         ><button
-          :disabled="busy || result.page + 1 >= result.totalPages"
+          :disabled="blocked || result.page + 1 >= result.totalPages"
           @click="perform(() => load(result!.page + 1))"
         >
           下一页

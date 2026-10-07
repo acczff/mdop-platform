@@ -84,6 +84,9 @@ async function load() {
   busy.value = true
   error.value = ''
   selected.value = undefined
+  history.value = []
+  cases.value = []
+  arrivals.value = []
   detail.value = undefined
   receipts.value = []
   arrivalId.value = 0
@@ -175,7 +178,10 @@ async function submit() {
   }
 }
 async function inspect(item: Case) {
-  selected.value = item
+  if (busy.value) return
+  busy.value = true
+  error.value = ''
+  selected.value = undefined
   decision.reason = ''
   decision.action = 'APPROVE'
   decisionKey.value = crypto.randomUUID()
@@ -184,8 +190,11 @@ async function inspect(item: Case) {
     history.value = await request<typeof history.value>(
       `/api/v1/wms/corrections/${item.id}/history`,
     )
+    selected.value = item
   } catch (e) {
     error.value = (e as Error).message
+  } finally {
+    busy.value = false
   }
 }
 async function decide() {

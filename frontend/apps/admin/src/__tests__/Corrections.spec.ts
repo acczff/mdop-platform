@@ -103,3 +103,41 @@ it('hides approval actions from a request-only user', async () => {
     false,
   )
 })
+
+it('clears old applications after a failed refresh and restores them on retry', async () => {
+  mock()
+  const view = mount(CorrectionsView, {
+    props: { authorities: ['ROLE_ADMIN'], username: 'bob' },
+  })
+  await flushPromises()
+  vi.mocked(request).mockRejectedValueOnce(new Error('查询失败'))
+  await view
+    .findAll('button')
+    .find((b) => b.text() === '刷新')!
+    .trigger('click')
+  await flushPromises()
+  expect(view.text()).toContain('查询失败')
+  expect(view.text()).not.toContain('查看 / 审批')
+  await view
+    .findAll('button')
+    .find((b) => b.text() === '刷新')!
+    .trigger('click')
+  await flushPromises()
+  expect(view.text()).toContain('查看 / 审批')
+})
+
+it('does not offer approval when its audit request fails', async () => {
+  mock()
+  const view = mount(CorrectionsView, {
+    props: { authorities: ['ROLE_ADMIN'], username: 'bob' },
+  })
+  await flushPromises()
+  vi.mocked(request).mockRejectedValueOnce(new Error('审计加载失败'))
+  await view
+    .findAll('button')
+    .find((b) => b.text() === '查看 / 审批')!
+    .trigger('click')
+  await flushPromises()
+  expect(view.text()).toContain('审计加载失败')
+  expect(view.text()).not.toContain('确认审批')
+})

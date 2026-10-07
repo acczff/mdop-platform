@@ -4,6 +4,8 @@ import QualityView from '../views/QualityView.vue'
 import { request } from '../api'
 vi.mock('../api', () => ({ request: vi.fn() }))
 afterEach(() => vi.resetAllMocks())
+const button = (view: ReturnType<typeof mount>, text: string) =>
+  view.findAll('button').find((b) => b.text() === text)!
 function mock(inspected = false) {
   vi.mocked(request).mockImplementation(async (path) => {
     if (path.includes('/warehouses'))
@@ -87,4 +89,47 @@ it('requires a destination and preserves retry identity on uncertain results', a
   expect(keys).toHaveLength(2)
   expect(keys[0]).toBe(keys[1])
   expect(view.get('[role="alert"]').text()).toContain('请核对后重试')
+})
+
+it('removes old processing details when the next detail request fails', async () => {
+  mock(true)
+  const view = mount(QualityView, { props: { authorities: ['ROLE_ADMIN'] } })
+  await flushPromises()
+  await button(view, '查看 / 处理').trigger('click')
+  await flushPromises()
+  expect(view.text()).toContain('确认整行上架')
+  vi.mocked(request).mockRejectedValueOnce(new Error('明细加载失败'))
+  await button(view, '查看 / 处理').trigger('click')
+  await flushPromises()
+  expect(view.text()).toContain('明细加载失败')
+  expect(view.text()).not.toContain('确认整行上架')
+  await button(view, '查看 / 处理').trigger('click')
+  await flushPromises()
+  expect(view.text()).toContain('确认整行上架')
+})
+
+it('locks the full putaway request after failure and retries its original contents', async () => {
+  mock(true)
+  const original = vi.mocked(request).getMockImplementation()!
+  const bodies: string[] = []
+  vi.mocked(request).mockImplementation(async (path, options) => {
+    if (path.endsWith('/putaway')) {
+      bodies.push(options!.body as string)
+      throw new Error('结果未知')
+    }
+    return original(path, options)
+  })
+  const view = mount(QualityView, { props: { authorities: ['ROLE_ADMIN'] } })
+  await flushPromises()
+  await button(view, '查看 / 处理').trigger('click')
+  await flushPromises()
+  await view.findAll('select')[1]!.setValue(2)
+  await button(view, '确认整行上架').trigger('click')
+  await flushPromises()
+  expect(view.findAll('select')[1]!.attributes()).toHaveProperty('disabled')
+  expect(button(view, '查看 / 处理').attributes()).toHaveProperty('disabled')
+  await button(view, '确认整行上架').trigger('click')
+  await flushPromises()
+  expect(bodies).toHaveLength(2)
+  expect(bodies[1]).toBe(bodies[0])
 })

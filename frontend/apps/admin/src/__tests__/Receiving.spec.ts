@@ -7,6 +7,48 @@ vi.mock('../api', async (original) => ({
   request: vi.fn(),
 }))
 afterEach(() => vi.resetAllMocks())
+it.each(['detail', 'list'])(
+  'clears previous receiving actions after a failed %s refresh',
+  async (failure) => {
+    const arrival = {
+      id: 1,
+      warehouseId: 1,
+      externalNoticeNo: 'ERP-OLD',
+      status: 'PENDING_RECEIPT',
+    }
+    vi.mocked(request).mockImplementation(async (path) => {
+      if (path.includes('/warehouses'))
+        return { items: [{ id: 1, name: '仓库' }] }
+      if (path.includes('/locations'))
+        return [{ id: 1, warehouseId: 1, areaType: 'RECEIVING' }]
+      if (path.endsWith('/capabilities')) return { enabled: false }
+      if (path.includes('/arrival-notices?')) return [arrival]
+      if (path === '/api/v1/wms/arrival-notices/1')
+        return { arrival, items: [] }
+      return []
+    })
+    const view = mount(ReceivingView, {
+      props: { authorities: ['ROLE_ADMIN'] },
+    })
+    await flushPromises()
+    const button = (text: string) =>
+      view.findAll('button').find((b) => b.text() === text)!
+    await button('查看与收货').trigger('click')
+    await flushPromises()
+    expect(view.text()).toContain('登记本次收货')
+    vi.mocked(request).mockRejectedValueOnce(new Error('查询失败'))
+    await button(failure === 'detail' ? '查看与收货' : '刷新').trigger('click')
+    await flushPromises()
+    expect(view.text()).toContain('查询失败')
+    expect(view.text()).not.toContain('登记本次收货')
+    if (failure === 'list') expect(view.text()).not.toContain('ERP-OLD')
+    await button('刷新').trigger('click')
+    await flushPromises()
+    await button('查看与收货').trigger('click')
+    await flushPromises()
+    expect(view.text()).toContain('登记本次收货')
+  },
+)
 describe('receiving workflow', () => {
   it('saves a draft without submitting and uses a stable key for confirmed submission', async () => {
     let saved = false,
@@ -116,6 +158,19 @@ describe('receiving workflow', () => {
       .get('[role="dialog"] input[inputmode="decimal"]')
       .setValue('12')
     await wrapper.get('[placeholder="按批次管理的物料必填"]').setValue('B-01')
+    for (const label of [
+      '登记本次收货',
+      '查看与收货',
+      '刷新',
+      '本地模拟 ERP 到货',
+    ]) {
+      expect(
+        wrapper
+          .findAll('button')
+          .find((b) => b.text() === label)!
+          .attributes('disabled'),
+      ).toBeDefined()
+    }
     await wrapper.get('[role="dialog"] form').trigger('submit')
     await flushPromises()
     expect(saved).toBe(true)
