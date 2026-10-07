@@ -10,10 +10,9 @@
 
 推荐分支名：
 
-- `feature/<description>`：新能力
-- `fix/<description>`：缺陷修复
-- `docs/<description>`：文档调整
-- `chore/<description>`：工程维护
+- `acczff/<description>`：使用固定用户前缀和简短英文主题，例如 `acczff/inventory-freeze`、`acczff/wms-delivery-docs`。
+
+依赖 PR 按顺序合并，上一项进入 `main` 后将下一项基线切回 `main`。清理分支前先 fetch、备份并验证提交已被主干包含；删除已合并分支不改写历史。不把提交人的自审描述为独立审批，也不把本地验证描述为远端 CI 通过。
 
 提交信息使用固定的中文类型和全角冒号，格式为 `类型：中文说明`。功能、修复、文档分别对应 `feat`、`fix`、`docs`，不在同一提交中混用中英文前缀。例如：
 

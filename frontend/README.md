@@ -61,21 +61,22 @@ pnpm.cmd run verify
 
 生产构建输出位于 `apps/admin/dist`，依赖目录位于 `node_modules`；两者均已被 Git 忽略。
 
-## 已完成验证
+## 当前验证（2026-10-07）
 
-- `pnpm.cmd run dev`：开发服务器能够在本机启动并显示 MDOP 管理端应用壳。
+- `pnpm.cmd run dev`：管理端业务页面已在隔离环境进行浏览器验收。
 - `pnpm.cmd run format:check`：Prettier 格式检查通过。
 - `pnpm.cmd run lint`：ESLint 静态检查通过，无警告或错误。
-- `pnpm.cmd run test`：1 个 Vitest 测试文件、1 个测试用例通过。
+- `pnpm.cmd run test`：19 个 Vitest 测试文件、68 个测试用例通过；详见 [WMS 公共流程验收清单](../docs/project/WMS公共流程验收清单.md)。
 - `pnpm.cmd run type-check`：TypeScript 与 Vue 类型检查通过。
 - `pnpm.cmd run build`：Vite 生产构建通过。
 - `pnpm.cmd run verify`：格式检查、静态检查、单元测试、类型检查和生产构建全部通过。
 
 ## 当前边界
 
-当前只建立 I0 前端工程基线：
+当前管理端覆盖四条 WMS 公共流程及基本异常：
 
 - admin 应用能够启动、测试、类型检查和生产构建。
 - Vue Router 与 Pinia 已完成最小装配。
-- 不实现登录、完整 IAM、JWT、菜单、数据权限或真实 API 客户端。
-- 不创建 WMS 业务页面、接口或数据库表。
+- 已实现会话登录、导航、同源 API/CSRF、操作权限入口和仓库范围查询；后端仍执行最终授权。
+- 已提供采购入库、生产物料协同、成品出入库、库存运营与消息管理。查询失败清空旧操作数据，不确定写入保留原请求重试。
+- 完整 IAM、JWT 和真实外部系统接入尚未实现；前端不直接修改数据库，当前只验证本地模拟业务。

@@ -1,6 +1,6 @@
 # Backend
 
-后端已在 I0 迭代中建立 Java 25 LTS、Spring Boot 和 Maven 多模块的模块化单体工程。
+后端以 Java 25 LTS、Spring Boot 和 Maven 多模块的模块化单体工程承载业务。2026-10-07，WMS 公共流程及基本异常已通过本地验收并合并 main；当前共 22 个迁移、175 项后端回归，日常数据库未随合并升级。
 
 当前模块包括：
 
