@@ -40,7 +40,7 @@ public class InventoryService {
                m.unit,b.origin_type,b.supplier_id,COALESCE(s.name,'自产') AS supplier_name,b.batch_no,b.date_code,
                CAST(b.production_date AS CHAR) AS production_date,
                CAST(b.expiry_date AS CHAR) AS expiry_date,b.quality_status,b.owner_type,b.owner_id,
-               CAST(b.on_hand_qty AS CHAR) AS on_hand_qty,
+               b.active_freeze_id,w.purpose AS warehouse_purpose,CAST(b.on_hand_qty AS CHAR) AS on_hand_qty,
                CAST(b.available_qty AS CHAR) AS available_qty,
                CAST(b.reserved_qty AS CHAR) AS reserved_qty,CAST(b.production_qty AS CHAR) AS production_qty
         """;

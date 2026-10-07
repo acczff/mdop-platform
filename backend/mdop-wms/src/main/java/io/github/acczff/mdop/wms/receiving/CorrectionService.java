@@ -248,11 +248,12 @@ public class CorrectionService {
             BigDecimal qty = (BigDecimal) original.get("change_qty");
             var balance =
                     db.sql(
-                                    "SELECT on_hand_qty,available_qty,quality_status FROM wms_inventory_balance WHERE id=? FOR UPDATE")
+                                    "SELECT on_hand_qty,available_qty,quality_status,active_freeze_id FROM wms_inventory_balance WHERE id=? FOR UPDATE")
                             .param(balanceId)
                             .query()
                             .singleRow();
             BigDecimal before = (BigDecimal) balance.get("on_hand_qty");
+            io.github.acczff.mdop.wms.inventory.StockFreeze.requireUnfrozen(balance);
             if (!balance.get("quality_status").equals("PENDING_INSPECTION")
                     || ((BigDecimal) balance.get("available_qty")).signum() != 0
                     || before.compareTo(qty) < 0)

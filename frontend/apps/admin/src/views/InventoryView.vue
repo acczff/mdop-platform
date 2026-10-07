@@ -7,6 +7,9 @@ import { request, type Page, type Warehouse } from '../api'
 const props = defineProps<{ authorities: string[] }>()
 interface Stock {
   id: number
+  warehouse_id: number
+  warehouse_purpose: string
+  active_freeze_id: number | null
   warehouse_name: string
   material_code: string
   material_name: string
@@ -390,7 +393,12 @@ onMounted(async () => {
               <td>
                 {{ s.supplier_name }}<small>{{ s.batch_no || '无批次' }}</small>
               </td>
-              <td>{{ qualityNames[s.quality_status] || s.quality_status }}</td>
+              <td>
+                {{ qualityNames[s.quality_status] || s.quality_status
+                }}<small v-if="s.active_freeze_id"
+                  >已冻结 · FR-{{ s.active_freeze_id }}</small
+                >
+              </td>
               <td>{{ s.on_hand_qty }}</td>
               <td>
                 {{ s.available_qty
@@ -401,6 +409,15 @@ onMounted(async () => {
               </td>
               <td>
                 <button :disabled="busy" @click="trace(s)">查看流水</button>
+                <RouterLink
+                  v-if="
+                    (props.authorities.includes('ROLE_ADMIN') ||
+                      props.authorities.includes('wms:freeze:read')) &&
+                    s.warehouse_purpose !== 'LINE_SIDE'
+                  "
+                  :to="`/freezes?warehouseId=${s.warehouse_id}&balanceId=${s.id}`"
+                  >冻结管理</RouterLink
+                >
                 <button
                   v-if="
                     canTransfer &&

@@ -293,7 +293,7 @@ public class SalesService {
         var available = type.equals("CONSUME") ? BigDecimal.ZERO : delta.negate();
         var physical = type.equals("CONSUME") ? amount.negate() : BigDecimal.ZERO;
         db.sql(
-                        "UPDATE wms_inventory_balance SET reserved_qty=reserved_qty+?,available_qty=available_qty+?,on_hand_qty=on_hand_qty+?,reservation_version=reservation_version+1 WHERE id=?")
+                        "UPDATE wms_inventory_balance SET reserved_qty=reserved_qty+?,available_qty=IF(active_freeze_id IS NULL,available_qty+?,0),on_hand_qty=on_hand_qty+?,reservation_version=reservation_version+1 WHERE id=?")
                 .params(delta, available, physical, n(b, "id"))
                 .update();
         db.sql(
@@ -351,6 +351,7 @@ public class SalesService {
     }
 
     private void eligibleStock(Map<String, Object> b) {
+        StockFreeze.requireUnfrozen(b);
         if (!"PRODUCTION".equals(b.get("origin_type"))
                 || !"QUALIFIED".equals(b.get("quality_status"))
                 || !"STORAGE".equals(b.get("area_type"))

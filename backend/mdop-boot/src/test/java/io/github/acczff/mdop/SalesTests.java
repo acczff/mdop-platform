@@ -19,6 +19,41 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class SalesTests extends InventoryScenarioSupport {
+    @Test
+    void frozenReservedSaleCannotShipAndCancellationRemainsUnavailable() throws Exception {
+        finished();
+        long id = sale("2");
+        reserveSale(id, 200);
+        long p = pick(id, "2");
+        postAs(path(id, "review"), reviewing(p, true), reviewer(), 200);
+        long freeze =
+                postAs(
+                                "/api/v1/wms/freezes",
+                                Map.of(
+                                        "balanceId",
+                                        stockId,
+                                        "idempotencyKey",
+                                        key(),
+                                        "reason",
+                                        "销售批次调查"),
+                                admin(),
+                                201)
+                        .get("id")
+                        .asLong();
+        ship(id, 409);
+        reserveSale(sale("1"), 409);
+        postAs(path(id, "cancel"), Map.of("reason", "需求取消"), admin(), 200);
+        assertThat(stock(stockId, "available_qty")).isZero();
+        assertThat(stock(stockId, "reserved_qty")).isZero();
+        assertThat(qty(stockId)).isEqualByComparingTo("10.123456");
+        postAs(
+                "/api/v1/wms/freezes/" + freeze + "/release",
+                Map.of("idempotencyKey", key(), "reason", "解除风险"),
+                user("reviewer").roles("ADMIN"),
+                200);
+        assertThat(stock(stockId, "available_qty")).isEqualByComparingTo("10.123456");
+    }
+
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean java.time.Clock clock;
 
     @org.junit.jupiter.params.ParameterizedTest
