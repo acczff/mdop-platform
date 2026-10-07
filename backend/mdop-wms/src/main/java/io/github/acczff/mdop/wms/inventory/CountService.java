@@ -149,8 +149,8 @@ public class CountService {
         eligible(b);
         db.sql(
                         """
-            INSERT INTO wms_stock_count(warehouse_id,balance_id,snapshot_qty,snapshot_available,last_ledger_id,request_key,created_by,created_at)
-            VALUES(?,?,?,?,?,?,?,?)
+            INSERT INTO wms_stock_count(warehouse_id,balance_id,snapshot_qty,snapshot_available,last_ledger_id,reservation_version,request_key,created_by,created_at)
+            VALUES(?,?,?,?,?,?,?,?,?)
             """)
                 .params(
                         warehouse,
@@ -158,6 +158,7 @@ public class CountService {
                         b.get("on_hand_qty"),
                         b.get("available_qty"),
                         lastLedger(input.balanceId()),
+                        b.get("reservation_version"),
                         input.idempotencyKey(),
                         actor.currentActor(),
                         now())
@@ -217,7 +218,8 @@ public class CountService {
         long balanceId = number(c, "balance_id");
         var b = balance(balanceId, true);
         eligible(b);
-        if (lastLedger(balanceId) != number(c, "last_ledger_id")
+        if (number(b, "reservation_version") != number(c, "reservation_version")
+                || lastLedger(balanceId) != number(c, "last_ledger_id")
                 || qty(b, "on_hand_qty").compareTo(qty(c, "snapshot_qty")) != 0
                 || qty(b, "available_qty").compareTo(qty(c, "snapshot_available")) != 0)
             throw conflict("盘点期间库存已变化，请取消原单并重新盘点");

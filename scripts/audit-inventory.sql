@@ -1,5 +1,5 @@
--- Read-only reconciliation for the current receiving/quality/return stage.
--- Every mismatch_count must be zero. Future reservation flows must extend the availability rule.
+-- Read-only inventory reconciliation including transfers, counts and material issues.
+-- Every mismatch_count must be zero, including reservations and line-side issue pairs.
 SELECT 'balance_vs_ledger' AS check_name,COUNT(*) AS mismatch_count
 FROM wms_inventory_balance b LEFT JOIN
  (SELECT balance_id,SUM(change_qty) AS quantity FROM wms_inventory_transaction GROUP BY balance_id) t ON t.balance_id=b.id
@@ -10,7 +10,7 @@ SELECT 'ledger_chain',COUNT(*) FROM
   FROM wms_inventory_transaction) chain WHERE before_qty<>previous_qty
 UNION ALL
 SELECT 'quality_availability',COUNT(*) FROM wms_inventory_balance b JOIN mdm_location l ON l.id=b.location_id
-WHERE b.available_qty<>CASE WHEN b.quality_status='QUALIFIED' AND l.area_type='STORAGE' THEN b.on_hand_qty ELSE 0 END
+WHERE b.available_qty<>CASE WHEN b.quality_status='QUALIFIED' AND l.area_type='STORAGE' THEN b.on_hand_qty-b.reserved_qty ELSE 0 END
 UNION ALL
 SELECT 'arrival_received_total',COUNT(*) FROM wms_arrival_notice_item a LEFT JOIN
  (SELECT i.arrival_item_id,SUM(i.quantity) AS quantity FROM wms_receipt_item i JOIN wms_receipt r ON r.id=i.receipt_id
@@ -56,4 +56,30 @@ WHERE (c.status='APPROVED' AND c.counted_qty<>c.snapshot_qty AND
  OR ((c.status<>'APPROVED' OR c.counted_qty=c.snapshot_qty) AND t.id IS NOT NULL)
 UNION ALL
 SELECT 'count_review',COUNT(*) FROM wms_stock_count c JOIN wms_inventory_balance b ON b.id=c.balance_id
-WHERE c.warehouse_id<>b.warehouse_id OR (c.status='APPROVED' AND (c.reviewed_by IS NULL OR c.reviewed_by=c.created_by OR c.reviewed_at IS NULL));
+WHERE c.warehouse_id<>b.warehouse_id OR (c.status='APPROVED' AND (c.reviewed_by IS NULL OR c.reviewed_by=c.created_by OR c.reviewed_at IS NULL))
+UNION ALL
+SELECT 'reservation_balance',COUNT(*) FROM wms_inventory_balance b LEFT JOIN
+ (SELECT source_balance_id,SUM(quantity) AS qty FROM wms_material_issue WHERE status='RESERVED' GROUP BY source_balance_id) d ON d.source_balance_id=b.id
+WHERE b.reserved_qty<>COALESCE(d.qty,0)
+UNION ALL
+SELECT 'reservation_events',COUNT(*) FROM wms_material_issue d
+WHERE (d.source_balance_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM wms_reservation_event e WHERE e.issue_id=d.id AND e.event_type='RESERVE' AND e.balance_id=d.source_balance_id AND e.quantity=d.quantity))
+ OR (d.status='ISSUED' AND NOT EXISTS(SELECT 1 FROM wms_reservation_event e WHERE e.issue_id=d.id AND e.event_type='CONSUME' AND e.quantity=d.quantity))
+ OR (d.status='CANCELLED' AND d.source_balance_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM wms_reservation_event e WHERE e.issue_id=d.id AND e.event_type='RELEASE' AND e.quantity=d.quantity))
+ OR (SELECT COUNT(*) FROM wms_reservation_event e WHERE e.issue_id=d.id)<>CASE WHEN d.status='OPEN' OR d.source_balance_id IS NULL THEN 0 WHEN d.status='RESERVED' THEN 1 ELSE 2 END
+UNION ALL
+SELECT 'reservation_chain',COUNT(*) FROM
+ (SELECT before_reserved,COALESCE(LAG(after_reserved) OVER(PARTITION BY balance_id ORDER BY id),0) AS previous_qty FROM wms_reservation_event) chain
+WHERE before_reserved<>previous_qty
+UNION ALL
+SELECT 'issue_pair',COUNT(*) FROM wms_material_issue d LEFT JOIN
+ (SELECT issue_id,COUNT(*) AS n,SUM(change_qty) AS net FROM wms_inventory_transaction WHERE issue_id IS NOT NULL GROUP BY issue_id) t ON t.issue_id=d.id
+WHERE (d.status='ISSUED' AND (COALESCE(t.n,0)<>2 OR t.net<>0
+ OR NOT EXISTS(SELECT 1 FROM wms_inventory_transaction l WHERE l.issue_id=d.id AND l.transaction_type='ISSUE_OUT' AND l.balance_id=d.source_balance_id AND l.change_qty=-d.quantity)
+ OR NOT EXISTS(SELECT 1 FROM wms_inventory_transaction l WHERE l.issue_id=d.id AND l.transaction_type='ISSUE_IN' AND l.balance_id=d.target_balance_id AND l.change_qty=d.quantity)))
+ OR (d.status<>'ISSUED' AND COALESCE(t.n,0)<>0)
+UNION ALL
+SELECT 'issue_dimensions',COUNT(*) FROM wms_material_issue d JOIN wms_inventory_balance s ON s.id=d.source_balance_id JOIN wms_inventory_balance t ON t.id=d.target_balance_id
+WHERE s.warehouse_id<>d.warehouse_id OR t.warehouse_id<>d.target_warehouse_id OR t.location_id<>d.target_location_id OR s.material_id<>d.material_id OR s.material_id<>t.material_id OR s.supplier_id<>t.supplier_id
+ OR s.batch_no<>t.batch_no OR s.date_code<>t.date_code OR NOT(s.production_date<=>t.production_date) OR NOT(s.expiry_date<=>t.expiry_date)
+ OR s.quality_status<>t.quality_status OR s.owner_type<>t.owner_type OR s.owner_id<>t.owner_id;
