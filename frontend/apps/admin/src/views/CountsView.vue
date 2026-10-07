@@ -54,6 +54,9 @@ function allowed(action: string) {
   )
 }
 async function load(page = 0) {
+  result.value = undefined
+  editing.value = undefined
+  decision.value = undefined
   if (!warehouseId.value) return
   result.value = await request<Page<Count>>(
     `/api/v1/wms/counts?warehouseId=${warehouseId.value}&page=${page}&size=20`,

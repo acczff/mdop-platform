@@ -99,6 +99,9 @@ async function perform(fn: () => Promise<void>) {
   }
 }
 async function load(page = 0) {
+  result.value = undefined
+  modal.value = undefined
+  row.value = undefined
   if (warehouse.value)
     result.value = await request(
       `/api/v1/wms/finished-receipts?warehouseId=${warehouse.value}&page=${page}&size=20`,
@@ -122,7 +125,7 @@ async function open(type: typeof modal.value, receipt?: Receipt) {
     amount.value = ''
     batch.value = ''
     dateCode.value = ''
-    productionDate.value = new Date().toISOString().slice(0, 10)
+    productionDate.value = ''
     expiry.value = ''
     quality.value = 'QUALIFIED'
     eventNo.value = ''

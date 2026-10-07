@@ -26,6 +26,7 @@ interface Stock {
 }
 interface Ledger {
   id: number
+  sales_order_id?: number | null
   finished_receipt_id?: number | null
   transaction_type: string
   receipt_no: string
@@ -64,6 +65,7 @@ const qualityNames: Record<string, string> = {
   REJECTED: '不合格',
 }
 const types: Record<string, string> = {
+  SALES_OUT: '销售出库',
   FG_RECEIPT: '成品实物收货',
   FG_QC_OUT: '成品质检转出',
   FG_QC_IN: '成品质检转入',
@@ -482,7 +484,9 @@ onMounted(async () => {
                 }}</small>
               </td>
               <td>
-                <template v-if="t.finished_receipt_id"
+                <template v-if="t.sales_order_id"
+                  >销售 SO-{{ t.sales_order_id }}</template
+                ><template v-else-if="t.finished_receipt_id"
                   >成品 FG-{{ t.finished_receipt_id }}</template
                 ><template v-else-if="t.issue_id"
                   >领料 MI-{{ t.issue_id
@@ -490,6 +494,8 @@ onMounted(async () => {
                     >消耗 PC-{{ t.consumption_id }}</small
                   ><small v-if="t.production_return_id"
                     >退料 PR-{{ t.production_return_id }}</small
+                  ><small v-if="t.production_reversal_id"
+                    >生产冲正 PCR-{{ t.production_reversal_id }}</small
                   ></template
                 >
                 <template v-else-if="t.count_id"
@@ -510,7 +516,10 @@ onMounted(async () => {
               <td>{{ t.change_qty }}</td>
               <td>{{ t.after_qty }}</td>
               <td>
-                <span v-if="t.transfer_id || t.issue_id"
+                <span v-if="t.reversed_transaction_id"
+                  >冲正原流水 #{{ t.reversed_transaction_id }}</span
+                >
+                <span v-else-if="t.transfer_id || t.issue_id"
                   ><button
                     v-if="t.source_balance_id"
                     :disabled="busy"
@@ -525,9 +534,7 @@ onMounted(async () => {
                     目标库存 #{{ t.target_balance_id }}
                   </button></span
                 >
-                <span v-else-if="t.reversed_transaction_id"
-                  >冲正原流水 #{{ t.reversed_transaction_id }}</span
-                ><span v-else-if="t.purchase_return_id"
+                <span v-else-if="t.purchase_return_id"
                   >退货 RT-{{ t.purchase_return_id }}</span
                 ><span v-else>—</span>
               </td>

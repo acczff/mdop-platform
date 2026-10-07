@@ -56,6 +56,7 @@ it('requires reviewer acknowledgement and preserves failed request', async () =>
   await dialog.get('form').trigger('submit')
   await flushPromises()
   expect(dialog.get('fieldset').attributes()).toHaveProperty('disabled')
+  expect(view.emitted('changed')).toBeUndefined()
   const body = vi.mocked(request).mock.calls.slice(-1)[0]![1]!.body
   await dialog.get('form').trigger('submit')
   await flushPromises()
@@ -65,4 +66,35 @@ it('requires reviewer acknowledgement and preserves failed request', async () =>
       .mock.calls.filter(([, o]) => o?.method === 'POST')
       .map(([, o]) => o!.body),
   ).toEqual([body, body])
+})
+
+it('notifies the parent after successful approval even when reloading records fails', async () => {
+  const view = setup('reviewer')
+  await flushPromises()
+  await view
+    .findAll('button')
+    .find((b) => b.text() === '审批冲正')!
+    .trigger('click')
+  const dialog = view.get('[role="dialog"]')
+  await dialog.get('textarea').setValue('实物与原流水已核对')
+  await dialog.get('input[type="checkbox"]').setValue(true)
+  vi.mocked(request)
+    .mockResolvedValueOnce({ status: 'APPROVED' })
+    .mockRejectedValueOnce(new Error('刷新冲正记录失败'))
+  await dialog.get('form').trigger('submit')
+  await flushPromises()
+  expect(view.emitted('changed')).toHaveLength(1)
+  expect(view.text()).toContain('刷新冲正记录失败')
+  expect(view.text()).toContain('冲正处理已保存。')
+  expect(view.text()).not.toContain('待审批')
+  expect(view.findAll('button').some((b) => b.text() === '审批冲正')).toBe(
+    false,
+  )
+  expect(view.find('[role="dialog"]').exists()).toBe(false)
+  expect(
+    vi
+      .mocked(request)
+      .mock.calls.filter(([, options]) => options?.method === 'POST'),
+  ).toHaveLength(1)
+  view.unmount()
 })

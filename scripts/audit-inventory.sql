@@ -59,7 +59,7 @@ SELECT 'count_review',COUNT(*) FROM wms_stock_count c JOIN wms_inventory_balance
 WHERE c.warehouse_id<>b.warehouse_id OR (c.status='APPROVED' AND (c.reviewed_by IS NULL OR c.reviewed_by=c.created_by OR c.reviewed_at IS NULL))
 UNION ALL
 SELECT 'reservation_balance',COUNT(*) FROM wms_inventory_balance b LEFT JOIN
- (SELECT source_balance_id,SUM(quantity) AS qty FROM wms_material_issue WHERE status='RESERVED' GROUP BY source_balance_id) d ON d.source_balance_id=b.id
+ (SELECT source_balance_id,SUM(quantity) AS qty FROM (SELECT source_balance_id,quantity FROM wms_material_issue WHERE status='RESERVED' UNION ALL SELECT source_balance_id,quantity FROM wms_sales_order WHERE status IN ('RESERVED','PICKED','VERIFIED')) a GROUP BY source_balance_id) d ON d.source_balance_id=b.id
 WHERE b.reserved_qty<>COALESCE(d.qty,0)
 UNION ALL
 SELECT 'reservation_events',COUNT(*) FROM wms_material_issue d
@@ -150,4 +150,23 @@ WHERE b.origin_type<>'PRODUCTION' OR b.supplier_id IS NOT NULL OR b.warehouse_id
  OR (t.transaction_type='FG_PUT_IN' AND (t.balance_id<>d.stored_balance_id OR b.quality_status<>'QUALIFIED'))
 UNION ALL
 SELECT 'finished_feedback',COUNT(*) FROM wms_finished_receipt d WHERE
- (SELECT COUNT(*) FROM wms_outbox o WHERE o.aggregate_type='FinishedReceipt' AND o.aggregate_id=d.id)<>CASE WHEN d.status='OPEN' THEN 0 WHEN d.status='STORED' THEN 3 ELSE 2 END;
+ (SELECT COUNT(*) FROM wms_outbox o WHERE o.aggregate_type='FinishedReceipt' AND o.aggregate_id=d.id)<>CASE WHEN d.status='OPEN' THEN 0 WHEN d.status='STORED' THEN 3 ELSE 2 END
+UNION ALL
+SELECT 'sales_ledger',COUNT(*) FROM wms_sales_order d LEFT JOIN wms_inventory_transaction t ON t.sales_order_id=d.id
+WHERE (d.status='SHIPPED' AND (t.id IS NULL OR t.balance_id<>d.source_balance_id OR t.change_qty<>-d.quantity OR t.transaction_type<>'SALES_OUT')) OR (d.status<>'SHIPPED' AND t.id IS NOT NULL)
+UNION ALL
+SELECT 'sales_dimensions',COUNT(*) FROM wms_sales_order d JOIN wms_inventory_balance b ON b.id=d.source_balance_id
+WHERE b.warehouse_id<>d.warehouse_id OR b.material_id<>d.material_id OR b.origin_type<>'PRODUCTION' OR b.quality_status<>'QUALIFIED'
+UNION ALL
+SELECT 'sales_review',COUNT(*) FROM wms_sales_order d WHERE d.status IN ('VERIFIED','SHIPPED') AND
+(d.picked_by=d.reviewed_by OR NOT EXISTS(SELECT 1 FROM wms_sales_action a WHERE a.id=d.pick_id AND a.sales_order_id=d.id AND a.action_type='PICK' AND a.created_by=d.picked_by)
+ OR NOT EXISTS(SELECT 1 FROM wms_sales_action a WHERE a.pick_id=d.pick_id AND a.sales_order_id=d.id AND a.action_type='APPROVE' AND a.created_by=d.reviewed_by))
+UNION ALL
+SELECT 'sales_reservation',COUNT(*) FROM wms_sales_order d WHERE
+ (SELECT COUNT(*) FROM wms_reservation_event e WHERE e.sales_order_id=d.id)<>CASE WHEN d.source_balance_id IS NULL THEN 0 WHEN d.status IN ('CANCELLED','SHIPPED') THEN 2 ELSE 1 END
+ OR (d.source_balance_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM wms_reservation_event e WHERE e.sales_order_id=d.id AND e.event_type='RESERVE' AND e.balance_id=d.source_balance_id AND e.quantity=d.quantity))
+ OR (d.status='SHIPPED' AND NOT EXISTS(SELECT 1 FROM wms_reservation_event e WHERE e.sales_order_id=d.id AND e.event_type='CONSUME' AND e.quantity=d.quantity))
+ OR (d.status='CANCELLED' AND d.source_balance_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM wms_reservation_event e WHERE e.sales_order_id=d.id AND e.event_type='RELEASE' AND e.quantity=d.quantity))
+UNION ALL
+SELECT 'sales_feedback',COUNT(*) FROM wms_sales_order d LEFT JOIN wms_outbox o ON o.aggregate_type='SalesOrder' AND o.aggregate_id=d.id AND o.event_type='SalesOutboundConfirmed'
+WHERE (d.status='SHIPPED' AND o.message_id IS NULL) OR (d.status<>'SHIPPED' AND o.message_id IS NOT NULL);

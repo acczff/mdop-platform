@@ -104,3 +104,17 @@ it('does not label broker publication as downstream receipt', async () => {
   await flushPromises()
   expect(v.get('[role="dialog"]').text()).toContain('已发布 · 尚未接收')
 })
+
+it('requires an explicit production date instead of silently defaulting to a UTC date', async () => {
+  const v = setup()
+  await flushPromises()
+  await v
+    .findAll('button')
+    .find((b) => b.text() === '模拟 MES 完工需求')!
+    .trigger('click')
+  await flushPromises()
+  const input = v.get('[role="dialog"] input[type="date"]')
+  expect((input.element as HTMLInputElement).value).toBe('')
+  expect(input.attributes()).toHaveProperty('required')
+  v.unmount()
+})

@@ -29,38 +29,61 @@ public class WarehouseResultStore {
             if (e == null
                     || !validator.validate(e).isEmpty()
                     || !e.sourceSystem().equals("WMS")
-                    || !e.aggregateType().equals("FinishedReceipt")
+                    || !Set.of("FinishedReceipt", "SalesOrder").contains(e.aggregateType())
                     || !Set.of(
                                     "FinishedGoodsReceived",
                                     "FinishedInspectionRequested",
-                                    "FinishedGoodsPutaway")
+                                    "FinishedGoodsPutaway",
+                                    "SalesOutboundConfirmed")
                             .contains(e.eventType())) throw new IllegalArgumentException();
             var p = e.payload();
-            id = number(p, "receiptId");
+            boolean sales = e.aggregateType().equals("SalesOrder");
+            if (sales != e.eventType().equals("SalesOutboundConfirmed"))
+                throw new IllegalArgumentException();
+            id = number(p, sales ? "salesOrderId" : "receiptId");
             if (!String.valueOf(id).equals(e.aggregateId())) throw new IllegalArgumentException();
             var qty = new BigDecimal(text(p, "quantity", 32));
             if (qty.signum() <= 0
                     || qty.scale() > 6
                     || qty.compareTo(new BigDecimal("999999999999.999999")) > 0)
                 throw new IllegalArgumentException();
-            String quality = text(p, "qualityStatus", 32);
-            if (!quality.equals(
-                    e.eventType().equals("FinishedGoodsPutaway")
-                            ? "QUALIFIED"
-                            : "PENDING_INSPECTION")) throw new IllegalArgumentException();
-            target = e.eventType().equals("FinishedInspectionRequested") ? "QMS" : "MES";
-            var canonical =
-                    List.of(
-                            e.aggregateType(),
-                            id,
-                            e.eventType(),
-                            target,
-                            text(p, "workOrderNo", 64),
-                            number(p, "warehouseId"),
-                            number(p, "materialId"),
-                            text(p, "batchNo", 64),
-                            qty.stripTrailingZeros().toPlainString(),
-                            quality);
+            target =
+                    sales
+                            ? "ERP"
+                            : e.eventType().equals("FinishedInspectionRequested") ? "QMS" : "MES";
+            java.util.List<Object> canonical;
+            if (sales) {
+                canonical =
+                        List.of(
+                                e.aggregateType(),
+                                id,
+                                e.eventType(),
+                                target,
+                                text(p, "salesOrderNo", 64),
+                                text(p, "customerReference", 128),
+                                number(p, "warehouseId"),
+                                number(p, "materialId"),
+                                text(p, "batchNo", 64),
+                                qty.stripTrailingZeros().toPlainString());
+            } else {
+                String quality = text(p, "qualityStatus", 32);
+                if (!quality.equals(
+                        e.eventType().equals("FinishedGoodsPutaway")
+                                ? "QUALIFIED"
+                                : "PENDING_INSPECTION")) throw new IllegalArgumentException();
+                canonical =
+                        List.of(
+                                e.aggregateType(),
+                                id,
+                                e.eventType(),
+                                target,
+                                text(p, "workOrderNo", 64),
+                                number(p, "warehouseId"),
+                                number(p, "materialId"),
+                                text(p, "batchNo", 64),
+                                qty.stripTrailingZeros().toPlainString(),
+                                quality);
+            }
             digest =
                     HexFormat.of()
                             .formatHex(

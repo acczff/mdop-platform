@@ -317,6 +317,8 @@ public class IssueService {
     }
 
     private void eligibleStock(Map<String, Object> b) {
+        if (!"PURCHASE".equals(b.get("origin_type")) || b.get("supplier_id") == null)
+            throw conflict("首版生产领料仅支持有供应商来源的采购原料");
         String area =
                 db.sql("SELECT area_type FROM mdm_location WHERE id=?")
                         .param(n(b, "location_id"))

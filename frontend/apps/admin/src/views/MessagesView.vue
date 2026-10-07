@@ -63,6 +63,7 @@ const names: Record<string, string> = {
 const eventNames: Record<string, string> = {
   ProductionConsumptionReversed: 'MES消耗冲正反馈',
   ProductionReturnReversed: 'MES退料冲正反馈',
+  SalesOutboundConfirmed: 'ERP销售出库反馈',
   MaterialIssued: 'MES发料反馈',
   FinishedGoodsReceived: '成品收货反馈',
   FinishedInspectionRequested: '成品检验请求',
@@ -288,11 +289,13 @@ onMounted(load)
             <tr v-for="item in results" :key="item.message_id">
               <td>
                 {{
-                  item.aggregate_type === 'FinishedReceipt'
-                    ? '成品 FG-'
-                    : item.aggregate_type === 'MaterialIssue'
-                      ? '领料 MI-'
-                      : '收货 #'
+                  item.aggregate_type === 'SalesOrder'
+                    ? '销售 SO-'
+                    : item.aggregate_type === 'FinishedReceipt'
+                      ? '成品 FG-'
+                      : item.aggregate_type === 'MaterialIssue'
+                        ? '领料 MI-'
+                        : '收货 #'
                 }}{{ item.aggregate_id }}
               </td>
               <td>

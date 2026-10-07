@@ -16,6 +16,61 @@ import org.springframework.test.context.ActiveProfiles;
 class ProductionReversalTests extends InventoryScenarioSupport {
     long source, store, issue, target;
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"CONSUMPTION", "RETURN"})
+    void concurrentApprovalsRestoreInventoryAndPublishOnlyOnce(String kind) throws Exception {
+        issued();
+        var originalSourceQty = qty(source);
+        long original = kind.equals("CONSUMPTION") ? consume() : returned("QUALIFIED");
+        long reversal = request(kind, original);
+        var gate = new CountDownLatch(1);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            List<Future<Boolean>> jobs = new ArrayList<>();
+            for (String reviewer : List.of("reviewer-a", "reviewer-b")) {
+                jobs.add(
+                        pool.submit(
+                                () -> {
+                                    gate.await();
+                                    postAs(
+                                            "/api/v1/wms/production-reversals/"
+                                                    + reversal
+                                                    + "/approve",
+                                            Map.of("reason", "并发复核同一纠错依据"),
+                                            both(reviewer, "wms:production:review"),
+                                            200);
+                                    return true;
+                                }));
+            }
+            gate.countDown();
+            for (var job : jobs) assertThat(job.get(30, TimeUnit.SECONDS)).isTrue();
+        }
+        assertThat(qty(target)).isEqualByComparingTo("30");
+        assertThat(stock(target, "production_qty")).isEqualByComparingTo("30");
+        var detail = read("/api/v1/wms/production/issues/" + issue);
+        assertThat(
+                        detail.get(kind.equals("CONSUMPTION") ? "consumed_qty" : "returned_qty")
+                                .asText())
+                .isEqualTo("0.000000");
+        assertThat(
+                        db.queryForObject(
+                                "SELECT COUNT(*) FROM wms_inventory_transaction WHERE production_reversal_id=?",
+                                Long.class,
+                                reversal))
+                .isEqualTo(kind.equals("CONSUMPTION") ? 1 : 2);
+        assertThat(
+                        db.queryForObject(
+                                "SELECT COUNT(*) FROM wms_outbox WHERE aggregate_id=? AND event_type=?",
+                                Long.class,
+                                issue,
+                                kind.equals("CONSUMPTION")
+                                        ? "ProductionConsumptionReversed"
+                                        : "ProductionReturnReversed"))
+                .isEqualTo(1);
+        if (kind.equals("RETURN")) {
+            assertThat(qty(source)).isEqualByComparingTo(originalSourceQty);
+        }
+    }
+
     void issued() throws Exception {
         var s = ready();
         source = s[0];
