@@ -108,7 +108,7 @@ public class InventoryService {
         var rows =
                 db.sql(
                                 """
-            SELECT t.id,t.transaction_type,t.receipt_id,r.receipt_no,t.receipt_item_id,
+            SELECT t.id,t.transaction_type,t.receipt_id,r.receipt_no,t.receipt_item_id,t.cross_transfer_receipt_id,
                    a.external_notice_no,a.purchase_order_no,i.material_code,i.material_name,i.unit,
                    CAST(t.before_qty AS CHAR) AS before_qty,CAST(t.change_qty AS CHAR) AS change_qty,
                    CAST(t.after_qty AS CHAR) AS after_qty,t.reversed_transaction_id,t.purchase_return_id,
