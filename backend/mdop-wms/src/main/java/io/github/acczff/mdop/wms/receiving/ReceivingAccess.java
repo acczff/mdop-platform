@@ -7,17 +7,18 @@ import org.springframework.stereotype.Component;
 @Component
 public class ReceivingAccess {
     public void requireWarehouse(long warehouseId) {
+        if (!canAccessWarehouse(warehouseId))
+            throw new BusinessException(403, "WAREHOUSE_ACCESS_DENIED", "没有目标仓库的数据权限");
+    }
+
+    public boolean canAccessWarehouse(long warehouseId) {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
-        boolean allowed =
-                authentication != null
-                        && authentication.getAuthorities().stream()
-                                .anyMatch(
-                                        a ->
-                                                a.getAuthority().equals("ROLE_ADMIN")
-                                                        || a.getAuthority()
-                                                                .equals(
-                                                                        "wms:warehouse:"
-                                                                                + warehouseId));
-        if (!allowed) throw new BusinessException(403, "WAREHOUSE_ACCESS_DENIED", "没有目标仓库的数据权限");
+        return authentication != null
+                && authentication.getAuthorities().stream()
+                        .anyMatch(
+                                a ->
+                                        a.getAuthority().equals("ROLE_ADMIN")
+                                                || a.getAuthority()
+                                                        .equals("wms:warehouse:" + warehouseId));
     }
 }

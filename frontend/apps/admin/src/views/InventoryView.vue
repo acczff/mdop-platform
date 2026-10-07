@@ -26,6 +26,7 @@ interface Stock {
 }
 interface Ledger {
   id: number
+  cross_transfer_id?: number | null
   sales_order_id?: number | null
   finished_receipt_id?: number | null
   transaction_type: string
@@ -65,6 +66,8 @@ const qualityNames: Record<string, string> = {
   REJECTED: '不合格',
 }
 const types: Record<string, string> = {
+  CROSS_OUT: '跨仓调拨发出',
+  CROSS_IN: '跨仓调拨收货',
   SALES_OUT: '销售出库',
   FG_RECEIPT: '成品实物收货',
   FG_QC_OUT: '成品质检转出',
@@ -484,6 +487,9 @@ onMounted(async () => {
                 }}</small>
               </td>
               <td>
+                <template v-if="t.cross_transfer_id"
+                  >跨仓 WT-{{ t.cross_transfer_id }}</template
+                >
                 <template v-if="t.sales_order_id"
                   >销售 SO-{{ t.sales_order_id }}</template
                 ><template v-else-if="t.finished_receipt_id"

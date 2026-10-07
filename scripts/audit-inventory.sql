@@ -59,7 +59,7 @@ SELECT 'count_review',COUNT(*) FROM wms_stock_count c JOIN wms_inventory_balance
 WHERE c.warehouse_id<>b.warehouse_id OR (c.status='APPROVED' AND (c.reviewed_by IS NULL OR c.reviewed_by=c.created_by OR c.reviewed_at IS NULL))
 UNION ALL
 SELECT 'reservation_balance',COUNT(*) FROM wms_inventory_balance b LEFT JOIN
- (SELECT source_balance_id,SUM(quantity) AS qty FROM (SELECT source_balance_id,quantity FROM wms_material_issue WHERE status='RESERVED' UNION ALL SELECT source_balance_id,quantity FROM wms_sales_order WHERE status IN ('RESERVED','PICKED','VERIFIED')) a GROUP BY source_balance_id) d ON d.source_balance_id=b.id
+ (SELECT source_balance_id,SUM(quantity) AS qty FROM (SELECT source_balance_id,quantity FROM wms_material_issue WHERE status='RESERVED' UNION ALL SELECT source_balance_id,quantity FROM wms_sales_order WHERE status IN ('RESERVED','PICKED','VERIFIED') UNION ALL SELECT source_balance_id,quantity FROM wms_cross_transfer WHERE status='APPROVED') a GROUP BY source_balance_id) d ON d.source_balance_id=b.id
 WHERE b.reserved_qty<>COALESCE(d.qty,0)
 UNION ALL
 SELECT 'reservation_events',COUNT(*) FROM wms_material_issue d
@@ -169,4 +169,28 @@ SELECT 'sales_reservation',COUNT(*) FROM wms_sales_order d WHERE
  OR (d.status='CANCELLED' AND d.source_balance_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM wms_reservation_event e WHERE e.sales_order_id=d.id AND e.event_type='RELEASE' AND e.quantity=d.quantity))
 UNION ALL
 SELECT 'sales_feedback',COUNT(*) FROM wms_sales_order d LEFT JOIN wms_outbox o ON o.aggregate_type='SalesOrder' AND o.aggregate_id=d.id AND o.event_type='SalesOutboundConfirmed'
-WHERE (d.status='SHIPPED' AND o.message_id IS NULL) OR (d.status<>'SHIPPED' AND o.message_id IS NOT NULL);
+WHERE (d.status='SHIPPED' AND o.message_id IS NULL) OR (d.status<>'SHIPPED' AND o.message_id IS NOT NULL)
+UNION ALL
+SELECT 'cross_transfer_ledger_and_transit',COUNT(*) FROM wms_cross_transfer d LEFT JOIN
+ (SELECT cross_transfer_id,COUNT(*) n,SUM(change_qty) qty FROM wms_inventory_transaction WHERE cross_transfer_id IS NOT NULL GROUP BY cross_transfer_id)t ON t.cross_transfer_id=d.id
+WHERE COALESCE(t.n,0)<>CASE WHEN d.status='RECEIVED' THEN 2 WHEN d.status='IN_TRANSIT' THEN 1 ELSE 0 END
+ OR COALESCE(t.qty,0)+IF(d.status='IN_TRANSIT',d.quantity,0)<>0
+ OR (d.status IN ('IN_TRANSIT','RECEIVED') AND NOT EXISTS(SELECT 1 FROM wms_inventory_transaction l WHERE l.cross_transfer_id=d.id AND l.transaction_type='CROSS_OUT' AND l.balance_id=d.source_balance_id AND l.change_qty=-d.quantity))
+ OR (d.status='RECEIVED' AND NOT EXISTS(SELECT 1 FROM wms_inventory_transaction l WHERE l.cross_transfer_id=d.id AND l.transaction_type='CROSS_IN' AND l.balance_id=d.target_balance_id AND l.change_qty=d.quantity))
+UNION ALL
+SELECT 'cross_transfer_dimensions',COUNT(*) FROM wms_cross_transfer d JOIN wms_inventory_balance s ON s.id=d.source_balance_id LEFT JOIN wms_inventory_balance t ON t.id=d.target_balance_id JOIN mdm_location l ON l.id=d.target_location_id
+WHERE d.source_warehouse_id<>s.warehouse_id OR d.target_warehouse_id<>l.warehouse_id OR l.area_type<>'STORAGE'
+ OR (t.id IS NOT NULL AND (d.target_warehouse_id<>t.warehouse_id OR d.target_location_id<>t.location_id OR s.material_id<>t.material_id OR NOT(s.supplier_id<=>t.supplier_id) OR s.batch_no<>t.batch_no OR s.date_code<>t.date_code OR NOT(s.production_date<=>t.production_date) OR NOT(s.expiry_date<=>t.expiry_date) OR s.quality_status<>t.quality_status OR s.origin_type<>t.origin_type OR s.owner_type<>t.owner_type OR s.owner_id<>t.owner_id))
+UNION ALL
+SELECT 'cross_transfer_reservation',COUNT(*) FROM wms_cross_transfer d WHERE
+ (SELECT COUNT(*) FROM wms_reservation_event e WHERE e.cross_transfer_id=d.id)<>CASE WHEN d.status IN ('PENDING','REJECTED') OR (d.status='CANCELLED' AND d.reviewed_by IS NULL) THEN 0 WHEN d.status='APPROVED' THEN 1 ELSE 2 END
+ OR (d.status IN ('APPROVED','IN_TRANSIT','RECEIVED') AND NOT EXISTS(SELECT 1 FROM wms_reservation_event e WHERE e.cross_transfer_id=d.id AND e.event_type='RESERVE' AND e.balance_id=d.source_balance_id AND e.quantity=d.quantity))
+ OR (d.status IN ('IN_TRANSIT','RECEIVED') AND NOT EXISTS(SELECT 1 FROM wms_reservation_event e WHERE e.cross_transfer_id=d.id AND e.event_type='CONSUME' AND e.balance_id=d.source_balance_id AND e.quantity=d.quantity))
+ OR (d.status='CANCELLED' AND d.reviewed_by IS NOT NULL AND NOT EXISTS(SELECT 1 FROM wms_reservation_event e WHERE e.cross_transfer_id=d.id AND e.event_type='RELEASE' AND e.balance_id=d.source_balance_id AND e.quantity=d.quantity))
+UNION ALL
+SELECT 'cross_transfer_actions',COUNT(*) FROM wms_cross_transfer d WHERE
+ NOT EXISTS(SELECT 1 FROM wms_cross_transfer_action a WHERE a.cross_transfer_id=d.id AND a.action_type='CREATE' AND a.created_by=d.created_by)
+ OR (d.reviewed_by IS NOT NULL AND (d.reviewed_by=d.created_by OR NOT EXISTS(SELECT 1 FROM wms_cross_transfer_action a WHERE a.cross_transfer_id=d.id AND a.action_type=IF(d.status='REJECTED','REJECT','APPROVE') AND a.created_by=d.reviewed_by)))
+ OR (d.status IN ('IN_TRANSIT','RECEIVED') AND NOT EXISTS(SELECT 1 FROM wms_cross_transfer_action a WHERE a.cross_transfer_id=d.id AND a.action_type='SHIP' AND a.created_by=d.shipped_by))
+ OR (d.status='RECEIVED' AND NOT EXISTS(SELECT 1 FROM wms_cross_transfer_action a WHERE a.cross_transfer_id=d.id AND a.action_type='RECEIVE' AND a.created_by=d.received_by))
+ OR (d.status='CANCELLED' AND NOT EXISTS(SELECT 1 FROM wms_cross_transfer_action a WHERE a.cross_transfer_id=d.id AND a.action_type='CANCEL'));
