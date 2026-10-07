@@ -12,6 +12,7 @@ public class MessagingConfiguration {
     public static final String EXCHANGE = "mdop.events.v1";
     public static final String ARRIVALS = "mdop.wms.arrivals.v1";
     public static final String ERP = "mdop.simulator.erp.v1";
+    public static final String OPERATIONS = "mdop.simulator.operations.v1";
     public static final String MES = "mdop.simulator.mes.v1";
     public static final String QMS = "mdop.simulator.qms.v1";
 
@@ -46,7 +47,21 @@ public class MessagingConfiguration {
                         .deadLetterRoutingKey("mes-result")
                         .build();
         var mesDead = QueueBuilder.durable(MES + ".dead").build();
+        var operations =
+                QueueBuilder.durable(OPERATIONS)
+                        .deadLetterExchange("mdop.dead.v1")
+                        .deadLetterRoutingKey("operations")
+                        .build();
+        var operationsDead = QueueBuilder.durable(OPERATIONS + ".dead").build();
         return new Declarables(
+                operations,
+                operationsDead,
+                BindingBuilder.bind(operationsDead)
+                        .to(new DirectExchange("mdop.dead.v1", true, false))
+                        .with("operations"),
+                BindingBuilder.bind(operations).to(exchange).with("FinishedGoodsReceived"),
+                BindingBuilder.bind(operations).to(exchange).with("FinishedInspectionRequested"),
+                BindingBuilder.bind(operations).to(exchange).with("FinishedGoodsPutaway"),
                 mes,
                 mesDead,
                 BindingBuilder.bind(mesDead)

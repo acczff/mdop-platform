@@ -4,6 +4,10 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
+      path: '/finished-goods',
+      component: () => import('../views/FinishedGoodsView.vue'),
+    },
+    {
       path: '/production',
       component: () => import('../views/ProductionView.vue'),
     },

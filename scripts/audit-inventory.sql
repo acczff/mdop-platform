@@ -44,7 +44,7 @@ SELECT 'transfer_dimensions',COUNT(*) FROM wms_stock_transfer x
  JOIN wms_inventory_balance s ON s.id=x.source_balance_id
  JOIN wms_inventory_balance d ON d.id=x.target_balance_id
 WHERE x.warehouse_id<>s.warehouse_id OR s.warehouse_id<>d.warehouse_id
- OR s.location_id=d.location_id OR s.material_id<>d.material_id OR s.supplier_id<>d.supplier_id
+ OR s.location_id=d.location_id OR s.material_id<>d.material_id OR NOT(s.supplier_id<=>d.supplier_id)
  OR s.batch_no<>d.batch_no OR s.date_code<>d.date_code
  OR NOT(s.production_date<=>d.production_date) OR NOT(s.expiry_date<=>d.expiry_date)
  OR s.quality_status<>d.quality_status OR s.owner_type<>d.owner_type OR s.owner_id<>d.owner_id
@@ -80,7 +80,7 @@ WHERE (d.status='ISSUED' AND (COALESCE(t.n,0)<>2 OR t.net<>0
  OR (d.status<>'ISSUED' AND COALESCE(t.n,0)<>0)
 UNION ALL
 SELECT 'issue_dimensions',COUNT(*) FROM wms_material_issue d JOIN wms_inventory_balance s ON s.id=d.source_balance_id JOIN wms_inventory_balance t ON t.id=d.target_balance_id
-WHERE s.warehouse_id<>d.warehouse_id OR t.warehouse_id<>d.target_warehouse_id OR t.location_id<>d.target_location_id OR s.material_id<>d.material_id OR s.material_id<>t.material_id OR s.supplier_id<>t.supplier_id
+WHERE s.warehouse_id<>d.warehouse_id OR t.warehouse_id<>d.target_warehouse_id OR t.location_id<>d.target_location_id OR s.material_id<>d.material_id OR s.material_id<>t.material_id OR NOT(s.supplier_id<=>t.supplier_id)
  OR s.batch_no<>t.batch_no OR s.date_code<>t.date_code OR NOT(s.production_date<=>t.production_date) OR NOT(s.expiry_date<=>t.expiry_date)
  OR s.quality_status<>t.quality_status OR s.owner_type<>t.owner_type OR s.owner_id<>t.owner_id
 UNION ALL
@@ -115,7 +115,7 @@ SELECT 'production_return_dimensions',COUNT(*) FROM wms_production_return p JOIN
  JOIN wms_inventory_balance s ON s.id=d.target_balance_id JOIN wms_inventory_balance t ON t.id=p.target_balance_id JOIN mdm_location l ON l.id=t.location_id
 WHERE t.warehouse_id<>d.warehouse_id OR t.location_id<>p.target_location_id OR t.quality_status<>p.quality_status
  OR l.area_type<>CASE WHEN p.quality_status='QUALIFIED' THEN 'STORAGE' ELSE 'INSPECTION' END
- OR s.material_id<>t.material_id OR s.supplier_id<>t.supplier_id OR s.batch_no<>t.batch_no OR s.date_code<>t.date_code
+ OR s.material_id<>t.material_id OR NOT(s.supplier_id<=>t.supplier_id) OR s.batch_no<>t.batch_no OR s.date_code<>t.date_code
  OR NOT(s.production_date<=>t.production_date) OR NOT(s.expiry_date<=>t.expiry_date) OR s.owner_type<>t.owner_type OR s.owner_id<>t.owner_id
 UNION ALL
 SELECT 'issue_feedback',COUNT(*) FROM wms_material_issue d LEFT JOIN wms_outbox o ON o.aggregate_type='MaterialIssue' AND o.aggregate_id=d.id AND o.event_type='MaterialIssued' AND o.business_key=''
@@ -134,4 +134,20 @@ UNION ALL
 SELECT 'production_reversal_links',COUNT(*) FROM wms_inventory_transaction t JOIN wms_inventory_transaction o ON o.id=t.reversed_transaction_id WHERE t.production_reversal_id IS NOT NULL AND (t.balance_id<>o.balance_id OR t.change_qty<>-o.change_qty)
 UNION ALL
 SELECT 'production_reversal_feedback',COUNT(*) FROM wms_production_reversal r LEFT JOIN wms_outbox o ON o.aggregate_type='MaterialIssue' AND o.aggregate_id=r.issue_id AND o.business_key=CAST(r.id AS CHAR) AND o.event_type=IF(r.consumption_id IS NULL,'ProductionReturnReversed','ProductionConsumptionReversed')
-WHERE (r.status='APPROVED' AND o.message_id IS NULL) OR (r.status<>'APPROVED' AND o.message_id IS NOT NULL);
+WHERE (r.status='APPROVED' AND o.message_id IS NULL) OR (r.status<>'APPROVED' AND o.message_id IS NOT NULL)
+UNION ALL
+SELECT 'finished_ledger',COUNT(*) FROM wms_finished_receipt d LEFT JOIN
+ (SELECT finished_receipt_id,COUNT(*) n,SUM(change_qty) qty FROM wms_inventory_transaction WHERE finished_receipt_id IS NOT NULL GROUP BY finished_receipt_id)t ON t.finished_receipt_id=d.id
+WHERE COALESCE(t.n,0)<>CASE WHEN d.status='OPEN' THEN 0 WHEN d.status='RECEIVED' THEN 1 WHEN d.status='STORED' THEN 5 ELSE 3 END
+ OR COALESCE(t.qty,0)<>IF(d.status='OPEN',0,d.quantity)
+UNION ALL
+SELECT 'finished_dimensions',COUNT(*) FROM wms_inventory_transaction t JOIN wms_finished_receipt d ON d.id=t.finished_receipt_id JOIN wms_inventory_balance b ON b.id=t.balance_id
+WHERE b.origin_type<>'PRODUCTION' OR b.supplier_id IS NOT NULL OR b.warehouse_id<>d.warehouse_id OR b.material_id<>d.material_id OR b.batch_no<>d.batch_no OR b.date_code<>d.date_code OR NOT(b.production_date<=>d.production_date) OR NOT(b.expiry_date<=>d.expiry_date)
+ OR ABS(t.change_qty)<>d.quantity
+ OR (t.transaction_type='FG_RECEIPT' AND (t.balance_id<>d.received_balance_id OR b.quality_status<>'PENDING_INSPECTION'))
+ OR (t.transaction_type='FG_QC_OUT' AND t.balance_id<>d.received_balance_id)
+ OR (t.transaction_type IN('FG_QC_IN','FG_PUT_OUT') AND (t.balance_id<>d.quality_balance_id OR b.quality_status<>d.quality_status))
+ OR (t.transaction_type='FG_PUT_IN' AND (t.balance_id<>d.stored_balance_id OR b.quality_status<>'QUALIFIED'))
+UNION ALL
+SELECT 'finished_feedback',COUNT(*) FROM wms_finished_receipt d WHERE
+ (SELECT COUNT(*) FROM wms_outbox o WHERE o.aggregate_type='FinishedReceipt' AND o.aggregate_id=d.id)<>CASE WHEN d.status='OPEN' THEN 0 WHEN d.status='STORED' THEN 3 ELSE 2 END;
