@@ -2,7 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { request, type Page } from '../api'
-const props = defineProps<{ authorities: string[] }>()
+import ProductionReversals from '../components/ProductionReversals.vue'
+const props = defineProps<{ authorities: string[]; username?: string }>()
 const route = useRoute()
 interface Issue {
   id: number
@@ -83,6 +84,8 @@ const statuses: Record<string, string> = {
   DEAD: '死信',
 }
 const eventNames: Record<string, string> = {
+  ProductionConsumptionReversed: '消耗冲正反馈',
+  ProductionReturnReversed: '退料冲正反馈',
   MaterialIssued: '发料结果',
   ProductionConsumed: '消耗记账结果',
   ProductionMaterialReturned: '退料结果',
@@ -421,6 +424,15 @@ onMounted(() =>
           >查看消息记录与失败重放</RouterLink
         >
       </section>
+      <ProductionReversals
+        :key="issue.id"
+        :issue-id="issue.id"
+        :username="username"
+        :authorities="authorities"
+        :consumptions="consumptions?.items || []"
+        :returns="returns?.items || []"
+        @changed="perform(load)"
+      />
     </template>
     <p v-else class="muted">从生产领料的已发料单进入，或输入领料单号查询。</p>
     <div v-if="action && issue" class="overlay">

@@ -55,6 +55,8 @@ public class MessagingConfiguration {
                 BindingBuilder.bind(mes).to(exchange).with("MaterialIssued"),
                 BindingBuilder.bind(mes).to(exchange).with("ProductionConsumed"),
                 BindingBuilder.bind(mes).to(exchange).with("ProductionMaterialReturned"),
+                BindingBuilder.bind(mes).to(exchange).with("ProductionConsumptionReversed"),
+                BindingBuilder.bind(mes).to(exchange).with("ProductionReturnReversed"),
                 erp,
                 qms,
                 BindingBuilder.bind(erp).to(exchange).with("PurchaseReceiptConfirmed"),

@@ -23,6 +23,26 @@ public class ProductionEvents {
 
     // Called inside the inventory transaction; delivery is owned by the integration module.
     public void record(long issueId, String type, String key, BigDecimal quantity) {
+        record(issueId, type, key, quantity, null, null);
+    }
+
+    public void reverse(
+            long issueId,
+            String type,
+            String key,
+            String originalType,
+            String originalKey,
+            BigDecimal quantity) {
+        record(issueId, type, key, quantity, originalType, originalKey);
+    }
+
+    private void record(
+            long issueId,
+            String type,
+            String key,
+            BigDecimal quantity,
+            String originalType,
+            String originalKey) {
         var d =
                 db.sql(
                                 "SELECT d.*,b.batch_no FROM wms_material_issue d JOIN wms_inventory_balance b ON b.id=d.source_balance_id WHERE d.id=?")
@@ -47,6 +67,11 @@ public class ProductionEvents {
                         d.get("warehouse_id"),
                         "lineWarehouseId",
                         d.get("target_warehouse_id"));
+        var envelope = new java.util.LinkedHashMap<String, Object>(payload);
+        if (originalType != null) {
+            envelope.put("originalEventType", originalType);
+            envelope.put("originalBusinessKey", originalKey);
+        }
         db.sql(
                         "INSERT INTO wms_outbox(message_id,event_type,aggregate_type,aggregate_id,trace_id,payload,occurred_at,business_key) VALUES(?,?,'MaterialIssue',?,?,?,?,?)")
                 .params(
@@ -54,7 +79,7 @@ public class ProductionEvents {
                         type,
                         issueId,
                         UUID.randomUUID().toString(),
-                        json.writeValueAsString(payload),
+                        json.writeValueAsString(envelope),
                         Timestamp.from(clock.instant()),
                         key)
                 .update();

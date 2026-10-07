@@ -186,6 +186,102 @@ class MesFeedbackTests extends InventoryScenarioSupport {
     }
 
     @Test
+    void priorDigestAndReversalFeedbackRemainReplaySafe() throws Exception {
+        long id = issued();
+        var event = delivery.outgoing(message(id));
+        var p = event.payload();
+        String legacy =
+                json.writeValueAsString(
+                        List.of(
+                                "MaterialIssued",
+                                id,
+                                "",
+                                p.get("workOrderNo").asText(),
+                                "20",
+                                p.get("materialId").asLong(),
+                                p.get("batchNo").asText(),
+                                p.get("sourceWarehouseId").asLong(),
+                                p.get("lineWarehouseId").asLong()));
+        String digest =
+                java.util.HexFormat.of()
+                        .formatHex(
+                                java.security.MessageDigest.getInstance("SHA-256")
+                                        .digest(
+                                                legacy.getBytes(
+                                                        java.nio.charset.StandardCharsets.UTF_8)));
+        store.accept(event);
+        assertThat(
+                        db.queryForObject(
+                                "SELECT payload_hash FROM integration_mes_message WHERE message_id=?",
+                                String.class,
+                                event.messageId()))
+                .isEqualTo(digest);
+        long c =
+                postAs(
+                                "/api/local/mes-production/consumptions",
+                                Map.of(
+                                        "eventNo",
+                                        key(),
+                                        "issueId",
+                                        id,
+                                        "workOrderNo",
+                                        "MO-001",
+                                        "quantity",
+                                        "2"),
+                                admin(),
+                                201)
+                        .get("id")
+                        .asLong();
+        long r =
+                postAs(
+                                "/api/v1/wms/production-reversals",
+                                Map.of(
+                                        "kind",
+                                        "CONSUMPTION",
+                                        "sourceId",
+                                        c,
+                                        "requestKey",
+                                        key(),
+                                        "externalReference",
+                                        "MES-FIX",
+                                        "reason",
+                                        "核实错误"),
+                                admin(),
+                                201)
+                        .get("id")
+                        .asLong();
+        postAs(
+                "/api/v1/wms/production-reversals/" + r + "/approve",
+                Map.of("reason", "已核实"),
+                both("reviewer", "wms:production:review"),
+                200);
+        delivery.dispatch(
+                io.github.acczff.mdop.integration.messaging.DeliveryService.Direction.OUTBOX);
+        org.awaitility.Awaitility.await()
+                .atMost(java.time.Duration.ofSeconds(10))
+                .untilAsserted(
+                        () ->
+                                assertThat(
+                                                db.queryForObject(
+                                                        "SELECT COUNT(*) FROM integration_mes_result WHERE event_type='ProductionConsumptionReversed' AND issue_id=?",
+                                                        Long.class,
+                                                        id))
+                                        .isEqualTo(1));
+        String message =
+                db.queryForObject(
+                        "SELECT message_id FROM wms_outbox WHERE aggregate_id=? AND event_type='ProductionConsumptionReversed'",
+                        String.class,
+                        id);
+        store.accept(delivery.outgoing(message));
+        assertThat(
+                        db.queryForObject(
+                                "SELECT COUNT(*) FROM integration_mes_result WHERE event_type='ProductionConsumptionReversed' AND issue_id=?",
+                                Long.class,
+                                id))
+                .isEqualTo(1);
+    }
+
+    @Test
     void failedFeedbackInsertRollsBackIssueAndKeepsReservation() throws Exception {
         long balance = ready()[0];
         lineSide();

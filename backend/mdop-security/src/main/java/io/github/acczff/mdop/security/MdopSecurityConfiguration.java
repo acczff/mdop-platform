@@ -51,6 +51,8 @@ public class MdopSecurityConfiguration {
                                             "wms:arrival:read",
                                             "wms:inventory:read",
                                             "wms:production:read",
+                                            "wms:production:reverse",
+                                            "wms:production:review",
                                             "wms:production:confirm",
                                             "wms:production:cancel",
                                             "wms:issue:read",

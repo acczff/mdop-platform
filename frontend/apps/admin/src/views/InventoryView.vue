@@ -34,6 +34,7 @@ interface Ledger {
   reversed_transaction_id: number | null
   purchase_return_id: number | null
   consumption_id: number | null
+  production_reversal_id?: number | null
   production_return_id: number | null
   issue_id: number | null
   count_id: number | null
@@ -60,6 +61,9 @@ const qualityNames: Record<string, string> = {
   REJECTED: '不合格',
 }
 const types: Record<string, string> = {
+  PRC_RESTORE: '消耗冲正恢复',
+  PRR_REMOVE: '退料冲正扣回',
+  PRR_RESTORE: '退料冲正恢复',
   CONSUMPTION: '生产消耗',
   PROD_RETURN_OUT: '线边退料发出',
   PROD_RETURN_IN: '生产退料入库',

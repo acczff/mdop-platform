@@ -32,7 +32,12 @@ public class MesResultStore {
         try {
             if (event == null
                     || !validator.validate(event).isEmpty()
-                    || !Set.of("MaterialIssued", "ProductionConsumed", "ProductionMaterialReturned")
+                    || !Set.of(
+                                    "MaterialIssued",
+                                    "ProductionConsumed",
+                                    "ProductionMaterialReturned",
+                                    "ProductionConsumptionReversed",
+                                    "ProductionReturnReversed")
                             .contains(event.eventType())
                     || !"WMS".equals(event.sourceSystem())
                     || !"MaterialIssue".equals(event.aggregateType()))
@@ -55,8 +60,19 @@ public class MesResultStore {
                 throw new IllegalArgumentException();
             long source = number(p, "sourceWarehouseId"), line = number(p, "lineWarehouseId");
             if (source == line) throw new IllegalArgumentException();
-            String canonical =
-                    json.writeValueAsString(
+            String originalType = "", originalKey = "";
+            if (event.eventType().endsWith("Reversed")) {
+                originalType = text(p, "originalEventType", 64);
+                originalKey = text(p, "originalBusinessKey", 64);
+                if (!originalKey.matches("[1-9][0-9]{0,18}")
+                        || !originalType.equals(
+                                event.eventType().equals("ProductionConsumptionReversed")
+                                        ? "ProductionConsumed"
+                                        : "ProductionMaterialReturned"))
+                    throw new IllegalArgumentException();
+            }
+            var canonicalFields =
+                    new ArrayList<Object>(
                             List.of(
                                     event.eventType(),
                                     issue,
@@ -67,6 +83,11 @@ public class MesResultStore {
                                     batch(p),
                                     source,
                                     line));
+            if (!originalType.isEmpty()) {
+                canonicalFields.add(originalType);
+                canonicalFields.add(originalKey);
+            }
+            String canonical = json.writeValueAsString(canonicalFields);
             digest =
                     HexFormat.of()
                             .formatHex(

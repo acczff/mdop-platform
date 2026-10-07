@@ -61,6 +61,8 @@ const names: Record<string, string> = {
   DEAD: '死信',
 }
 const eventNames: Record<string, string> = {
+  ProductionConsumptionReversed: 'MES消耗冲正反馈',
+  ProductionReturnReversed: 'MES退料冲正反馈',
   MaterialIssued: 'MES发料反馈',
   ProductionConsumed: 'MES消耗记账结果',
   ProductionMaterialReturned: 'MES退料反馈',
