@@ -19,6 +19,37 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class SalesTests extends InventoryScenarioSupport {
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean java.time.Clock clock;
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(
+            strings = {"2026-10-06T16:00:00Z", "2026-10-06T23:59:59Z", "2026-10-07T00:00:00Z"})
+    void expiredAtBusinessMidnightCannotBeReservedOrShipped(String instant) throws Exception {
+        finished();
+        db.update("UPDATE wms_inventory_balance SET expiry_date='2026-10-06' WHERE id=?", stockId);
+        org.mockito.Mockito.doReturn(java.time.Instant.parse("2026-10-06T15:59:59Z"))
+                .when(clock)
+                .instant();
+        long id = sale("2");
+        reserveSale(id, 200);
+        long p = pick(id, "2");
+        postAs(path(id, "review"), reviewing(p, true), reviewer(), 200);
+        org.mockito.Mockito.doReturn(java.time.Instant.parse(instant)).when(clock).instant();
+        reserveSale(sale("1"), 409);
+        ship(id, 409);
+        assertThat(read("/api/v1/wms/sales-orders/" + id).get("status").asText())
+                .isEqualTo("VERIFIED");
+        assertThat(qty(stockId)).isEqualByComparingTo("10.123456");
+        assertThat(stock(stockId, "reserved_qty")).isEqualByComparingTo("2");
+        assertThat(read(path(id, "reservations"))).hasSize(1);
+        assertThat(
+                        db.queryForObject(
+                                "SELECT COUNT(*) FROM wms_inventory_transaction WHERE sales_order_id=?",
+                                Long.class,
+                                id))
+                .isZero();
+    }
+
     @org.springframework.test.context.DynamicPropertySource
     static void broker(org.springframework.test.context.DynamicPropertyRegistry r) {
         r.add("spring.rabbitmq.host", RABBITMQ::getHost);

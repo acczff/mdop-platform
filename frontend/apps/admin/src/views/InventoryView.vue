@@ -494,6 +494,8 @@ onMounted(async () => {
                     >消耗 PC-{{ t.consumption_id }}</small
                   ><small v-if="t.production_return_id"
                     >退料 PR-{{ t.production_return_id }}</small
+                  ><small v-if="t.production_reversal_id"
+                    >生产冲正 PCR-{{ t.production_reversal_id }}</small
                   ></template
                 >
                 <template v-else-if="t.count_id"
@@ -514,7 +516,10 @@ onMounted(async () => {
               <td>{{ t.change_qty }}</td>
               <td>{{ t.after_qty }}</td>
               <td>
-                <span v-if="t.transfer_id || t.issue_id"
+                <span v-if="t.reversed_transaction_id"
+                  >冲正原流水 #{{ t.reversed_transaction_id }}</span
+                >
+                <span v-else-if="t.transfer_id || t.issue_id"
                   ><button
                     v-if="t.source_balance_id"
                     :disabled="busy"
@@ -529,9 +534,7 @@ onMounted(async () => {
                     目标库存 #{{ t.target_balance_id }}
                   </button></span
                 >
-                <span v-else-if="t.reversed_transaction_id"
-                  >冲正原流水 #{{ t.reversed_transaction_id }}</span
-                ><span v-else-if="t.purchase_return_id"
+                <span v-else-if="t.purchase_return_id"
                   >退货 RT-{{ t.purchase_return_id }}</span
                 ><span v-else>—</span>
               </td>

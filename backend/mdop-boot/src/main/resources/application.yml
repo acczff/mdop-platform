@@ -35,6 +35,7 @@ spring:
           time_zone: UTC
 
 mdop:
+  time-zone: ${MDOP_TIME_ZONE:Asia/Shanghai}
   messaging:
     enabled: false
   auth:

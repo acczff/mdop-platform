@@ -16,7 +16,30 @@ import org.springframework.test.context.ActiveProfiles;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class FinishedGoodsTests extends InventoryScenarioSupport {
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean java.time.Clock clock;
+
     long fg, inspection, storage;
+
+    @Test
+    void shanghaiMidnightAcceptsTodayButRejectsTomorrowAndExpiredQualification() throws Exception {
+        org.mockito.Mockito.doReturn(java.time.Instant.parse("2026-10-06T16:00:00Z"))
+                .when(clock)
+                .instant();
+        finishedWarehouse();
+        var body = new HashMap<>(demand());
+        body.put("productionDate", "2026-10-07");
+        postAs("/api/local/finished-receipts", body, admin(), 201);
+        body.put("demandNo", key());
+        body.put("productionDate", "2026-10-08");
+        postAs("/api/local/finished-receipts", body, admin(), 409);
+        body.put("productionDate", "2026-10-06");
+        body.put("expiryDate", "2026-10-06");
+        long id = postAs("/api/local/finished-receipts", body, admin(), 201).get("id").asLong();
+        receive(id, 200);
+        quality(id, "QUALIFIED", key(), 409);
+        assertThat(read("/api/v1/wms/finished-receipts/" + id).get("status").asText())
+                .isEqualTo("RECEIVED");
+    }
 
     @org.springframework.test.context.DynamicPropertySource
     static void broker(org.springframework.test.context.DynamicPropertyRegistry r) {

@@ -123,6 +123,9 @@ async function perform(fn: () => Promise<void>) {
   }
 }
 async function load(page = 0) {
+  result.value = undefined
+  modal.value = undefined
+  row.value = undefined
   if (warehouse.value)
     result.value = await request(
       `/api/v1/wms/sales-orders?warehouseId=${warehouse.value}&page=${page}&size=20`,
