@@ -7,6 +7,8 @@ vi.mock('vue-router', () => ({ useRoute: () => ({ query: { issueId: '1' } }) }))
 afterEach(() => vi.resetAllMocks())
 function setup(authorities = ['ROLE_ADMIN']) {
   vi.mocked(request).mockImplementation(async (path) => {
+    if (path.includes('/production-reversals'))
+      return { items: [], page: 0, totalPages: 0, totalElements: 0 }
     if (path.includes('capabilities')) return { enabled: true }
     if (path.includes('/locations'))
       return [

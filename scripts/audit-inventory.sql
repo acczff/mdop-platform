@@ -89,11 +89,11 @@ SELECT 'production_allocation',COUNT(*) FROM wms_inventory_balance b LEFT JOIN
 WHERE b.production_qty<>COALESCE(d.qty,0)
 UNION ALL
 SELECT 'consumption_total',COUNT(*) FROM wms_material_issue d LEFT JOIN
- (SELECT issue_id,SUM(quantity) AS qty FROM wms_production_consumption GROUP BY issue_id) c ON c.issue_id=d.id
+ (SELECT c.issue_id,SUM(c.quantity) AS qty FROM wms_production_consumption c WHERE NOT EXISTS(SELECT 1 FROM wms_production_reversal r WHERE r.consumption_id=c.id AND r.status='APPROVED') GROUP BY c.issue_id) c ON c.issue_id=d.id
 WHERE d.consumed_qty<>COALESCE(c.qty,0)
 UNION ALL
 SELECT 'production_return_total',COUNT(*) FROM wms_material_issue d LEFT JOIN
- (SELECT issue_id,SUM(quantity) AS qty FROM wms_production_return WHERE status='RETURNED' GROUP BY issue_id) p ON p.issue_id=d.id
+ (SELECT p.issue_id,SUM(p.quantity) AS qty FROM wms_production_return p WHERE p.status='RETURNED' AND NOT EXISTS(SELECT 1 FROM wms_production_reversal r WHERE r.production_return_id=p.id AND r.status='APPROVED') GROUP BY p.issue_id) p ON p.issue_id=d.id
 WHERE d.returned_qty<>COALESCE(p.qty,0)
 UNION ALL
 SELECT 'pending_return_quota',COUNT(*) FROM wms_material_issue d JOIN
@@ -125,4 +125,13 @@ SELECT 'consumption_feedback',COUNT(*) FROM wms_production_consumption c LEFT JO
 WHERE o.message_id IS NULL
 UNION ALL
 SELECT 'production_return_feedback',COUNT(*) FROM wms_production_return p LEFT JOIN wms_outbox o ON o.aggregate_type='MaterialIssue' AND o.aggregate_id=p.issue_id AND o.event_type='ProductionMaterialReturned' AND o.business_key=CAST(p.id AS CHAR)
-WHERE (p.status='RETURNED' AND o.message_id IS NULL) OR (p.status<>'RETURNED' AND o.message_id IS NOT NULL);
+WHERE (p.status='RETURNED' AND o.message_id IS NULL) OR (p.status<>'RETURNED' AND o.message_id IS NOT NULL)
+UNION ALL
+SELECT 'production_reversal_ledger',COUNT(*) FROM wms_production_reversal r LEFT JOIN
+ (SELECT production_reversal_id,COUNT(*) AS n,SUM(change_qty) AS qty FROM wms_inventory_transaction WHERE production_reversal_id IS NOT NULL GROUP BY production_reversal_id)t ON t.production_reversal_id=r.id
+WHERE (r.status='APPROVED' AND (COALESCE(t.n,0)<>IF(r.consumption_id IS NULL,2,1) OR t.qty<>IF(r.consumption_id IS NULL,0,r.quantity))) OR (r.status<>'APPROVED' AND COALESCE(t.n,0)<>0)
+UNION ALL
+SELECT 'production_reversal_links',COUNT(*) FROM wms_inventory_transaction t JOIN wms_inventory_transaction o ON o.id=t.reversed_transaction_id WHERE t.production_reversal_id IS NOT NULL AND (t.balance_id<>o.balance_id OR t.change_qty<>-o.change_qty)
+UNION ALL
+SELECT 'production_reversal_feedback',COUNT(*) FROM wms_production_reversal r LEFT JOIN wms_outbox o ON o.aggregate_type='MaterialIssue' AND o.aggregate_id=r.issue_id AND o.business_key=CAST(r.id AS CHAR) AND o.event_type=IF(r.consumption_id IS NULL,'ProductionReturnReversed','ProductionConsumptionReversed')
+WHERE (r.status='APPROVED' AND o.message_id IS NULL) OR (r.status<>'APPROVED' AND o.message_id IS NOT NULL);
