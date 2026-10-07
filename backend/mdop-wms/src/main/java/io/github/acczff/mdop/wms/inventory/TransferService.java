@@ -148,7 +148,7 @@ public class TransferService {
                                 warehouse,
                                 input.targetLocationId(),
                                 number(source, "material_id"),
-                                number(source, "supplier_id"),
+                                source.get("supplier_id"),
                                 source.get("batch_no"),
                                 source.get("date_code"),
                                 date(source, "production_date"),
@@ -159,8 +159,8 @@ public class TransferService {
         db.sql(
                         """
             INSERT INTO wms_inventory_balance(stock_key,warehouse_id,location_id,material_id,supplier_id,
-            batch_no,date_code,production_date,expiry_date,quality_status,owner_type,owner_id)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE stock_key=stock_key
+            batch_no,date_code,production_date,expiry_date,quality_status,owner_type,owner_id,origin_type)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE stock_key=stock_key
             """)
                 .params(
                         stockKey,
@@ -174,7 +174,8 @@ public class TransferService {
                         expiry,
                         source.get("quality_status"),
                         source.get("owner_type"),
-                        source.get("owner_id"))
+                        source.get("owner_id"),
+                        source.get("origin_type"))
                 .update();
         var destination =
                 db.sql("SELECT * FROM wms_inventory_balance WHERE stock_key=? FOR UPDATE")

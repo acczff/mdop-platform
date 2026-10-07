@@ -64,6 +64,9 @@ const eventNames: Record<string, string> = {
   ProductionConsumptionReversed: 'MES消耗冲正反馈',
   ProductionReturnReversed: 'MES退料冲正反馈',
   MaterialIssued: 'MES发料反馈',
+  FinishedGoodsReceived: '成品收货反馈',
+  FinishedInspectionRequested: '成品检验请求',
+  FinishedGoodsPutaway: '成品上架反馈',
   ProductionConsumed: 'MES消耗记账结果',
   ProductionMaterialReturned: 'MES退料反馈',
   PurchaseReturnConfirmed: 'ERP采购退货反馈',
@@ -285,9 +288,11 @@ onMounted(load)
             <tr v-for="item in results" :key="item.message_id">
               <td>
                 {{
-                  item.aggregate_type === 'MaterialIssue'
-                    ? '领料 MI-'
-                    : '收货 #'
+                  item.aggregate_type === 'FinishedReceipt'
+                    ? '成品 FG-'
+                    : item.aggregate_type === 'MaterialIssue'
+                      ? '领料 MI-'
+                      : '收货 #'
                 }}{{ item.aggregate_id }}
               </td>
               <td>

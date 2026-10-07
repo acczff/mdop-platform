@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
+const route = useRoute()
 import { request, type Page, type Warehouse } from '../api'
 
 const props = defineProps<{ authorities: string[] }>()
@@ -24,6 +26,7 @@ interface Stock {
 }
 interface Ledger {
   id: number
+  finished_receipt_id?: number | null
   transaction_type: string
   receipt_no: string
   external_notice_no: string
@@ -61,6 +64,11 @@ const qualityNames: Record<string, string> = {
   REJECTED: '不合格',
 }
 const types: Record<string, string> = {
+  FG_RECEIPT: '成品实物收货',
+  FG_QC_OUT: '成品质检转出',
+  FG_QC_IN: '成品质检转入',
+  FG_PUT_OUT: '成品上架转出',
+  FG_PUT_IN: '成品上架入库',
   PRC_RESTORE: '消耗冲正恢复',
   PRR_REMOVE: '退料冲正扣回',
   PRR_RESTORE: '退料冲正恢复',
@@ -154,6 +162,8 @@ async function confirmMove() {
     notice.value = `移库 TR-${result.id} 已完成，已生成移出和移入流水。`
     busy.value = false
     await search(0, true)
+    if (Number(route?.query.balanceId) > 0)
+      await followBalance(Number(route.query.balanceId))
   } catch (e) {
     error.value = `${(e as Error).message}。重试将使用首次确认的原请求；调整内容前请先核对移库记录。`
   } finally {
@@ -229,8 +239,14 @@ onMounted(async () => {
       )
       if (page++ >= result.totalPages) break
     }
-    warehouseId.value = warehouses.value[0]?.id || 0
+    warehouseId.value =
+      warehouses.value.find((w) => w.id === Number(route?.query.warehouseId))
+        ?.id ||
+      warehouses.value[0]?.id ||
+      0
     await search(0, true)
+    if (Number(route?.query.balanceId) > 0)
+      await followBalance(Number(route.query.balanceId))
   } catch (e) {
     error.value = (e as Error).message
   }
@@ -315,10 +331,7 @@ onMounted(async () => {
           :disabled="busy"
       /></label>
       <label
-        >供应商批次（精确匹配）<input
-          v-model="batch"
-          maxlength="64"
-          :disabled="busy"
+        >批次（精确匹配）<input v-model="batch" maxlength="64" :disabled="busy"
       /></label>
       <label
         >质量状态<select v-model="quality" :disabled="busy">
@@ -353,7 +366,7 @@ onMounted(async () => {
             <tr>
               <th>物料 / 单位</th>
               <th>库位</th>
-              <th>供应商 / 批次</th>
+              <th>来源 / 批次</th>
               <th>质量状态</th>
               <th>现有数量</th>
               <th>可用数量</th>
@@ -469,7 +482,9 @@ onMounted(async () => {
                 }}</small>
               </td>
               <td>
-                <template v-if="t.issue_id"
+                <template v-if="t.finished_receipt_id"
+                  >成品 FG-{{ t.finished_receipt_id }}</template
+                ><template v-else-if="t.issue_id"
                   >领料 MI-{{ t.issue_id
                   }}<small v-if="t.consumption_id"
                     >消耗 PC-{{ t.consumption_id }}</small
