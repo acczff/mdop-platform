@@ -111,7 +111,7 @@ public class InventoryService {
                    a.external_notice_no,a.purchase_order_no,i.material_code,i.material_name,i.unit,
                    CAST(t.before_qty AS CHAR) AS before_qty,CAST(t.change_qty AS CHAR) AS change_qty,
                    CAST(t.after_qty AS CHAR) AS after_qty,t.reversed_transaction_id,t.purchase_return_id,
-                   t.created_by,t.created_at,t.transfer_id,
+                   t.created_by,t.created_at,t.transfer_id,t.count_id,
                    x.source_balance_id,x.target_balance_id
             FROM wms_inventory_transaction t LEFT JOIN wms_receipt r ON r.id=t.receipt_id
             LEFT JOIN wms_receipt_item ri ON ri.id=t.receipt_item_id

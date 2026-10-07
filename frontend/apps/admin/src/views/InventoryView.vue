@@ -31,6 +31,7 @@ interface Ledger {
   after_qty: string
   reversed_transaction_id: number | null
   purchase_return_id: number | null
+  count_id: number | null
   transfer_id: number | null
   source_balance_id: number | null
   target_balance_id: number | null
@@ -54,6 +55,8 @@ const qualityNames: Record<string, string> = {
   REJECTED: '不合格',
 }
 const types: Record<string, string> = {
+  COUNT_GAIN: '盘盈',
+  COUNT_LOSS: '盘亏',
   RECEIPT: '收货入库',
   REVERSAL: '收货冲正',
   QUALITY_OUT: '质检转出',
@@ -371,6 +374,15 @@ onMounted(async () => {
                 >
                   移库
                 </button>
+                <RouterLink
+                  v-if="
+                    (props.authorities.includes('ROLE_ADMIN') ||
+                      props.authorities.includes('wms:count:create')) &&
+                    s.quality_status === 'QUALIFIED'
+                  "
+                  :to="`/counts?balanceId=${s.id}`"
+                  >盘点</RouterLink
+                >
               </td>
             </tr>
             <tr v-if="!stocks?.items.length">
@@ -437,7 +449,8 @@ onMounted(async () => {
                 }}</small>
               </td>
               <td>
-                <template v-if="t.transfer_id"
+                <template v-if="t.count_id">盘点 CT-{{ t.count_id }}</template
+                ><template v-else-if="t.transfer_id"
                   >移库 TR-{{ t.transfer_id
                   }}<small
                     >来源可能包含多次收货，沿库存维度追溯。</small
@@ -518,6 +531,12 @@ onMounted(async () => {
 }
 .inventory-table {
   overflow-x: auto;
+}
+.inventory-table table {
+  min-width: 1000px;
+}
+.inventory-table button {
+  white-space: nowrap;
 }
 td small {
   display: block;

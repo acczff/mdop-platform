@@ -4,6 +4,7 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     { path: '/', redirect: '/warehouses' },
+    { path: '/counts', component: () => import('../views/CountsView.vue') },
     {
       path: '/warehouses',
       component: () => import('../views/WarehousesView.vue'),
