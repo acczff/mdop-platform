@@ -31,4 +31,20 @@ UNION ALL
 SELECT 'return_quota',COUNT(*) FROM wms_quality_item q JOIN
  (SELECT receipt_item_id,SUM(quantity) AS quantity FROM wms_purchase_return
   WHERE status IN ('PENDING','APPROVED','RETURNED') GROUP BY receipt_item_id) p ON p.receipt_item_id=q.receipt_item_id
-WHERE p.quantity>q.rejected_qty;
+WHERE p.quantity>q.rejected_qty
+UNION ALL
+SELECT 'transfer_pair',COUNT(*) FROM wms_stock_transfer x LEFT JOIN
+ (SELECT transfer_id,COUNT(*) AS n,SUM(change_qty) AS net FROM wms_inventory_transaction
+  WHERE transfer_id IS NOT NULL GROUP BY transfer_id) t ON t.transfer_id=x.id
+WHERE COALESCE(t.n,0)<>2 OR t.net<>0
+ OR NOT EXISTS(SELECT 1 FROM wms_inventory_transaction l WHERE l.transfer_id=x.id AND l.transaction_type='TRANSFER_OUT' AND l.balance_id=x.source_balance_id AND l.change_qty=-x.quantity)
+ OR NOT EXISTS(SELECT 1 FROM wms_inventory_transaction l WHERE l.transfer_id=x.id AND l.transaction_type='TRANSFER_IN' AND l.balance_id=x.target_balance_id AND l.change_qty=x.quantity)
+UNION ALL
+SELECT 'transfer_dimensions',COUNT(*) FROM wms_stock_transfer x
+ JOIN wms_inventory_balance s ON s.id=x.source_balance_id
+ JOIN wms_inventory_balance d ON d.id=x.target_balance_id
+WHERE x.warehouse_id<>s.warehouse_id OR s.warehouse_id<>d.warehouse_id
+ OR s.location_id=d.location_id OR s.material_id<>d.material_id OR s.supplier_id<>d.supplier_id
+ OR s.batch_no<>d.batch_no OR s.date_code<>d.date_code
+ OR NOT(s.production_date<=>d.production_date) OR NOT(s.expiry_date<=>d.expiry_date)
+ OR s.quality_status<>d.quality_status OR s.owner_type<>d.owner_type OR s.owner_id<>d.owner_id;

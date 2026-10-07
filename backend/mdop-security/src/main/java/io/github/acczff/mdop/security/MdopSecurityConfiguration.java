@@ -50,6 +50,8 @@ public class MdopSecurityConfiguration {
                                             "warehouse:read",
                                             "wms:arrival:read",
                                             "wms:inventory:read",
+                                            "wms:transfer:read",
+                                            "wms:transfer:confirm",
                                             "wms:receipt:create",
                                             "wms:receipt:submit",
                                             "wms:correction:read",

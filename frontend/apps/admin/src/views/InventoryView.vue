@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { request, type Page, type Warehouse } from '../api'
 
 const props = defineProps<{ authorities: string[] }>()
@@ -31,6 +31,9 @@ interface Ledger {
   after_qty: string
   reversed_transaction_id: number | null
   purchase_return_id: number | null
+  transfer_id: number | null
+  source_balance_id: number | null
+  target_balance_id: number | null
   created_by: string
   created_at: string
 }
@@ -59,6 +62,97 @@ const types: Record<string, string> = {
   PUTAWAY_OUT: '上架转出',
   PUTAWAY_IN: '上架转入',
   RETURN_OUT: '采购退货',
+  TRANSFER_OUT: '移库移出',
+  TRANSFER_IN: '移库移入',
+}
+const canTransfer = computed(
+  () =>
+    props.authorities.includes('ROLE_ADMIN') ||
+    props.authorities.includes('wms:transfer:confirm'),
+)
+const moving = ref<Stock>(),
+  destination = ref(0),
+  moveQuantity = ref(''),
+  moveReason = ref(''),
+  acknowledged = ref(false),
+  notice = ref('')
+const locations = ref<
+  {
+    id: number
+    name: string
+    code: string
+    warehouseId: number
+    areaType: string
+  }[]
+>([])
+let moveKey = crypto.randomUUID()
+let movePayload: string | undefined
+async function openMove(stock: Stock) {
+  busy.value = true
+  error.value = ''
+  notice.value = ''
+  try {
+    const detail = await request<
+      Stock & { warehouse_id: number; location_id: number }
+    >(`/api/v1/wms/stock/${stock.id}`)
+    const all = await request<typeof locations.value>(
+      '/api/master-data/locations',
+    )
+    locations.value = all.filter(
+      (l) =>
+        l.warehouseId === detail.warehouse_id &&
+        l.areaType === 'STORAGE' &&
+        l.id !== detail.location_id,
+    )
+    moving.value = detail
+    destination.value = 0
+    moveQuantity.value = ''
+    moveReason.value = ''
+    acknowledged.value = false
+    moveKey = crypto.randomUUID()
+    movePayload = undefined
+  } catch (e) {
+    error.value = (e as Error).message
+  } finally {
+    busy.value = false
+  }
+}
+async function confirmMove() {
+  if (!moving.value || !acknowledged.value) return
+  busy.value = true
+  error.value = ''
+  movePayload ??= JSON.stringify({
+    idempotencyKey: moveKey,
+    sourceBalanceId: moving.value.id,
+    targetLocationId: destination.value,
+    quantity: moveQuantity.value,
+    reason: moveReason.value,
+  })
+  try {
+    const result = await request<{ id: number }>('/api/v1/wms/transfers', {
+      method: 'POST',
+      body: movePayload,
+    })
+    moving.value = undefined
+    notice.value = `移库 TR-${result.id} 已完成，已生成移出和移入流水。`
+    busy.value = false
+    await search(0, true)
+  } catch (e) {
+    error.value = `${(e as Error).message}。重试将使用首次确认的原请求；调整内容前请先核对移库记录。`
+  } finally {
+    busy.value = false
+  }
+}
+async function followBalance(id: number) {
+  busy.value = true
+  error.value = ''
+  try {
+    await trace(await request<Stock>(`/api/v1/wms/stock/${id}`))
+  } catch (e) {
+    error.value = (e as Error).message
+  } finally {
+    busy.value = false
+  }
 }
 let applied = new URLSearchParams()
 async function search(page = 0, apply = false) {
@@ -137,6 +231,58 @@ onMounted(async () => {
       </div>
     </header>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <p v-if="notice" class="success" role="status">{{ notice }}</p>
+    <section v-if="moving" class="panel move-panel" aria-label="确认仓内移库">
+      <h2>确认仓内移库 · {{ moving.material_name }}</h2>
+      <p>
+        来源：{{ moving.location_name }} · 批次 {{ moving.batch_no || '无' }} ·
+        可用 {{ moving.available_qty }} {{ moving.unit }}
+      </p>
+      <p class="hint">
+        仅同仓正式存储库位之间移动合格可用库存。请在实物移动完成后确认，原始流水不会覆盖。
+      </p>
+      <form @submit.prevent="confirmMove">
+        <fieldset :disabled="busy || !!movePayload">
+          <label
+            >目标库位<select v-model="destination" required>
+              <option :value="0" disabled>请选择目标库位</option>
+              <option v-for="l in locations" :key="l.id" :value="l.id">
+                {{ l.code }} · {{ l.name }}
+              </option>
+            </select></label
+          >
+          <label
+            >移库数量<input
+              v-model="moveQuantity"
+              inputmode="decimal"
+              required
+              pattern="[0-9]+(\.[0-9]{1,6})?"
+          /></label>
+          <label
+            >移库原因<textarea v-model="moveReason" required maxlength="500" />
+          </label>
+          <label
+            ><input
+              v-model="acknowledged"
+              type="checkbox"
+            />我确认实物已经移动至目标库位</label
+          >
+        </fieldset>
+        <p v-if="movePayload" class="hint">
+          请求已锁定，重试保持首次确认内容。修改前请先在移库记录中核对结果。
+        </p>
+        <button
+          class="primary"
+          :disabled="busy || !destination || !acknowledged"
+        >
+          {{ movePayload ? '按原请求重试' : '确认移库并记账' }}
+        </button>
+        <button type="button" :disabled="busy" @click="moving = undefined">
+          关闭
+        </button>
+        <RouterLink to="/transfers">查看移库记录</RouterLink>
+      </form>
+    </section>
     <form class="panel filters" @submit.prevent="search(0, true)">
       <label
         >仓库<select v-model="warehouseId" :disabled="busy" required>
@@ -214,6 +360,17 @@ onMounted(async () => {
               <td>{{ s.available_qty }}</td>
               <td>
                 <button :disabled="busy" @click="trace(s)">查看流水</button>
+                <button
+                  v-if="
+                    canTransfer &&
+                    s.quality_status === 'QUALIFIED' &&
+                    Number(s.available_qty) > 0
+                  "
+                  :disabled="busy"
+                  @click="openMove(s)"
+                >
+                  移库
+                </button>
               </td>
             </tr>
             <tr v-if="!stocks?.items.length">
@@ -280,14 +437,38 @@ onMounted(async () => {
                 }}</small>
               </td>
               <td>
-                {{ t.receipt_no }}<small>到货：{{ t.external_notice_no }}</small
-                ><small>采购：{{ t.purchase_order_no }}</small>
+                <template v-if="t.transfer_id"
+                  >移库 TR-{{ t.transfer_id
+                  }}<small
+                    >来源可能包含多次收货，沿库存维度追溯。</small
+                  ></template
+                >
+                <template v-else
+                  >{{ t.receipt_no
+                  }}<small>到货：{{ t.external_notice_no }}</small
+                  ><small>采购：{{ t.purchase_order_no }}</small></template
+                >
               </td>
               <td>{{ t.before_qty }}</td>
               <td>{{ t.change_qty }}</td>
               <td>{{ t.after_qty }}</td>
               <td>
-                <span v-if="t.reversed_transaction_id"
+                <span v-if="t.transfer_id"
+                  ><button
+                    v-if="t.source_balance_id"
+                    :disabled="busy"
+                    @click="followBalance(t.source_balance_id)"
+                  >
+                    来源库存 #{{ t.source_balance_id }}</button
+                  ><button
+                    v-if="t.target_balance_id"
+                    :disabled="busy"
+                    @click="followBalance(t.target_balance_id)"
+                  >
+                    目标库存 #{{ t.target_balance_id }}
+                  </button></span
+                >
+                <span v-else-if="t.reversed_transaction_id"
                   >冲正原流水 #{{ t.reversed_transaction_id }}</span
                 ><span v-else-if="t.purchase_return_id"
                   >退货 RT-{{ t.purchase_return_id }}</span
@@ -325,6 +506,16 @@ onMounted(async () => {
   </main>
 </template>
 <style scoped>
+.move-panel {
+  padding: 20px;
+}
+.move-panel fieldset {
+  border: 0;
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  margin-bottom: 12px;
+}
 .inventory-table {
   overflow-x: auto;
 }
