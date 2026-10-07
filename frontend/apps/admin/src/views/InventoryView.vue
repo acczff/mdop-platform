@@ -26,6 +26,7 @@ interface Stock {
 }
 interface Ledger {
   id: number
+  sales_order_id?: number | null
   finished_receipt_id?: number | null
   transaction_type: string
   receipt_no: string
@@ -64,6 +65,7 @@ const qualityNames: Record<string, string> = {
   REJECTED: '不合格',
 }
 const types: Record<string, string> = {
+  SALES_OUT: '销售出库',
   FG_RECEIPT: '成品实物收货',
   FG_QC_OUT: '成品质检转出',
   FG_QC_IN: '成品质检转入',
@@ -482,7 +484,9 @@ onMounted(async () => {
                 }}</small>
               </td>
               <td>
-                <template v-if="t.finished_receipt_id"
+                <template v-if="t.sales_order_id"
+                  >销售 SO-{{ t.sales_order_id }}</template
+                ><template v-else-if="t.finished_receipt_id"
                   >成品 FG-{{ t.finished_receipt_id }}</template
                 ><template v-else-if="t.issue_id"
                   >领料 MI-{{ t.issue_id

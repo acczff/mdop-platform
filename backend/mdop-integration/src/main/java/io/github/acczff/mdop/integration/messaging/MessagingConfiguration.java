@@ -62,6 +62,7 @@ public class MessagingConfiguration {
                 BindingBuilder.bind(operations).to(exchange).with("FinishedGoodsReceived"),
                 BindingBuilder.bind(operations).to(exchange).with("FinishedInspectionRequested"),
                 BindingBuilder.bind(operations).to(exchange).with("FinishedGoodsPutaway"),
+                BindingBuilder.bind(operations).to(exchange).with("SalesOutboundConfirmed"),
                 mes,
                 mesDead,
                 BindingBuilder.bind(mesDead)
