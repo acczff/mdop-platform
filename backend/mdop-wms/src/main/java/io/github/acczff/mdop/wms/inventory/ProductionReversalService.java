@@ -167,6 +167,7 @@ public class ProductionReversalService {
                         || q(target, "production_qty").signum() != 0
                         || q(target, "on_hand_qty").compareTo(qty) < 0)
                     throw conflict("退回库存已有后续业务或占用，禁止直接冲正");
+                StockFreeze.requireUnfrozen(target);
                 BigDecimal available =
                         "QUALIFIED".equals(p.get("quality_status")) ? qty : BigDecimal.ZERO;
                 if (q(target, "available_qty").compareTo(available) < 0) throw conflict("可冲正库存不足");

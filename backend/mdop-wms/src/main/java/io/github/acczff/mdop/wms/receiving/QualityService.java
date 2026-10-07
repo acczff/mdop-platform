@@ -319,12 +319,14 @@ public class QualityService {
             boolean available,
             String type) {
         var row = balance(a, i, location, quality);
+        if (delta.signum() < 0)
+            io.github.acczff.mdop.wms.inventory.StockFreeze.requireUnfrozen(row);
         var before = (BigDecimal) row.get("on_hand_qty");
         var after = before.add(delta);
         if (after.signum() < 0) throw conflict("库存不足，请核对库存流水");
         long id = ((Number) row.get("id")).longValue();
         db.sql(
-                        "UPDATE wms_inventory_balance SET on_hand_qty=?,available_qty=available_qty+? WHERE id=?")
+                        "UPDATE wms_inventory_balance SET on_hand_qty=?,available_qty=IF(active_freeze_id IS NULL,available_qty+?,0) WHERE id=?")
                 .params(after, available ? delta : BigDecimal.ZERO, id)
                 .update();
         db.sql(

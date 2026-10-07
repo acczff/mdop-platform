@@ -19,6 +19,47 @@ import tools.jackson.databind.JsonNode;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class CrossTransferTests extends InventoryScenarioSupport {
+    @Test
+    void freezeBlocksApprovedDispatchAndReleaseOfReservationStaysFrozen() throws Exception {
+        long b = ready()[0];
+        destination();
+        long id = create(b, "10");
+        act(id, "approve", reviewer(), 200);
+        long f =
+                postAs(
+                                "/api/v1/wms/freezes",
+                                Map.of("balanceId", b, "idempotencyKey", key(), "reason", "调拨批次调查"),
+                                admin(),
+                                201)
+                        .get("id")
+                        .asLong();
+        act(id, "ship", admin(), 409);
+        act(id, "cancel", admin(), 200);
+        assertThat(stock(b, "available_qty")).isZero();
+        assertThat(stock(b, "reserved_qty")).isZero();
+        assertThat(qty(b)).isEqualByComparingTo("80");
+        postAs(
+                "/api/v1/wms/freezes/" + f + "/release",
+                Map.of("idempotencyKey", key(), "reason", "复核完成"),
+                operator("reviewer", "wms:freeze:review"),
+                200);
+        long first = create(b, "5");
+        act(first, "approve", reviewer(), 200);
+        act(first, "ship", admin(), 200);
+        long dest = act(first, "receive", admin(), 200).get("target_balance_id").asLong();
+        postAs(
+                "/api/v1/wms/freezes",
+                Map.of("balanceId", dest, "idempotencyKey", key(), "reason", "目标批次调查"),
+                admin(),
+                201);
+        long second = create(b, "2");
+        act(second, "approve", reviewer(), 200);
+        act(second, "ship", admin(), 200);
+        act(second, "receive", admin(), 200);
+        assertThat(qty(dest)).isEqualByComparingTo("7");
+        assertThat(stock(dest, "available_qty")).isZero();
+    }
+
     static final String URL = "/api/v1/wms/cross-transfers";
 
     void destination() throws Exception {

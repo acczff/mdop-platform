@@ -10,7 +10,7 @@ SELECT 'ledger_chain',COUNT(*) FROM
   FROM wms_inventory_transaction) chain WHERE before_qty<>previous_qty
 UNION ALL
 SELECT 'quality_availability',COUNT(*) FROM wms_inventory_balance b JOIN mdm_location l ON l.id=b.location_id
-WHERE b.available_qty<>CASE WHEN b.quality_status='QUALIFIED' AND l.area_type='STORAGE' THEN b.on_hand_qty-b.reserved_qty-b.production_qty ELSE 0 END
+WHERE b.available_qty<>CASE WHEN b.active_freeze_id IS NULL AND b.quality_status='QUALIFIED' AND l.area_type='STORAGE' THEN b.on_hand_qty-b.reserved_qty-b.production_qty ELSE 0 END
 UNION ALL
 SELECT 'arrival_received_total',COUNT(*) FROM wms_arrival_notice_item a LEFT JOIN
  (SELECT i.arrival_item_id,SUM(i.quantity) AS quantity FROM wms_receipt_item i JOIN wms_receipt r ON r.id=i.receipt_id
@@ -193,4 +193,11 @@ SELECT 'cross_transfer_actions',COUNT(*) FROM wms_cross_transfer d WHERE
  OR (d.reviewed_by IS NOT NULL AND (d.reviewed_by=d.created_by OR NOT EXISTS(SELECT 1 FROM wms_cross_transfer_action a WHERE a.cross_transfer_id=d.id AND a.action_type=IF(d.status='REJECTED','REJECT','APPROVE') AND a.created_by=d.reviewed_by)))
  OR (d.status IN ('IN_TRANSIT','RECEIVED') AND NOT EXISTS(SELECT 1 FROM wms_cross_transfer_action a WHERE a.cross_transfer_id=d.id AND a.action_type='SHIP' AND a.created_by=d.shipped_by))
  OR (d.status='RECEIVED' AND NOT EXISTS(SELECT 1 FROM wms_cross_transfer_action a WHERE a.cross_transfer_id=d.id AND a.action_type='RECEIVE' AND a.created_by=d.received_by))
- OR (d.status='CANCELLED' AND NOT EXISTS(SELECT 1 FROM wms_cross_transfer_action a WHERE a.cross_transfer_id=d.id AND a.action_type='CANCEL'));
+ OR (d.status='CANCELLED' AND NOT EXISTS(SELECT 1 FROM wms_cross_transfer_action a WHERE a.cross_transfer_id=d.id AND a.action_type='CANCEL'))
+UNION ALL
+SELECT 'freeze_pointer',COUNT(*) FROM wms_inventory_balance b LEFT JOIN wms_stock_freeze f ON f.id=b.active_freeze_id
+WHERE b.active_freeze_id IS NOT NULL AND (f.id IS NULL OR f.balance_id<>b.id OR f.status<>'FROZEN' OR b.available_qty<>0)
+UNION ALL
+SELECT 'freeze_state',COUNT(*) FROM wms_stock_freeze f JOIN wms_inventory_balance b ON b.id=f.balance_id JOIN mdm_warehouse w ON w.id=b.warehouse_id
+WHERE f.warehouse_id<>b.warehouse_id OR (f.status='FROZEN' AND (NOT(b.active_freeze_id<=>f.id) OR w.purpose='LINE_SIDE' OR b.production_qty<>0))
+ OR (f.status='RELEASED' AND (f.released_by=f.created_by OR f.released_at IS NULL));

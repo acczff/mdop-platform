@@ -225,7 +225,7 @@ public class CrossTransferService {
                 notExpired(source);
                 var destination = destination(d, source);
                 db.sql(
-                                "UPDATE wms_inventory_balance SET on_hand_qty=on_hand_qty+?,available_qty=available_qty+? WHERE id=?")
+                                "UPDATE wms_inventory_balance SET on_hand_qty=on_hand_qty+?,available_qty=IF(active_freeze_id IS NULL,available_qty+?,0) WHERE id=?")
                         .params(q(d, "quantity"), q(d, "quantity"), n(destination, "id"))
                         .update();
                 ledger(destination, q(d, "quantity"), id, "CROSS_IN");
@@ -243,7 +243,7 @@ public class CrossTransferService {
     private void reservation(Map<String, Object> d, Map<String, Object> b, String type) {
         BigDecimal qty = q(d, "quantity"), delta = type.equals("RESERVE") ? qty : qty.negate();
         db.sql(
-                        "UPDATE wms_inventory_balance SET reserved_qty=reserved_qty+?,available_qty=available_qty+?,on_hand_qty=on_hand_qty+?,reservation_version=reservation_version+1 WHERE id=?")
+                        "UPDATE wms_inventory_balance SET reserved_qty=reserved_qty+?,available_qty=IF(active_freeze_id IS NULL,available_qty+?,0),on_hand_qty=on_hand_qty+?,reservation_version=reservation_version+1 WHERE id=?")
                 .params(
                         delta,
                         type.equals("CONSUME") ? BigDecimal.ZERO : delta.negate(),
@@ -361,6 +361,7 @@ public class CrossTransferService {
     }
 
     private void eligible(Map<String, Object> b) {
+        StockFreeze.requireUnfrozen(b);
         targetStorage(n(b, "location_id"), n(b, "warehouse_id"));
         if (!"QUALIFIED".equals(b.get("quality_status"))
                 || !"ENTERPRISE".equals(b.get("owner_type"))

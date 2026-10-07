@@ -200,7 +200,7 @@ public class IssueService {
         if ("RESERVED".equals(d.get("status"))) {
             var b = balance(n(d, "source_balance_id"), true);
             db.sql(
-                            "UPDATE wms_inventory_balance SET available_qty=available_qty+?,reserved_qty=reserved_qty-?,reservation_version=reservation_version+1 WHERE id=?")
+                            "UPDATE wms_inventory_balance SET available_qty=IF(active_freeze_id IS NULL,available_qty+?,0),reserved_qty=reserved_qty-?,reservation_version=reservation_version+1 WHERE id=?")
                     .params(q(d, "quantity"), q(d, "quantity"), n(b, "id"))
                     .update();
             event(d, b, "RELEASE", q(d, "quantity").negate());
@@ -317,6 +317,7 @@ public class IssueService {
     }
 
     private void eligibleStock(Map<String, Object> b) {
+        StockFreeze.requireUnfrozen(b);
         if (!"PURCHASE".equals(b.get("origin_type")) || b.get("supplier_id") == null)
             throw conflict("首版生产领料仅支持有供应商来源的采购原料");
         String area =

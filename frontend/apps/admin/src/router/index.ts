@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    { path: '/freezes', component: () => import('../views/FreezesView.vue') },
     {
       path: '/cross-transfers',
       component: () => import('../views/CrossTransfersView.vue'),

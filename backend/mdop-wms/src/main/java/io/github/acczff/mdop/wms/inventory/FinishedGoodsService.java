@@ -280,10 +280,11 @@ public class FinishedGoodsService {
 
     private void move(
             Map<String, Object> b, BigDecimal delta, boolean available, String type, long id) {
+        if (delta.signum() < 0) StockFreeze.requireUnfrozen(b);
         BigDecimal before = (BigDecimal) b.get("on_hand_qty");
         if (before.add(delta).signum() < 0) throw conflict("成品库存不足");
         db.sql(
-                        "UPDATE wms_inventory_balance SET on_hand_qty=on_hand_qty+?,available_qty=available_qty+? WHERE id=?")
+                        "UPDATE wms_inventory_balance SET on_hand_qty=on_hand_qty+?,available_qty=IF(active_freeze_id IS NULL,available_qty+?,0) WHERE id=?")
                 .params(delta, available ? delta : BigDecimal.ZERO, n(b, "id"))
                 .update();
         db.sql(

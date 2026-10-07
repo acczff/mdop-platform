@@ -140,6 +140,7 @@ public class TransferService {
         if (!"QUALIFIED".equals(source.get("quality_status"))) throw conflict("仅合格可用库存允许移库");
         LocalDate expiry = date(source, "expiry_date");
         if (expiry != null && expiry.isBefore(LocalDate.now(clock))) throw conflict("过期库存不允许普通移库");
+        StockFreeze.requireUnfrozen(source);
         if (input.quantity().compareTo((BigDecimal) source.get("available_qty")) > 0)
             throw conflict("可用库存不足，请刷新库存后重试");
         String stockKey =
@@ -213,7 +214,7 @@ public class TransferService {
         BigDecimal after = before.add(delta);
         long id = number(balance, "id");
         db.sql(
-                        "UPDATE wms_inventory_balance SET on_hand_qty=?,available_qty=available_qty+? WHERE id=?")
+                        "UPDATE wms_inventory_balance SET on_hand_qty=?,available_qty=IF(active_freeze_id IS NULL,available_qty+?,0) WHERE id=?")
                 .params(after, delta, id)
                 .update();
         db.sql(

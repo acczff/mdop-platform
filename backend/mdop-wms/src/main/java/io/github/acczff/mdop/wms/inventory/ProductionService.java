@@ -257,7 +257,7 @@ public class ProductionService {
         BigDecimal amount = q(p, "quantity");
         spend(b, amount);
         db.sql(
-                        "UPDATE wms_inventory_balance SET on_hand_qty=on_hand_qty+?,available_qty=available_qty+? WHERE id=?")
+                        "UPDATE wms_inventory_balance SET on_hand_qty=on_hand_qty+?,available_qty=IF(active_freeze_id IS NULL,available_qty+?,0) WHERE id=?")
                 .params(
                         amount,
                         "QUALIFIED".equals(quality) ? amount : BigDecimal.ZERO,

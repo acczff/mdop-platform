@@ -99,6 +99,7 @@ public class CountService {
     }
 
     private void eligible(Map<String, Object> b) {
+        StockFreeze.requireUnfrozen(b);
         catalog.requireReceivingWarehouse(number(b, "warehouse_id"));
         String area =
                 db.sql("SELECT area_type FROM mdm_location WHERE id=?")

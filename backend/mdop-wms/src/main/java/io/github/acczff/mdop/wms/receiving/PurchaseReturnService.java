@@ -213,6 +213,7 @@ public class PurchaseReturnService {
                         .param(balanceId)
                         .query()
                         .singleRow();
+        io.github.acczff.mdop.wms.inventory.StockFreeze.requireUnfrozen(balance);
         if (!balance.get("quality_status").equals("REJECTED")
                 || ((BigDecimal) balance.get("available_qty")).signum() != 0)
             throw conflict("退货来源必须是不合格不可用库存");
