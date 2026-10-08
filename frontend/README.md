@@ -6,7 +6,7 @@ MDOP 前端使用 pnpm（高效的 Node.js 包管理器）工作区管理应用�
 
 - Node.js：`>=24.18.0 <25`，使用 Node.js 24 LTS（长期支持版本）。
 - Corepack：负责提供并管理 pnpm 命令入口。
-- pnpm：固定为 `11.13.0`。
+- pnpm：固定为 `11.13.1`。
 - 管理端：Vue 3、TypeScript、Vue Router、Pinia、Vite 和 Vitest。
 - 质量工具：Prettier 3.9.5 和 ESLint 10.7.0。
 
@@ -62,6 +62,8 @@ pnpm.cmd run verify
 生产构建输出位于 `apps/admin/dist`，依赖目录位于 `node_modules`；两者均已被 Git 忽略。
 
 ## 当前验证（2026-10-07）
+
+CI 的 `Frontend verify` 复用 `pnpm run verify`，先按锁文件安装依赖。`CI` 环境额外输出 `apps/admin/test-results/junit.xml`，生成报告不提交 Git；触发、失败日志及构建产物见 [CI 自动验收](../docs/project/CI自动验收.md)。下列数量为最近一次 WMS 验收记录，CI 结果以相应提交的实际运行结果为准。
 
 - `pnpm.cmd run dev`：管理端业务页面已在隔离环境进行浏览器验收。
 - `pnpm.cmd run format:check`：Prettier 格式检查通过。

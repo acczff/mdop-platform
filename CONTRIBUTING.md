@@ -8,6 +8,8 @@
 4. 本地完成适用的格式化、测试和构建检查。
 5. 通过 Pull Request 合并，禁止直接向 `main` 提交日常功能。
 
+PR 创建和更新后，核对最新提交的 `Backend verify`、`Frontend verify` 两项 CI 检查；失败时先查看步骤日志与诊断产物。绿色检查不替代业务审查，未配置分支保护时也不会自动阻止合并。具体触发、报告和边界见 [CI 自动验收](docs/project/CI自动验收.md)。
+
 推荐分支名：
 
 - `acczff/<description>`：使用固定用户前缀和简短英文主题，例如 `acczff/inventory-freeze`、`acczff/wms-delivery-docs`。
