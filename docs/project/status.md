@@ -2,14 +2,16 @@
 
 记录日期：2026-10-08。此页保存可核验的提交和运行证据，不作为实时 GitHub 状态面板。历史文档中的测试数量、迁移数量和“当时未部署”保留原时间含义。
 
-## 代码与交付基线
+## 整理前的代码与交付基线
 
 | 范围 | 提交 / PR | 本次整理基线 |
 |---|---|---|
 | WMS 公共流程与首次 CI | main `0d8e627`，PR #30 | 已进入主干；22 个迁移 |
-| 用户与固定角色管理 | [PR #31](https://github.com/acczff/mdop-platform/pull/31)，`d3177b5` | 已实现及验证，尚待合并；新增第 23 个迁移 |
+| 用户与固定角色管理 | [PR #31](https://github.com/acczff/mdop-platform/pull/31)，`d3177b5` | 整理时已实现及验证、待合并；新增第 23 个迁移 |
 | 发布与恢复保障 | [PR #32](https://github.com/acczff/mdop-platform/pull/32)，`5dca76e` | 已实现及验证，依赖 #31；不含新增业务迁移 |
-| 本次开源文档整理 | `acczff/open-source-readiness`，基于 `5dca76e` | 面向上述完整候选代码整理；不代表 main 已包含所有内容 |
+| 本次开源文档整理 | [PR #33](https://github.com/acczff/mdop-platform/pull/33)，基于 `5dca76e` | 整理时以完整候选代码为基线，随后进入统一审核交付 |
+
+上述表格保存整理前快照，不代表实时待合并清单。2026-10-08 维护者授权统一审核交付，顺序为 #31 → #32 → #33；后续 PR 对齐 main 后重新验证，最终主干运行见 [main CI](https://github.com/acczff/mdop-platform/actions/workflows/ci.yml?query=branch%3Amain)。合并结果与提交身份可通过各 PR 的合并记录核验。清理已合并的本地分支前保留可校验的 Git bundle；不随 Git 交付升级日常数据库。
 
 读者克隆默认 main 时，以该 checkout 自带文档为准；审查候选功能时使用对应 PR 的分支及代码，不用新版步骤启动旧版配置。依赖合并后将下一 PR 切回 main 并重新跑 CI。
 
