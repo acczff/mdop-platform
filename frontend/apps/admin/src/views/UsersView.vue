@@ -60,8 +60,15 @@ function roleName(code: string) {
     (code === 'IMPORTED' ? '原配置导入（待分配角色）' : code)
   )
 }
-async function load() {
+function invalidateList() {
   ready.value = false
+  users.value = []
+  total.value = 0
+  roles.value = []
+  warehouses.value = []
+}
+async function load() {
+  invalidateList()
   const [result, options] = await Promise.all([
     request<{ items: User[]; totalElements: number }>(
       `/api/iam/users?page=${page.value}`,
@@ -173,8 +180,16 @@ async function save() {
     error.value = saved
       ? `操作已成功，但列表刷新失败：${(e as Error).message}`
       : (e as Error).message
-    if (!saved && e instanceof ApiError && (e.status === 0 || e.status === 409))
+    if (
+      !saved &&
+      (!(e instanceof ApiError) ||
+        e.status === 0 ||
+        e.status === 409 ||
+        e.status >= 500)
+    ) {
       uncertain.value = true
+      invalidateList()
+    }
   } finally {
     password.value = ''
     busy.value = false
@@ -263,13 +278,16 @@ onMounted(() => {
       </div>
       <div class="toolbar">
         <button
-          :disabled="busy || !!mode || page === 0"
+          :disabled="busy || !ready || !!mode || page === 0"
           @click="refresh(page - 1)"
         >
           上一页</button
-        ><span>第 {{ page + 1 }} 页 · 共 {{ total }} 个账号</span
+        ><span v-if="ready">第 {{ page + 1 }} 页 · 共 {{ total }} 个账号</span
+        ><span v-else>{{
+          busy ? '正在读取账号列表…' : '账号列表未就绪，请刷新后操作。'
+        }}</span
         ><button
-          :disabled="busy || !!mode || (page + 1) * 50 >= total"
+          :disabled="busy || !ready || !!mode || (page + 1) * 50 >= total"
           @click="refresh(page + 1)"
         >
           下一页

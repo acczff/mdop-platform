@@ -18,7 +18,7 @@ const user = {
   warehouseIds: [4],
   authorities: ['warehouse:read'],
 }
-function setup(authorities = ['iam:manage']) {
+function setup(authorities = ['iam:manage'], totalElements = 1) {
   vi.mocked(request).mockImplementation(async (path) => {
     if (path === '/api/iam/options')
       return {
@@ -28,7 +28,7 @@ function setup(authorities = ['iam:manage']) {
         warehouses: [{ id: 4, code: 'W4', name: '原料仓' }],
       }
     if (path.startsWith('/api/iam/users?page='))
-      return { items: [user], totalElements: 1 }
+      return { items: [user], totalElements }
     if (path.endsWith('/audit')) return []
     return undefined
   })
@@ -59,7 +59,12 @@ it('sends version and reason when disabling an account', async () => {
   expect(view.text()).toContain('操作成功')
   view.unmount()
 })
-it('blocks resubmission after an uncertain write until refreshed', async () => {
+it.each([
+  new ApiError(0, '请求超时'),
+  new ApiError(409, '版本冲突'),
+  new ApiError(502, '网关响应失败'),
+  new SyntaxError('响应内容不完整'),
+])('requires a successful refresh after write failure: %s', async (failure) => {
   const view = setup()
   await flushPromises()
   await view
@@ -67,7 +72,7 @@ it('blocks resubmission after an uncertain write until refreshed', async () => {
     .find((b) => b.text() === '停用')!
     .trigger('click')
   await view.get('textarea').setValue('停用')
-  vi.mocked(request).mockRejectedValueOnce(new ApiError(0, '请求超时'))
+  vi.mocked(request).mockRejectedValueOnce(failure)
   await view.get('form').trigger('submit')
   await flushPromises()
   expect(view.text()).toContain('核对最新状态')
@@ -77,8 +82,64 @@ it('blocks resubmission after an uncertain write until refreshed', async () => {
       .find((b) => b.text() === '保存')!
       .attributes('disabled'),
   ).toBeDefined()
+  await view
+    .findAll('button')
+    .find((b) => b.text() === '取消')!
+    .trigger('click')
+  expect(view.text()).not.toContain('只读人员')
+  const create = () =>
+    view.findAll('button').find((b) => b.text() === '新增账号')!
+  expect(create().attributes('disabled')).toBeDefined()
+  await create().trigger('click')
+  expect(view.find('[role="dialog"]').exists()).toBe(false)
+  vi.mocked(request).mockRejectedValueOnce(new ApiError(500, '刷新失败'))
+  await view
+    .findAll('button')
+    .find((b) => b.text() === '刷新列表')!
+    .trigger('click')
+  await flushPromises()
+  expect(create().attributes('disabled')).toBeDefined()
+  await view
+    .findAll('button')
+    .find((b) => b.text() === '刷新列表')!
+    .trigger('click')
+  await flushPromises()
+  expect(create().attributes('disabled')).toBeUndefined()
+  await view
+    .findAll('button')
+    .find((b) => b.text() === '停用')!
+    .trigger('click')
+  expect(view.find('[role="dialog"]').exists()).toBe(true)
   view.unmount()
 })
+it.each(['users', 'options'])(
+  'clears stale rows when paginating fails in %s',
+  async (source) => {
+    const view = setup(['iam:manage'], 51)
+    await flushPromises()
+    if (source === 'options')
+      vi.mocked(request).mockResolvedValueOnce({
+        items: [{ ...user, username: 'other' }],
+        totalElements: 51,
+      })
+    vi.mocked(request).mockRejectedValueOnce(new ApiError(500, '列表读取失败'))
+    await view
+      .findAll('button')
+      .find((b) => b.text() === '下一页')!
+      .trigger('click')
+    await flushPromises()
+    expect(view.text()).toContain('列表读取失败')
+    expect(view.text()).not.toContain('只读人员')
+    expect(view.text()).not.toContain('第 2 页')
+    expect(
+      view
+        .findAll('button')
+        .find((b) => b.text() === '下一页')!
+        .attributes('disabled'),
+    ).toBeDefined()
+    view.unmount()
+  },
+)
 it('distinguishes a saved mutation from failed refresh', async () => {
   const view = setup()
   await flushPromises()
