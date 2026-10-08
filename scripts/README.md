@@ -2,6 +2,8 @@
 
 本目录提供 MDOP 仓库级操作脚本。Windows 用户从仓库根目录通过 `mdop.cmd` 调用，不需要直接执行 `scripts/mdop.ps1`。
 
+文档工具 `node scripts/docs/check.mjs` 校验所有纳入 Git 的 Markdown 相对链接、标题锚点及源码导航同步；`--write-index` 更新模块、页面、控制器和迁移清单。工具回归为 `node --test scripts/docs/check.test.mjs`，CI 使用 `Documentation verify`，失败会阻止发布候选。它不检查外部网站或证明接口行为。
+
 `release/release.mjs` 负责 CI 组件标记、候选包组合与完整性校验；`release/database.mjs` 提供停写后的数据库备份校验和仅空目标恢复。它们不调用 `mdop start`，不自动升级日常数据库；参数和失败处理见[发布包操作手册](../deploy/release/RUNBOOK.md)。工具回归使用 `node --test scripts/release/*.test.mjs`，CI 的 `Release candidate` 检查自动执行。
 
 ## 命令
@@ -50,7 +52,7 @@
 
 ## `start` 启动范围
 
-当前主干已包含 WMS 公共流程和 22 个迁移。`start` 启动后端时会应用目标库中尚未执行的迁移，不能将 Git 合并理解为已经部署。已有库升级先按 [部署与恢复流程](../deploy/README.md#11-wms-主干升级与恢复)备份验证；本次合并未自动启动日常环境。
+`start` 启动后端时会应用目标库中尚未执行的迁移，不能将 Git 合并理解为已经部署。当前代码与历史主干的迁移区别见[版本记录](../docs/project/status.md)；已有库升级先按 [部署与恢复流程](../deploy/README.md#11-wms-主干升级与恢复)备份验证，本轮未自动启动日常环境。
 
 `start` 按以下顺序执行：
 

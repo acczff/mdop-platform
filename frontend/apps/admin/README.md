@@ -39,7 +39,7 @@ src
 
 ## 运行与验证
 
-统一从 `frontend` 工作区根目录执行：
+推荐在仓库根目录使用 `.\scripts\pnpm.cmd run <动作>`（当前 PATH 先包含 `scripts` 与所选 Node）。下面的直接命令仅在 `frontend` 目录且已经配置正确 pnpm 入口时执行：
 
 ```powershell
 pnpm.cmd run dev

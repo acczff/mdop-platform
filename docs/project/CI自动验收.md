@@ -1,6 +1,6 @@
 # CI 自动验收
 
-CI 首版建立前后端持续集成验证，本轮补充同次构建的候选包。每个 PR 自动检查现有后端与前端，保留诊断结果并在两项检查通过后组合发布候选。不增加 WMS 业务规则，不发布 GitHub Release、不部署应用，不执行日常数据库迁移，也不自动合并 PR。
+CI 首版建立前后端持续集成验证，本轮补充同次构建的候选包。每个 PR 自动检查现有后端与前端，保留诊断结果并在文档、后端和前端检查通过后组合发布候选。不增加 WMS 业务规则，不发布 GitHub Release、不部署应用，不执行日常数据库迁移，也不自动合并 PR。
 
 ## 触发与完成条件
 
@@ -9,17 +9,18 @@ CI 首版建立前后端持续集成验证，本轮补充同次构建的候选�
 - 任意目标分支的 PR 创建、更新或重新打开时运行，包括草稿 PR；不按文件路径跳过。
 - 推送到 `main` 时再次验证合并结果；进入主干后支持 Actions 页面手动运行。
 - 同一个 PR 更新时取消旧运行，只保留最新候选；`main` 的运行不主动取消。
-- `Backend verify`、`Frontend verify` 和依赖二者的 `Release candidate` 三项检查都成功，才视为本次 CI 通过。取消、跳过、排队或没有运行都不算通过。
+- `Documentation verify`、`Backend verify`、`Frontend verify` 和依赖前三者的 `Release candidate` 四项检查都成功，才视为本次 CI 通过。取消、跳过、排队或没有运行都不算通过。
 
-首次工作流通过 PR 提交后即可触发 `pull_request` 验证；手动入口需要工作流已进入默认分支。当前不修改分支保护策略，工作流本身不会阻止管理员绕过检查。若后续启用必须检查，使用上述三个固定检查名称，不将 CI 当成业务审批。
+首次工作流通过 PR 提交后即可触发 `pull_request` 验证；手动入口需要工作流已进入默认分支。当前不修改分支保护策略，工作流本身不会阻止管理员绕过检查。若后续启用必须检查，使用上述四个固定检查名称，不将 CI 当成业务审批。
 
 ## 验证范围
 
 | 检查 | 环境与命令 | 完成标准 |
 |---|---|---|
+| Documentation verify | Ubuntu 24.04、Node 24.18.0；`node --test scripts/docs/check.test.mjs`、`node scripts/docs/check.mjs` | 文档工具回归、本地链接/锚点和源码导航同步检查成功；5 分钟超时，无额外依赖 |
 | Backend verify | Ubuntu 24.04、Temurin Java 25、仓库 Maven Wrapper；`./backend/mvnw -B -ntp -f backend/pom.xml verify` | 版本与依赖约束、Java 格式、全部测试、打包和 JaCoCo 报告成功 |
 | Frontend verify | Ubuntu 24.04、Node 24.18.0；pnpm 从 `frontend/package.json` 的 packageManager 读取；`pnpm install --frozen-lockfile`、`pnpm run verify` | 格式、ESLint、Vitest、类型检查与生产构建成功 |
-| Release candidate | 两项验证成功后运行；Node 内置测试、下载本次运行的组件、生成清单并逐文件校验 | 发布工具回归通过，前后端提交及运行编号一致，无文件损坏或缺失，候选包成功上传 |
+| Release candidate | 文档及前后端验证成功后运行；Node 内置测试、下载本次运行的组件、生成清单并逐文件校验 | 发布工具回归通过，前后端提交及运行编号一致，无文件损坏或缺失，候选包成功上传 |
 
 后端使用现有 Testcontainers 基座启动 MySQL、RabbitMQ 和 Redis，随机端口和临时凭据，不依赖本地 Compose 或 `.env.local`。Docker 不可用直接失败，不跳过数据库测试。后端超时 30 分钟，前端 15 分钟，缓存只用于依赖下载，不复用业务数据。
 
@@ -51,7 +52,7 @@ CI 首版建立前后端持续集成验证，本轮补充同次构建的候选�
 
 首次远端运行暴露原固定 pnpm `11.13.0` 被安装器以 `ERR_PNPM_BROKEN_PNPM_RELEASE` 拒绝：该版本的可执行包发布损坏。项目 packageManager、工作区 engines 与运行文档统一修正为 `11.13.1`，保留现有依赖锁文件；不通过跳过版本保护继续使用损坏发布。历史 I0 变更记录仍保留当时的版本号。
 
-首次 CI 交付基线为后端 175 项、前端 68 项；IAM 候选已增加到后端 186 项、前端 75 项，本轮另有 13 项发布工具测试。数量不是写死的通过门槛，新增用例应自然进入对应验证入口。CI 只说明自动检查结果，不能代替浏览器业务验收、异人审批、数据恢复演练或真实系统联调。
+首次 CI 交付基线为后端 175 项、前端 68 项；后续数量及对应提交见[版本记录](status.md)。数量不是写死的通过门槛，新增用例应自然进入对应验证入口。CI 只说明自动检查结果，不能代替浏览器业务验收、异人审批、数据恢复演练或真实系统联调。文档检查失败直接查看步骤输出，当前不另上传文档 artifact。
 
 参考：[GitHub Java 配置](https://github.com/actions/setup-java)、[pnpm 安装与版本读取](https://github.com/pnpm/action-setup)、[Vitest 报告](https://vitest.dev/guide/reporters.html)、[Actions 产物上传](https://github.com/actions/upload-artifact)。
 
