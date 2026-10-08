@@ -29,6 +29,8 @@
 
 ## 后端质量门禁
 
+PR 与 main 推送通过 CI 的 `Backend verify` 执行同一 Maven 验证入口；运行环境为 Ubuntu 24.04 和 Java 25，临时基础设施由 Testcontainers 创建。失败诊断、超时及报告保留规则见 [CI 自动验收](../docs/project/CI自动验收.md)。
+
 从仓库根目录执行完整后端验证：
 
 ```powershell

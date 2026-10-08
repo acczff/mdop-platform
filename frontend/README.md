@@ -63,6 +63,8 @@ pnpm.cmd run verify
 
 ## 当前验证（2026-10-07）
 
+CI 的 `Frontend verify` 复用 `pnpm run verify`，先按锁文件安装依赖。`CI` 环境额外输出 `apps/admin/test-results/junit.xml`，生成报告不提交 Git；触发、失败日志及构建产物见 [CI 自动验收](../docs/project/CI自动验收.md)。下列数量为最近一次 WMS 验收记录，CI 结果以相应提交的实际运行结果为准。
+
 - `pnpm.cmd run dev`：管理端业务页面已在隔离环境进行浏览器验收。
 - `pnpm.cmd run format:check`：Prettier 格式检查通过。
 - `pnpm.cmd run lint`：ESLint 静态检查通过，无警告或错误。

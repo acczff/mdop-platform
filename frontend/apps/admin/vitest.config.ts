@@ -7,6 +7,8 @@ export default mergeConfig(
   defineConfig({
     test: {
       environment: 'jsdom',
+      reporters: process.env.CI ? ['default', 'junit'] : ['default'],
+      outputFile: { junit: 'test-results/junit.xml' },
       exclude: [...configDefaults.exclude, 'e2e/**'],
       root: fileURLToPath(new URL('./', import.meta.url)),
     },
