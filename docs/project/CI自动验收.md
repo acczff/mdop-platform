@@ -51,7 +51,7 @@ CI 首版建立前后端持续集成验证，本轮补充同次构建的候选�
 
 首次远端运行暴露原固定 pnpm `11.13.0` 被安装器以 `ERR_PNPM_BROKEN_PNPM_RELEASE` 拒绝：该版本的可执行包发布损坏。项目 packageManager、工作区 engines 与运行文档统一修正为 `11.13.1`，保留现有依赖锁文件；不通过跳过版本保护继续使用损坏发布。历史 I0 变更记录仍保留当时的版本号。
 
-仓库现有本地验收基线为后端 175 项、前端 68 项；这不是写死的通过门槛，后续新增用例应自然进入同一验证入口。CI 只说明自动检查结果，不能代替浏览器业务验收、异人审批、数据恢复演练或真实系统联调。
+首次 CI 交付基线为后端 175 项、前端 68 项；IAM 候选已增加到后端 186 项、前端 75 项，本轮另有 13 项发布工具测试。数量不是写死的通过门槛，新增用例应自然进入对应验证入口。CI 只说明自动检查结果，不能代替浏览器业务验收、异人审批、数据恢复演练或真实系统联调。
 
 参考：[GitHub Java 配置](https://github.com/actions/setup-java)、[pnpm 安装与版本读取](https://github.com/pnpm/action-setup)、[Vitest 报告](https://vitest.dev/guide/reporters.html)、[Actions 产物上传](https://github.com/actions/upload-artifact)。
 

@@ -39,7 +39,11 @@ deploy
 │  ├─ .env.example
 │  └─ .env.local
 ├─ docker
-└─ monitoring
+├─ monitoring
+└─ release
+   ├─ application-release.yml
+   ├─ nginx.conf
+   └─ RUNBOOK.md
 ```
 
 说明：
