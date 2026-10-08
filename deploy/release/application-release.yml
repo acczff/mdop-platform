@@ -1,0 +1,32 @@
+# Copy outside the verified bundle. No local/test profile: simulation endpoints stay disabled.
+spring:
+  datasource:
+    url: ${MDOP_JDBC_URL}
+    username: ${MDOP_DB_USER}
+    password: ${MDOP_DB_PASSWORD}
+  rabbitmq:
+    host: ${MDOP_RABBITMQ_HOST:127.0.0.1}
+    port: ${MDOP_RABBITMQ_PORT:5672}
+    username: ${MDOP_RABBITMQ_USER:unused}
+    password: ${MDOP_RABBITMQ_PASSWORD:unused}
+    virtual-host: ${MDOP_RABBITMQ_VHOST:/}
+server:
+  address: 127.0.0.1
+  port: ${MDOP_BACKEND_PORT:8081}
+  servlet:
+    session:
+      cookie:
+        secure: ${MDOP_COOKIE_SECURE:true}
+management:
+  endpoint:
+    health:
+      show-details: never
+  health:
+    rabbit:
+      enabled: ${MDOP_MESSAGING_ENABLED:false}
+mdop:
+  auth:
+    username: ${MDOP_ADMIN_USERNAME:admin}
+    password: ${MDOP_ADMIN_PASSWORD:}
+  messaging:
+    enabled: ${MDOP_MESSAGING_ENABLED:false}
