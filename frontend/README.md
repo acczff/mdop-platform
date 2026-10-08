@@ -6,7 +6,7 @@ MDOP 前端使用 pnpm（高效的 Node.js 包管理器）工作区管理应用�
 
 - Node.js：`>=24.18.0 <25`，使用 Node.js 24 LTS（长期支持版本）。
 - Corepack：负责提供并管理 pnpm 命令入口。
-- pnpm：固定为 `11.13.0`。
+- pnpm：固定为 `11.13.1`。
 - 管理端：Vue 3、TypeScript、Vue Router、Pinia、Vite 和 Vitest。
 - 质量工具：Prettier 3.9.5 和 ESLint 10.7.0。
 

@@ -52,7 +52,7 @@ mdop-platform
 
 - Java 25；
 - Node.js 24，最低 `24.18.0` 且低于 25；
-- 由 Corepack（Node.js 包管理器代理）管理的 pnpm `11.13.0`；
+- 由 Corepack（Node.js 包管理器代理）管理的 pnpm `11.13.1`；
 - 已启动的 Docker Desktop（Docker 桌面程序）和可用的 Docker Engine（Docker 容器引擎）。
 
 在仓库根目录确认工具版本：
