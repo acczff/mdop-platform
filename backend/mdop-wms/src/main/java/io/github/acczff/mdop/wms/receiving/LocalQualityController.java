@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @Profile({"local", "test"})
 @RequestMapping("/api/local/qms-results")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('ADMIN') or hasAuthority('integration:simulate')")
 public class LocalQualityController {
     private final QualityService service;
 

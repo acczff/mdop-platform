@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @Profile({"local", "test"})
 @RequestMapping("/api/local/mes-demands")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('ADMIN') or hasAuthority('integration:simulate')")
 public class LocalMesController {
     private final IssueService service;
 

@@ -1,0 +1,34 @@
+CREATE TABLE iam_guard (id INT PRIMARY KEY, initialized BOOLEAN NOT NULL DEFAULT FALSE);
+INSERT INTO iam_guard (id) VALUES (1);
+CREATE TABLE iam_user (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT,
+ username VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_ci NOT NULL UNIQUE,
+ display_name VARCHAR(80) NOT NULL,
+ password_hash VARCHAR(255) NOT NULL,
+ enabled BOOLEAN NOT NULL DEFAULT TRUE,
+ version BIGINT NOT NULL DEFAULT 0,
+ created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+);
+CREATE TABLE iam_user_role (
+ user_id BIGINT NOT NULL,
+ role_code VARCHAR(40) NOT NULL,
+ PRIMARY KEY(user_id, role_code),
+ FOREIGN KEY(user_id) REFERENCES iam_user(id)
+);
+CREATE TABLE iam_user_permission (
+ user_id BIGINT NOT NULL,
+ permission VARCHAR(100) NOT NULL,
+ PRIMARY KEY(user_id, permission),
+ FOREIGN KEY(user_id) REFERENCES iam_user(id)
+);
+CREATE TABLE iam_audit (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT,
+ user_id BIGINT NOT NULL,
+ action VARCHAR(40) NOT NULL,
+ actor VARCHAR(64) NOT NULL,
+ reason VARCHAR(300) NOT NULL,
+ before_state TEXT NULL,
+ after_state TEXT NOT NULL,
+ created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+ FOREIGN KEY(user_id) REFERENCES iam_user(id)
+);

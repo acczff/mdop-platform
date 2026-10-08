@@ -244,7 +244,13 @@ onMounted(async () => {
       <p class="hint">
         不合格品保留原位置并保持不可用；每条明细的合格数量整行上架。
       </p>
-      <form v-if="!selected.reference_no && admin" @submit.prevent="inspect">
+      <form
+        v-if="
+          !selected.reference_no &&
+          (admin || props.authorities.includes('integration:simulate'))
+        "
+        @submit.prevent="inspect"
+      >
         <h3>模拟 QMS 结果</h3>
         <p class="hint">仅供本地模拟，不代表真实 QMS 已完成检验。</p>
         <label

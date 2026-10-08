@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 @Profile({"local", "test"})
 @ConditionalOnProperty(name = "mdop.messaging.enabled", havingValue = "true")
 @RequestMapping("/api/local/erp-messages")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('ADMIN') or hasAuthority('integration:simulate')")
 public class ErpMessageController {
     private final EventPublisher publisher;
     private final DeliveryService service;

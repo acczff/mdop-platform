@@ -1,14 +1,10 @@
 package io.github.acczff.mdop.security;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.savedrequest.NullRequestCache;
 
@@ -18,104 +14,13 @@ import org.springframework.security.web.savedrequest.NullRequestCache;
 public class MdopSecurityConfiguration {
 
     @Bean
-    UserDetailsService localOperator(
-            @Value("${mdop.auth.username}") String username,
-            @Value("${mdop.auth.password}") String password,
-            OperatorProperties operators) {
-        if (!username.matches("[A-Za-z][A-Za-z0-9._-]{0,63}") || password.length() < 12) {
-            throw new IllegalArgumentException(
-                    "请配置合法的 MDOP_ADMIN_USERNAME 和至少12位的 MDOP_ADMIN_PASSWORD");
-        }
-        var encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
-        var manager =
-                new InMemoryUserDetailsManager(
-                        User.withUsername(username)
-                                .password(encoder.encode(password))
-                                .roles("ADMIN", "RECEIVER")
-                                .build());
-        if (operators.operators() != null)
-            for (var operator : operators.operators()) {
-                if (operator.username() == null
-                        || !operator.username().matches("[A-Za-z][A-Za-z0-9._-]{0,63}")
-                        || operator.password() == null
-                        || operator.password().length() < 12
-                        || operator.authorities() == null
-                        || operator.authorities().isEmpty()
-                        || manager.userExists(operator.username()))
-                    throw new IllegalArgumentException("操作账号配置不合法或重名");
-                var authorities = operator.authorities();
-                for (String authority : authorities)
-                    if (!authority.matches("wms:warehouse:[1-9][0-9]*")
-                            && !java.util.Set.of(
-                                            "warehouse:read",
-                                            "wms:arrival:read",
-                                            "wms:inventory:read",
-                                            "wms:freeze:read",
-                                            "wms:freeze:create",
-                                            "wms:freeze:review",
-                                            "wms:cross-transfer:read",
-                                            "wms:cross-transfer:create",
-                                            "wms:cross-transfer:review",
-                                            "wms:cross-transfer:ship",
-                                            "wms:cross-transfer:receive",
-                                            "wms:cross-transfer:cancel",
-                                            "wms:sales:read",
-                                            "wms:sales:reserve",
-                                            "wms:sales:pick",
-                                            "wms:sales:review",
-                                            "wms:sales:ship",
-                                            "wms:sales:cancel",
-                                            "wms:finished:read",
-                                            "wms:finished:receive",
-                                            "wms:finished:putaway",
-                                            "wms:production:read",
-                                            "wms:production:reverse",
-                                            "wms:production:review",
-                                            "wms:production:confirm",
-                                            "wms:production:cancel",
-                                            "wms:issue:read",
-                                            "wms:issue:reserve",
-                                            "wms:issue:cancel",
-                                            "wms:issue:confirm",
-                                            "wms:count:read",
-                                            "wms:count:create",
-                                            "wms:count:submit",
-                                            "wms:count:review",
-                                            "wms:count:cancel",
-                                            "wms:transfer:read",
-                                            "wms:transfer:confirm",
-                                            "wms:receipt:create",
-                                            "wms:receipt:submit",
-                                            "wms:correction:read",
-                                            "wms:correction:create",
-                                            "wms:correction:approve",
-                                            "wms:quality:read",
-                                            "wms:putaway:confirm",
-                                            "wms:return:read",
-                                            "wms:return:create",
-                                            "wms:return:approve",
-                                            "wms:return:confirm")
-                                    .contains(authority))
-                        throw new IllegalArgumentException("操作账号包含不受支持的权限");
-                if (authorities.contains("wms:correction:approve")
-                        && (authorities.contains("wms:correction:create")
-                                || authorities.contains("wms:receipt:submit")))
-                    throw new IllegalArgumentException("审批账号不能同时配置申请或收货提交权限");
-                if (authorities.contains("wms:return:approve")
-                        && (authorities.contains("wms:return:create")
-                                || authorities.contains("wms:return:confirm")))
-                    throw new IllegalArgumentException("退货审批账号不能同时配置申请或实际退货确认权限");
-                manager.createUser(
-                        User.withUsername(operator.username())
-                                .password(encoder.encode(operator.password()))
-                                .authorities(authorities.toArray(String[]::new))
-                                .build());
-            }
-        return manager;
+    org.springframework.security.crypto.password.PasswordEncoder passwordEncoder() {
+        return PasswordEncoderFactories.createDelegatingPasswordEncoder();
     }
 
     @Bean
-    SecurityFilterChain mdopSecurityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain mdopSecurityFilterChain(HttpSecurity http, AccountDirectory accounts)
+            throws Exception {
         http.authorizeHttpRequests(
                         authorize ->
                                 authorize
@@ -153,6 +58,9 @@ public class MdopSecurityConfiguration {
                                                 (request, response, authentication) ->
                                                         response.setStatus(204)));
 
+        http.addFilterBefore(
+                new AccountSessionFilter(accounts),
+                org.springframework.security.web.access.intercept.AuthorizationFilter.class);
         return http.build();
     }
 }

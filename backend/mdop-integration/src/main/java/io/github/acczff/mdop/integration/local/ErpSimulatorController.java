@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @Profile({"local", "test"})
 @RequestMapping("/api/local/erp-arrivals")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('ADMIN') or hasAuthority('integration:simulate')")
 public class ErpSimulatorController {
     private final ReceivingService service;
 

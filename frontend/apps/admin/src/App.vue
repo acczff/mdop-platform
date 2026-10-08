@@ -8,9 +8,12 @@ const busy = ref(false)
 const error = ref('')
 const username = ref('admin')
 const password = ref('')
-function expired() {
+function expired(event: Event) {
   session.value = null
-  error.value = '登录已过期，请重新登录。'
+  error.value =
+    event instanceof CustomEvent && typeof event.detail === 'string'
+      ? event.detail
+      : '登录已过期，请重新登录。'
 }
 async function restore() {
   try {
@@ -91,7 +94,7 @@ onUnmounted(() => window.removeEventListener('session-expired', expired))
       <button class="primary" :disabled="busy">
         {{ busy ? '正在登录…' : '登录' }}
       </button>
-      <p class="hint">使用本项目本地环境配置中的账号与密码。</p>
+      <p class="hint">使用管理员分配的账号登录。首次初始化账号见部署说明。</p>
     </form>
   </main>
   <div v-else class="layout">
@@ -99,6 +102,12 @@ onUnmounted(() => window.removeEventListener('session-expired', expired))
       <div class="brand">MDOP<small>制造运营平台</small></div>
       <p class="nav-caption">仓储工作台</p>
       <nav aria-label="主导航">
+        <RouterLink to="/account">我的账号</RouterLink>
+        <RouterLink
+          v-if="session.authorities.includes('iam:manage')"
+          to="/users"
+          >用户与权限</RouterLink
+        >
         <RouterLink
           v-if="
             session.authorities.includes('ROLE_ADMIN') ||
@@ -187,9 +196,28 @@ onUnmounted(() => window.removeEventListener('session-expired', expired))
           to="/quality"
           >质检与上架</RouterLink
         >
-        <RouterLink to="/warehouses">仓库管理</RouterLink
-        ><RouterLink to="/catalog">收货基础资料</RouterLink
-        ><RouterLink to="/receiving">采购收货</RouterLink>
+        <RouterLink
+          v-if="
+            session.authorities.includes('warehouse:read') ||
+            session.authorities.includes('ROLE_ADMIN')
+          "
+          to="/warehouses"
+          >仓库管理</RouterLink
+        ><RouterLink
+          v-if="
+            session.authorities.includes('warehouse:read') ||
+            session.authorities.includes('ROLE_ADMIN')
+          "
+          to="/catalog"
+          >收货基础资料</RouterLink
+        ><RouterLink
+          v-if="
+            session.authorities.includes('wms:arrival:read') ||
+            session.authorities.includes('ROLE_ADMIN')
+          "
+          to="/receiving"
+          >采购收货</RouterLink
+        >
         <RouterLink
           v-if="
             session.authorities.includes('ROLE_ADMIN') ||
@@ -199,7 +227,10 @@ onUnmounted(() => window.removeEventListener('session-expired', expired))
           >差异与冲正</RouterLink
         >
         <RouterLink
-          v-if="session.authorities.includes('ROLE_ADMIN')"
+          v-if="
+            session.authorities.includes('ROLE_ADMIN') ||
+            session.authorities.includes('integration:simulate')
+          "
           to="/messages"
           >消息管理</RouterLink
         >

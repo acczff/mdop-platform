@@ -3,6 +3,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    { path: '/users', component: () => import('../views/UsersView.vue') },
+    { path: '/account', component: () => import('../views/AccountView.vue') },
     { path: '/freezes', component: () => import('../views/FreezesView.vue') },
     {
       path: '/cross-transfers',
@@ -17,7 +19,7 @@ const router = createRouter({
       path: '/production',
       component: () => import('../views/ProductionView.vue'),
     },
-    { path: '/', redirect: '/warehouses' },
+    { path: '/', redirect: '/account' },
     { path: '/issues', component: () => import('../views/IssuesView.vue') },
     { path: '/counts', component: () => import('../views/CountsView.vue') },
     {
@@ -47,7 +49,7 @@ const router = createRouter({
       path: '/receiving',
       component: () => import('../views/ReceivingView.vue'),
     },
-    { path: '/:pathMatch(.*)*', redirect: '/warehouses' },
+    { path: '/:pathMatch(.*)*', redirect: '/account' },
   ],
 })
 
