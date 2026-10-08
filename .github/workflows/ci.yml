@@ -17,6 +17,9 @@ defaults:
   run:
     shell: bash
 
+env:
+  MDOP_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+
 jobs:
   backend:
     name: Backend verify
@@ -31,7 +34,7 @@ jobs:
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
-          java-version: '25'
+          java-version: "25"
           cache: maven
           cache-dependency-path: |
             backend/**/pom.xml
@@ -41,6 +44,11 @@ jobs:
           java -version
           docker version
           docker info --format '{{.OSType}}'
+      - name: Set up Node for release metadata
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.18.0"
+          package-manager-cache: false
       - name: Verify backend
         run: |
           mkdir -p logs/ci
@@ -57,6 +65,18 @@ jobs:
             backend/**/target/surefire-reports/
             backend/**/target/failsafe-reports/
             backend/**/target/site/jacoco/
+      - name: Stamp verified backend
+        run: |
+          jars=(backend/mdop-boot/target/mdop-boot-*.jar)
+          test "${#jars[@]}" -eq 1
+          node scripts/release/release.mjs stamp . backend "${jars[0]}" tmp/release/backend
+      - name: Preserve verified backend component
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: backend-component-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 7
+          if-no-files-found: error
+          path: tmp/release/backend/
 
   frontend:
     name: Frontend verify
@@ -73,7 +93,7 @@ jobs:
       - name: Set up Node 24
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '24.18.0'
+          node-version: "24.18.0"
           package-manager-cache: false
       - name: Set up repository pnpm version
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -107,3 +127,59 @@ jobs:
           retention-days: 7
           if-no-files-found: error
           path: frontend/apps/admin/dist/
+      - name: Stamp verified frontend
+        run: node ../scripts/release/release.mjs stamp .. frontend apps/admin/dist ../tmp/release/frontend
+      - name: Preserve verified frontend component
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: frontend-component-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 7
+          if-no-files-found: error
+          path: tmp/release/frontend/
+
+  release:
+    name: Release candidate
+    needs: [backend, frontend]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.18.0"
+          package-manager-cache: false
+      - name: Verify release tooling
+        run: |
+          mkdir -p logs/ci
+          node --test scripts/release/*.test.mjs 2>&1 | tee logs/ci/release-tools.log
+      - name: Preserve release diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-reports-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: logs/ci/release-tools.log
+      - name: Download backend from this run
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: backend-component-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tmp/release/backend
+      - name: Download frontend from this run
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: frontend-component-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tmp/release/frontend
+      - name: Assemble matching verified components
+        run: node scripts/release/release.mjs assemble . tmp/release/backend tmp/release/frontend tmp/release/candidate
+      - name: Preserve candidate bundle
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 14
+          if-no-files-found: error
+          path: tmp/release/candidate/

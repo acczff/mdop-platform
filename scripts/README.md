@@ -2,6 +2,8 @@
 
 本目录提供 MDOP 仓库级操作脚本。Windows 用户从仓库根目录通过 `mdop.cmd` 调用，不需要直接执行 `scripts/mdop.ps1`。
 
+`release/release.mjs` 负责 CI 组件标记、候选包组合与完整性校验；`release/database.mjs` 提供停写后的数据库备份校验和仅空目标恢复。它们不调用 `mdop start`，不自动升级日常数据库；参数和失败处理见[发布包操作手册](../deploy/release/RUNBOOK.md)。工具回归使用 `node --test scripts/release/*.test.mjs`，CI 的 `Release candidate` 检查自动执行。
+
 ## 命令
 
 ```powershell
