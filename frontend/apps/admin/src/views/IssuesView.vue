@@ -241,7 +241,10 @@ onMounted(() =>
     }
     warehouseId.value = sourceWarehouses.value[0]?.id || 0
     targetWarehouseId.value = targetWarehouses.value[0]?.id || 0
-    if (props.authorities.includes('ROLE_ADMIN')) {
+    if (
+      props.authorities.includes('ROLE_ADMIN') ||
+      props.authorities.includes('integration:simulate')
+    ) {
       simulator.value = await request<{ enabled: boolean }>(
         '/api/local/mes-demands/capabilities',
       )

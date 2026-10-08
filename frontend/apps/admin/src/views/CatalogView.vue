@@ -8,7 +8,11 @@ import {
   areaNames,
 } from '../receiving'
 const props = defineProps<{ authorities: string[] }>()
-const editable = computed(() => props.authorities.includes('ROLE_ADMIN'))
+const editable = computed(
+  () =>
+    props.authorities.includes('ROLE_ADMIN') ||
+    props.authorities.includes('masterdata:write'),
+)
 const tab = ref<'suppliers' | 'materials' | 'locations'>('suppliers')
 const labels = { suppliers: '供应商', materials: '物料', locations: '库位' }
 const suppliers = ref<Supplier[]>([]),

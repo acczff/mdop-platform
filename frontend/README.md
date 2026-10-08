@@ -10,6 +10,8 @@ MDOP 前端使用 pnpm（高效的 Node.js 包管理器）工作区管理应用�
 - 管理端：Vue 3、TypeScript、Vue Router、Pinia、Vite 和 Vitest。
 - 质量工具：Prettier 3.9.5 和 ESLint 10.7.0。
 
+用户与固定角色分配、账号审计和本人改密的范围见[用户与权限首版](../docs/project/IAM用户与权限首版.md)。
+
 ## 当前结构
 
 ```text

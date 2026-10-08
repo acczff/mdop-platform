@@ -47,3 +47,7 @@
 仓库现有本地验收基线为后端 175 项、前端 68 项；这不是写死的通过门槛，后续新增用例应自然进入同一验证入口。CI 只说明自动检查结果，不能代替浏览器业务验收、异人审批、数据恢复演练或真实系统联调。
 
 参考：[GitHub Java 配置](https://github.com/actions/setup-java)、[pnpm 安装与版本读取](https://github.com/pnpm/action-setup)、[Vitest 报告](https://vitest.dev/guide/reporters.html)、[Actions 产物上传](https://github.com/actions/upload-artifact)。
+
+## 交付记录
+
+2026-10-08，PR [#30](https://github.com/acczff/mdop-platform/pull/30) 已合并 main，合并提交 `0d8e627`。PR 与[主干 push 运行](https://github.com/acczff/mdop-platform/actions/runs/37714241236)均通过；下载报告核对后端 175 项、前端 68 项，失败、错误和跳过均为 0。报告与前端构建产物齐全。该数量属于 CI 首次交付基线，后续迭代以当次运行报告为准。

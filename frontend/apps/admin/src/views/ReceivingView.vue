@@ -75,7 +75,7 @@ async function loadFoundation() {
     materials.value = m
     locations.value = l
     warehouseId.value = w.items[0]?.id || 0
-    if (admin.value) {
+    if (admin.value || props.authorities.includes('integration:simulate')) {
       try {
         simEnabled.value = (
           await request<{ enabled: boolean }>(

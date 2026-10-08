@@ -50,14 +50,14 @@ public class CatalogController {
 
     @PostMapping("/suppliers")
     @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('masterdata:write')")
     public Supplier supplier(@Valid @RequestBody SupplierInput request) {
         return service.createSupplier(request.code(), request.name());
     }
 
     @PostMapping("/materials")
     @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('masterdata:write')")
     public Material material(@Valid @RequestBody MaterialInput request) {
         return service.createMaterial(
                 request.code(),
@@ -70,7 +70,7 @@ public class CatalogController {
 
     @PostMapping("/locations")
     @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('masterdata:write')")
     public Location location(@Valid @RequestBody LocationInput request) {
         return service.createLocation(
                 request.warehouseId(), request.code(), request.name(), request.areaType());

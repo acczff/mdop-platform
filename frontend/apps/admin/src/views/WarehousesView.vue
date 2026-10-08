@@ -11,7 +11,11 @@ import {
   type Warehouse,
 } from '../api'
 const props = defineProps<{ authorities: string[] }>()
-const canEdit = computed(() => props.authorities.includes('ROLE_ADMIN'))
+const canEdit = computed(
+  () =>
+    props.authorities.includes('ROLE_ADMIN') ||
+    props.authorities.includes('masterdata:write'),
+)
 const data = ref<Page<Warehouse>>({
   items: [],
   page: 1,

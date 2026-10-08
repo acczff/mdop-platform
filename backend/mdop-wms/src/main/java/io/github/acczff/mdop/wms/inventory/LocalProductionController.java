@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @Profile({"local", "test"})
 @RequestMapping("/api/local/mes-production")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('ADMIN') or hasAuthority('integration:simulate')")
 public class LocalProductionController {
     private final ProductionService service;
 

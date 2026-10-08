@@ -38,7 +38,7 @@ public class WarehouseController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('masterdata:write')")
     public ResponseEntity<WarehouseResponse> create(
             @Valid @RequestBody CreateWarehouseRequest request) {
         Warehouse warehouse =
@@ -77,7 +77,7 @@ public class WarehouseController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('masterdata:write')")
     public WarehouseResponse update(
             @PathVariable @Positive Long id, @Valid @RequestBody UpdateWarehouseRequest request) {
         return WarehouseResponse.from(
@@ -92,7 +92,7 @@ public class WarehouseController {
     }
 
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('masterdata:write')")
     public WarehouseResponse changeStatus(
             @PathVariable @Positive Long id,
             @Valid @RequestBody ChangeWarehouseStatusRequest request) {
