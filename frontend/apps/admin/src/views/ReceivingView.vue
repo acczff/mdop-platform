@@ -383,6 +383,7 @@ onMounted(loadFoundation)
               </td>
               <td>
                 {{
+                  a.supplierName ||
                   suppliers.find((s) => s.id === a.supplierId)?.name ||
                   a.supplierId
                 }}

@@ -18,6 +18,8 @@ export interface Arrival {
   externalNoticeNo: string
   purchaseOrderNo: string
   supplierId: number
+  supplierCode?: string
+  supplierName?: string
   warehouseId: number
   status: string
   version: number

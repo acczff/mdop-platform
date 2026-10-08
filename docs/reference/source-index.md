@@ -54,7 +54,7 @@
 | [FinishedFeedbackController.java](../../backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/FinishedFeedbackController.java) | `/api/integration/finished-receipts` | 1 | — |
 | [IssueFeedbackController.java](../../backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/IssueFeedbackController.java) | `/api/integration/material-issues` | 1 | — |
 | [SalesFeedbackController.java](../../backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/SalesFeedbackController.java) | `/api/integration/sales-orders` | 1 | — |
-| [CatalogController.java](../../backend/mdop-master-data/src/main/java/io/github/acczff/mdop/masterdata/catalog/CatalogController.java) | `/api/master-data` | 6 | — |
+| [CatalogController.java](../../backend/mdop-master-data/src/main/java/io/github/acczff/mdop/masterdata/catalog/CatalogController.java) | `/api/master-data` | 10 | — |
 | [WarehouseController.java](../../backend/mdop-master-data/src/main/java/io/github/acczff/mdop/masterdata/warehouse/api/WarehouseController.java) | `/api/master-data/warehouses` | 5 | — |
 | [SessionController.java](../../backend/mdop-security/src/main/java/io/github/acczff/mdop/security/SessionController.java) | `GET /api/auth/csrf`<br>`GET /api/auth/me` | 2 | — |
 | [AccountController.java](../../backend/mdop-system/src/main/java/io/github/acczff/mdop/system/identity/AccountController.java) | `GET /api/iam/options`<br>`GET /api/iam/users`<br>`GET /api/iam/users/{id}/audit`<br>`POST /api/iam/users`<br>`POST /api/iam/users/{id}/access`<br>`POST /api/iam/users/{id}/status`<br>`POST /api/iam/users/{id}/password`<br>`POST /api/auth/password` | 8 | — |
@@ -107,3 +107,5 @@
 | [V202610070011__inventory_freeze.sql](../../backend/mdop-wms/src/main/resources/db/migration/wms/V202610070011__inventory_freeze.sql) | mdop-wms |
 | [V202610070012__partial_transfer_receiving.sql](../../backend/mdop-wms/src/main/resources/db/migration/wms/V202610070012__partial_transfer_receiving.sql) | mdop-wms |
 | [V202610080001__identity_access.sql](../../backend/mdop-system/src/main/resources/db/migration/system/V202610080001__identity_access.sql) | mdop-system |
+| [V202610080002__catalog_lifecycle.sql](../../backend/mdop-master-data/src/main/resources/db/migration/masterdata/V202610080002__catalog_lifecycle.sql) | mdop-master-data |
+| [V202610080003__master_data_snapshots.sql](../../backend/mdop-wms/src/main/resources/db/migration/wms/V202610080003__master_data_snapshots.sql) | mdop-wms |

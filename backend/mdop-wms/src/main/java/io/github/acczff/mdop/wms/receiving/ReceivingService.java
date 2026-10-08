@@ -52,23 +52,29 @@ public class ReceivingService {
     public ArrivalDetail receiveArrival(String sourceSystem, ArrivalInput input) {
         access.requireWarehouse(input.warehouseId());
         catalog.requireReceivingWarehouse(input.warehouseId());
-        catalog.supplier(input.supplierId());
+        var supplier = catalog.referenceSupplier(input.supplierId());
         String number = required(input.externalNoticeNo(), "外部到货单号", 64);
         String purchase = required(input.purchaseOrderNo(), "采购订单号", 64);
         long id =
                 insert(
-                        "INSERT INTO wms_arrival_notice(source_system,external_notice_no,purchase_order_no,supplier_id,warehouse_id,created_by,created_at) VALUES (?,?,?,?,?,?,?)",
+                        "INSERT INTO wms_arrival_notice(source_system,external_notice_no,purchase_order_no,supplier_id,warehouse_id,created_by,created_at,supplier_code,supplier_name) VALUES (?,?,?,?,?,?,?,?,?)",
                         required(sourceSystem, "来源系统", 32),
                         number,
                         purchase,
                         input.supplierId(),
                         input.warehouseId(),
                         actor.currentActor(),
-                        now());
+                        now(),
+                        supplier.code(),
+                        supplier.name());
         Set<Long> seen = new HashSet<>();
-        for (var line : input.items()) {
+        // Acquire material locks in stable order; result order remains identified by material ID.
+        for (var line :
+                input.items().stream()
+                        .sorted(java.util.Comparator.comparingLong(ArrivalLine::materialId))
+                        .toList()) {
             if (!seen.add(line.materialId())) throw invalid("同一通知中的物料不能重复，请合并数量");
-            var material = catalog.material(line.materialId());
+            var material = catalog.referenceMaterial(line.materialId());
             jdbc.sql(
                             "INSERT INTO wms_arrival_notice_item(arrival_id,material_id,material_code,material_name,unit,notice_qty) VALUES (?,?,?,?,?,?)")
                     .params(
@@ -233,7 +239,13 @@ public class ReceivingService {
                                             "arrival",
                                             arrival(arrival.id()),
                                             "supplier",
-                                            catalog.supplier(arrival.supplierId()),
+                                            Map.of(
+                                                    "id",
+                                                    arrival.supplierId(),
+                                                    "code",
+                                                    arrival.supplierCode(),
+                                                    "name",
+                                                    arrival.supplierName()),
                                             "operator",
                                             actor.currentActor())),
                             now())

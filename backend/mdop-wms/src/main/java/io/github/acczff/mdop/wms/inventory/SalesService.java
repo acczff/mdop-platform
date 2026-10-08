@@ -65,7 +65,7 @@ public class SalesService {
     }
 
     private static final String SELECT =
-            "SELECT d.*,CAST(d.quantity AS CHAR) AS amount,m.code AS material_code,m.name AS material_name,m.unit,b.batch_no,l.name AS location_name FROM wms_sales_order d JOIN mdm_material m ON m.id=d.material_id LEFT JOIN wms_inventory_balance b ON b.id=d.source_balance_id LEFT JOIN mdm_location l ON l.id=b.location_id";
+            "SELECT d.*,CAST(d.quantity AS CHAR) AS amount,b.batch_no,l.name AS location_name FROM wms_sales_order d LEFT JOIN wms_inventory_balance b ON b.id=d.source_balance_id LEFT JOIN mdm_location l ON l.id=b.location_id";
 
     public InventoryService.Page list(long warehouse, int page, int size) {
         access.requireWarehouse(warehouse);
@@ -128,9 +128,9 @@ public class SalesService {
             return detail(n(d, "id"));
         }
         eligible(in.warehouseId());
-        catalog.material(in.materialId());
+        var material = catalog.referenceMaterial(in.materialId());
         db.sql(
-                        "INSERT INTO wms_sales_order(demand_no,sales_order_no,customer_reference,warehouse_id,material_id,quantity,created_by,created_at) VALUES(?,?,?,?,?,?,?,?)")
+                        "INSERT INTO wms_sales_order(demand_no,sales_order_no,customer_reference,warehouse_id,material_id,quantity,created_by,created_at,material_code,material_name,unit) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
                 .params(
                         in.demandNo(),
                         in.salesOrderNo().trim(),
@@ -139,7 +139,10 @@ public class SalesService {
                         in.materialId(),
                         in.quantity(),
                         actor.currentActor(),
-                        now())
+                        now(),
+                        material.code(),
+                        material.name(),
+                        material.unit())
                 .update();
         return detail(
                 db.sql("SELECT id FROM wms_sales_order WHERE demand_no=?")

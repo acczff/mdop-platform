@@ -209,7 +209,7 @@ onUnmounted(() => window.removeEventListener('session-expired', expired))
             session.authorities.includes('ROLE_ADMIN')
           "
           to="/catalog"
-          >收货基础资料</RouterLink
+          >基础资料</RouterLink
         ><RouterLink
           v-if="
             session.authorities.includes('wms:arrival:read') ||
