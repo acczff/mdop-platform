@@ -19,6 +19,6 @@
 - [ ] 范围和验收标准明确
 - [ ] 相关文档已同步更新
 - [ ] 正常和异常场景已验证
-- [ ] 最新提交的 Backend verify、Frontend verify 与 Release candidate 均通过，或明确说明未运行/失败原因
+- [ ] 最新提交的 Documentation verify、Backend verify、Frontend verify 与 Release candidate 均通过，或明确说明未运行/失败原因
 - [ ] 未提交真实数据、密码、密钥或生产配置
 - [ ] 变更不破坏模块边界和 `main` 分支质量

@@ -40,15 +40,15 @@ admin 应用的职责、源码结构和验证方式见 [apps/admin/README.md](ap
 推荐使用根目录 `.\mdop.cmd verify` 或 `.\scripts\pnpm.cmd run <动作>`，以保证嵌套 pnpm 命令使用相同版本。手动运行 `dev` 前将 `scripts` 目录加入当前终端 PATH；后端代理由 `MDOP_BACKEND_URL` 指定，默认端口 8081。
 
 ```powershell
-pnpm.cmd run dev
-pnpm.cmd run format
-pnpm.cmd run format:check
-pnpm.cmd run lint
-pnpm.cmd run lint:fix
-pnpm.cmd run test
-pnpm.cmd run type-check
-pnpm.cmd run build
-pnpm.cmd run verify
+.\scripts\pnpm.cmd run dev
+.\scripts\pnpm.cmd run format
+.\scripts\pnpm.cmd run format:check
+.\scripts\pnpm.cmd run lint
+.\scripts\pnpm.cmd run lint:fix
+.\scripts\pnpm.cmd run test
+.\scripts\pnpm.cmd run type-check
+.\scripts\pnpm.cmd run build
+.\scripts\pnpm.cmd run verify
 ```
 
 - `dev`：启动 admin 开发服务器。
@@ -63,7 +63,7 @@ pnpm.cmd run verify
 
 生产构建输出位于 `apps/admin/dist`，依赖目录位于 `node_modules`；两者均已被 Git 忽略。
 
-## 当前验证（2026-10-07）
+## 历史验证（2026-10-07）
 
 CI 的 `Frontend verify` 复用 `pnpm run verify`，先按锁文件安装依赖。`CI` 环境额外输出 `apps/admin/test-results/junit.xml`，生成报告不提交 Git；触发、失败日志及构建产物见 [CI 自动验收](../docs/project/CI自动验收.md)。下列数量为最近一次 WMS 验收记录，CI 结果以相应提交的实际运行结果为准。
 
@@ -82,5 +82,7 @@ CI 的 `Frontend verify` 复用 `pnpm run verify`，先按锁文件安装依赖�
 - admin 应用能够启动、测试、类型检查和生产构建。
 - Vue Router 与 Pinia 已完成最小装配。
 - 已实现会话登录、导航、同源 API/CSRF、操作权限入口和仓库范围查询；后端仍执行最终授权。
-- 已提供采购入库、生产物料协同、成品出入库、库存运营与消息管理。查询失败清空旧操作数据，不确定写入保留原请求重试。
+- 已提供采购入库、生产物料协同、成品出入库、库存运营与消息管理。查询失败和不确定写入按页面处理；先刷新核对事实，有幂等键的操作保持原键与载荷，不能把所有写操作都视为可直接重试。
 - 完整 IAM、JWT 和真实外部系统接入尚未实现；前端不直接修改数据库，当前只验证本地模拟业务。
+
+当前分支已包含数据库账号、固定角色、账号审计和本人改密。最新带提交身份的验证数量见[版本记录](../docs/project/status.md)，完整页面清单见[源码导航](../docs/reference/source-index.md)。
