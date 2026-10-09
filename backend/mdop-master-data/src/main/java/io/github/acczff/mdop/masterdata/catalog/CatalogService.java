@@ -256,7 +256,8 @@ public class CatalogService {
     }
 
     public Map<String, Object> createDirectory(String kind, String code, String name) {
-        if (!List.of("customers", "units", "organizations").contains(kind)) throw missing("资料类型");
+        if (!List.of("customers", "units", "organizations", "production-sites").contains(kind))
+            throw missing("资料类型");
         String table = table(kind);
         String value = required(name, "名称", kind.equals("units") ? 16 : 100);
         long id;
@@ -273,7 +274,9 @@ public class CatalogService {
                         .update(keys);
             else
                 jdbc.sql(
-                                "INSERT INTO mdm_customer(code,name,created_by,created_at) VALUES(?,?,?,?)")
+                                "INSERT INTO "
+                                        + table
+                                        + "(code,name,created_by,created_at) VALUES(?,?,?,?)")
                         .params(
                                 code(code),
                                 value,
@@ -392,6 +395,7 @@ public class CatalogService {
             case "units" -> "mdm_unit";
             case "organizations" -> "mdm_organization";
             case "materials" -> "mdm_material";
+            case "production-sites" -> "mdm_production_site";
             default -> throw missing("资料类型");
         };
     }

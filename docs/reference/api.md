@@ -96,4 +96,6 @@
 
 ## BOM 版本接口
 
+生产需求及工单接口位于同一根路径下的 `/api/v1/manufacturing/demands`、`/orders` 和 `/sales-sources`，使用独立 `manufacturing:read/write/review` 及成品仓权限；生产地点复用 `/api/master-data/production-sites`。请求和生命周期详见[生产订单接口](../erp/生产订单实现与验收.md#3-页面接口和迁移)。
+
 `/api/v1/manufacturing/boms` 提供列表、详情、草稿创建/编辑、复制及发布/停用。读取要求 `bom:read`，写入要求 `bom:write`；单组织共享资料不按仓库分组，系统管理员和旧 ADMIN 不绕过权限。请求字段、状态及恢复规则见 [BOM 接口表](../erp/BOM版本实现与验收.md#3-页面与接口)。BOM 发布不生成生产订单或库存动作。

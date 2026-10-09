@@ -111,6 +111,8 @@ public class IssueService {
     }
 
     public Map<String, Object> create(Demand input) {
+        io.github.acczff.mdop.common.manufacturing.ProductionNumbers.requireLegacy(
+                input.workOrderNo());
         lockWarehouses(input.warehouseId(), input.targetWarehouseId());
         var existing =
                 db.sql("SELECT * FROM wms_material_issue WHERE demand_no=?")

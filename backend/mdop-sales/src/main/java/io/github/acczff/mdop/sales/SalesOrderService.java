@@ -30,6 +30,7 @@ public class SalesOrderService {
     private final ObjectMapper json;
     private final SalesShippingPort shipping;
     private final SalesFulfillment fulfillment;
+    private final io.github.acczff.mdop.common.manufacturing.ProductionDemandUsage production;
 
     public SalesOrderService(
             JdbcClient db,
@@ -38,7 +39,8 @@ public class SalesOrderService {
             Clock clock,
             ObjectMapper json,
             SalesShippingPort shipping,
-            SalesFulfillment fulfillment) {
+            SalesFulfillment fulfillment,
+            io.github.acczff.mdop.common.manufacturing.ProductionDemandUsage production) {
         this.db = db;
         this.catalog = catalog;
         this.actor = actor;
@@ -46,6 +48,7 @@ public class SalesOrderService {
         this.json = json;
         this.shipping = shipping;
         this.fulfillment = fulfillment;
+        this.production = production;
     }
 
     public record Page(List<Map<String, Object>> items, long total, int page, int size) {}
@@ -193,6 +196,7 @@ public class SalesOrderService {
                 state = action.equals("approve") ? "APPROVED" : "REJECTED";
             }
             case "cancel" -> {
+                if (production.hasActiveSalesDemand(id)) throw conflict("请先安全取消关联生产工单和生产需求");
                 requireState(d, "DRAFT", "REJECTED", "SUBMITTED", "APPROVED", "FULFILLING");
                 if (activeArrangements(id) > 0) throw conflict("请先确认所有发货安排安全撤回");
                 for (var a : arrangements(id))
