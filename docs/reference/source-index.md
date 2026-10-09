@@ -8,9 +8,10 @@
 
 | 模块 | 直接依赖的内部模块（含测试依赖） | 定义 |
 |---|---|---|
-| mdop-boot | mdop-sales、mdop-purchasing、mdop-security、mdop-system、mdop-master-data、mdop-wms、mdop-integration、mdop-test-support (test) | [pom.xml](../../backend/mdop-boot/pom.xml) |
+| mdop-boot | mdop-manufacturing、mdop-sales、mdop-purchasing、mdop-security、mdop-system、mdop-master-data、mdop-wms、mdop-integration、mdop-test-support (test) | [pom.xml](../../backend/mdop-boot/pom.xml) |
 | mdop-common | 无 | [pom.xml](../../backend/mdop-common/pom.xml) |
 | mdop-integration | mdop-common、mdop-wms | [pom.xml](../../backend/mdop-integration/pom.xml) |
+| mdop-manufacturing | mdop-master-data、mdop-security、mdop-common | [pom.xml](../../backend/mdop-manufacturing/pom.xml) |
 | mdop-master-data | mdop-common、mdop-security | [pom.xml](../../backend/mdop-master-data/pom.xml) |
 | mdop-purchasing | mdop-master-data、mdop-security、mdop-common | [pom.xml](../../backend/mdop-purchasing/pom.xml) |
 | mdop-sales | mdop-master-data、mdop-security、mdop-common | [pom.xml](../../backend/mdop-sales/pom.xml) |
@@ -23,6 +24,7 @@
 
 | 路径 | 源码 |
 |---|---|
+| `/boms` | [BomsView.vue](../../frontend/apps/admin/src/views/BomsView.vue) |
 | `/sales-orders` | [SalesOrdersView.vue](../../frontend/apps/admin/src/views/SalesOrdersView.vue) |
 | `/purchasing` | [PurchasingView.vue](../../frontend/apps/admin/src/views/PurchasingView.vue) |
 | `/users` | [UsersView.vue](../../frontend/apps/admin/src/views/UsersView.vue) |
@@ -58,6 +60,7 @@
 | [FinishedFeedbackController.java](../../backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/FinishedFeedbackController.java) | `/api/integration/finished-receipts` | 1 | — |
 | [IssueFeedbackController.java](../../backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/IssueFeedbackController.java) | `/api/integration/material-issues` | 1 | — |
 | [SalesFeedbackController.java](../../backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/SalesFeedbackController.java) | `/api/integration/sales-orders` | 1 | — |
+| [BomController.java](../../backend/mdop-manufacturing/src/main/java/io/github/acczff/mdop/manufacturing/BomController.java) | `/api/v1/manufacturing/boms` | 6 | — |
 | [CatalogController.java](../../backend/mdop-master-data/src/main/java/io/github/acczff/mdop/masterdata/catalog/CatalogController.java) | `/api/master-data` | 10 | — |
 | [WarehouseController.java](../../backend/mdop-master-data/src/main/java/io/github/acczff/mdop/masterdata/warehouse/api/WarehouseController.java) | `/api/master-data/warehouses` | 5 | — |
 | [PurchaseController.java](../../backend/mdop-purchasing/src/main/java/io/github/acczff/mdop/purchasing/PurchaseController.java) | `/api/v1/purchasing/documents` | 8 | — |
@@ -122,3 +125,4 @@
 | [V202610090005__purchase_original_order.sql](../../backend/mdop-purchasing/src/main/resources/db/migration/purchasing/V202610090005__purchase_original_order.sql) | mdop-purchasing |
 | [V202610090006__sales_documents.sql](../../backend/mdop-sales/src/main/resources/db/migration/sales/V202610090006__sales_documents.sql) | mdop-sales |
 | [V202610090007__formal_sales_source.sql](../../backend/mdop-wms/src/main/resources/db/migration/wms/V202610090007__formal_sales_source.sql) | mdop-wms |
+| [V202610090008__bom_versions.sql](../../backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610090008__bom_versions.sql) | mdop-manufacturing |
