@@ -168,8 +168,10 @@ SELECT 'sales_reservation',COUNT(*) FROM wms_sales_order d WHERE
  OR (d.status='SHIPPED' AND NOT EXISTS(SELECT 1 FROM wms_reservation_event e WHERE e.sales_order_id=d.id AND e.event_type='CONSUME' AND e.quantity=d.quantity))
  OR (d.status='CANCELLED' AND d.source_balance_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM wms_reservation_event e WHERE e.sales_order_id=d.id AND e.event_type='RELEASE' AND e.quantity=d.quantity))
 UNION ALL
-SELECT 'sales_feedback',COUNT(*) FROM wms_sales_order d LEFT JOIN wms_outbox o ON o.aggregate_type='SalesOrder' AND o.aggregate_id=d.id AND o.event_type='SalesOutboundConfirmed'
-WHERE (d.status='SHIPPED' AND o.message_id IS NULL) OR (d.status<>'SHIPPED' AND o.message_id IS NOT NULL)
+-- Formal ERP sales read WMS facts directly; only simulator shipments publish this feedback.
+SELECT 'sales_feedback',COUNT(*) FROM wms_sales_order d
+WHERE (SELECT COUNT(*) FROM wms_outbox o WHERE o.aggregate_type='SalesOrder' AND o.aggregate_id=d.id AND o.event_type='SalesOutboundConfirmed')
+ <> CASE WHEN d.source_system='ERP_SIMULATOR' AND d.status='SHIPPED' THEN 1 ELSE 0 END
 UNION ALL
 SELECT 'cross_transfer_ledger_and_transit',COUNT(*) FROM wms_cross_transfer d LEFT JOIN
  (SELECT cross_transfer_id,COUNT(*) n,SUM(change_qty) qty FROM wms_inventory_transaction WHERE cross_transfer_id IS NOT NULL GROUP BY cross_transfer_id)t ON t.cross_transfer_id=d.id

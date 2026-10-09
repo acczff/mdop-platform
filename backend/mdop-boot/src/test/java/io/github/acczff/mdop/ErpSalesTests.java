@@ -174,6 +174,26 @@ class ErpSalesTests extends InventoryScenarioSupport {
     }
 
     @Test
+    void auditSeparatesFormalFactsFromSimulatorFeedback() throws Exception {
+        long id = approved("10"), a = arrange(id, "10"), w = deliver(id, a);
+        execute(w, "10");
+        long baseline = salesFeedbackMismatches();
+        assertThat(baseline).isZero();
+        String message = key();
+        try {
+            db.update(
+                    "INSERT INTO wms_outbox(message_id,event_type,aggregate_type,aggregate_id,trace_id,payload,occurred_at) VALUES(?,'SalesOutboundConfirmed','SalesOrder',?,?,'{}',NOW(6))",
+                    message,
+                    w,
+                    key());
+            assertThat(salesFeedbackMismatches()).isEqualTo(baseline + 1);
+        } finally {
+            db.update("DELETE FROM wms_outbox WHERE message_id=?", message);
+        }
+        assertThat(salesFeedbackMismatches()).isEqualTo(baseline);
+    }
+
+    @Test
     void partialShipmentsCloseOnlyActualQuantityAndPreserveSnapshot() throws Exception {
         long id = approved("100");
         long a = arrange(id, "60"), b = arrange(id, "40");
