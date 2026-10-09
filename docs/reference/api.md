@@ -67,6 +67,8 @@
 
 ## 重试和外部边界
 
+人工补货仍通过 POST `/api/v1/purchasing/documents` 创建需求，可传 `originalOrderId`。原单必须存在、为同仓采购订单且已有实际退供，调用者须有原仓权限；不符合分别返回 404/409/403。该引用建单后不可更换；编辑省略或传 null 都保留原值，转采购订单时自动继承。返回字段为 `original_order_id`，详情 `related` 同仓双向列出来源及补货单据。关联不恢复原单额度、不自动批准或计算补货数量。
+
 采购 P2 在 `/api/v1/purchasing/documents/{id}/arrangements` POST 创建安排，字段为 `idempotencyKey`、父单 `version`、`expectedDate`、`reason` 及 `lines[{orderLineId,quantity}]`。同路径追加 `/{arrangementId}/deliver` 或 `/withdraw` POST，使用 P1 动作请求（键、版本、原因），返回父单最新详情。详情 `arrangements` 带持久化行映射及 WMS 收货引用；未知结果仍按原键原载荷重试。待送达/失败占用额度，撤回确认才释放；所有安排撤回前拒绝取消订单。完整事务及来源边界见[采购 P2](../erp/采购P2实现与验收.md)。
 
 采购 P3 的同一详情接口返回 `fulfillment`（逐行数量字符串、来源 `notices`、`blockers`、`canClose`、`outcome`）、`closure`（不可变快照、原因、操作者/时间）和 `closureMatches`。POST `/api/v1/purchasing/documents/{id}/actions/close` 使用原动作请求和 `purchasing:write` 权限；服务端重查事实，不接受客户端累计数或 `canClose`。少收、未决差异、待检/上架/退供、版本/来源冲突均返回 409。结案为 `CLOSED`，结果 `QUALIFIED` 或 `WITH_RETURNS`；`closureMatches=false` 表示需核对，不能覆盖原快照。详细口径见[采购 P3](../erp/采购P3实现与验收.md)。

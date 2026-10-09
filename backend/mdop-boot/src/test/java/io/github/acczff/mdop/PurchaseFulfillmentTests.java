@@ -159,6 +159,8 @@ class PurchaseFulfillmentTests extends PurchaseScenarioSupport {
         assertThat(quantities(d).get("rejectedPendingReturn").asText()).isEqualTo("20.000000");
         close(d, 409);
         var body = Map.of("idempotencyKey", key(), "version", 1, "handoverNo", "HANDOVER-" + key());
+        var replacement = replacement(d.get("id").asLong());
+        postAs(URL, replacement, operator("buyer", "purchasing:write"), 409);
         postAs(
                 "/api/v1/wms/purchase-returns/" + id + "/confirm",
                 body,
@@ -173,6 +175,101 @@ class PurchaseFulfillmentTests extends PurchaseScenarioSupport {
         assertThat(quantities(d).get("returned").asText()).isEqualTo("20.000000");
         arrange(getOrder(d.get("id").asLong()), "1", 409);
         assertThat(close(d, 200).get("closure").get("outcome").asText()).isEqualTo("WITH_RETURNS");
+        var original = getOrder(d.get("id").asLong());
+        var request = postAs(URL, replacement, operator("buyer", "purchasing:write"), 201);
+        var replay = postAs(URL, replacement, operator("buyer", "purchasing:write"), 201);
+        assertThat(replay.get("id")).isEqualTo(request.get("id"));
+        assertThat(request.get("original_order_id").asLong()).isEqualTo(d.get("id").asLong());
+        assertThat(request.get("status").asText()).isEqualTo("DRAFT");
+        assertThat(request.get("related").toString()).contains(d.get("document_no").asText());
+        assertThat(getOrder(d.get("id").asLong()).get("related").toString())
+                .contains(request.get("document_no").asText());
+        var edit = new HashMap<String, Object>(replacement);
+        edit.put("idempotencyKey", key());
+        edit.put("version", 0);
+        edit.put("reason", "保留来源修改用途");
+        edit.put("originalOrderId", request.get("id").asLong());
+        mvc.perform(
+                        put(URL + "/" + request.get("id").asLong())
+                                .with(operator("buyer", "purchasing:write"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(json.writeValueAsString(edit)))
+                .andExpect(status().isConflict());
+        edit.remove("originalOrderId"); // Older clients must not clear the immutable reference.
+        mvc.perform(
+                        put(URL + "/" + request.get("id").asLong())
+                                .with(operator("buyer", "purchasing:write"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(json.writeValueAsString(edit)))
+                .andExpect(status().isOk());
+        request = getOrder(request.get("id").asLong());
+        assertThat(request.get("original_order_id").asLong()).isEqualTo(d.get("id").asLong());
+        request = action(request, "submit", "buyer", "purchasing:write", 200);
+        action(request, "approve", "buyer", "purchasing:review", 409);
+        request = action(request, "approve", "reviewer", "purchasing:review", 200);
+        var converted =
+                postAs(
+                        URL + "/" + request.get("id").asLong() + "/convert",
+                        Map.of(
+                                "idempotencyKey",
+                                key(),
+                                "version",
+                                request.get("version").asLong(),
+                                "supplierId",
+                                supplier,
+                                "neededDate",
+                                "2026-11-03",
+                                "reason",
+                                "独立审批补货"),
+                        operator("buyer", "purchasing:write"),
+                        200);
+        assertThat(converted.get("original_order_id").asLong()).isEqualTo(d.get("id").asLong());
+        assertThat(converted.get("status").asText()).isEqualTo("DRAFT");
+        assertThat(getOrder(d.get("id").asLong()).get("closure"))
+                .isEqualTo(original.get("closure"));
+        assertThat(getOrder(d.get("id").asLong()).get("version"))
+                .isEqualTo(original.get("version"));
+    }
+
+    Map<String, Object> replacement(long original) {
+        return Map.of(
+                "idempotencyKey",
+                key(),
+                "warehouseId",
+                warehouse,
+                "originalOrderId",
+                original,
+                "purpose",
+                "退供后人工补货",
+                "neededDate",
+                "2026-11-03",
+                "lines",
+                List.of(Map.of("materialId", material, "quantity", "20")));
+    }
+
+    @Test
+    void replacementRejectsInvalidSourceAndCrossWarehouseReferences() throws Exception {
+        var d = order();
+        postAs(URL, replacement(d.get("id").asLong()), operator("buyer", "purchasing:write"), 409);
+        postAs(
+                URL,
+                replacement(d.get("request_id").asLong()),
+                operator("buyer", "purchasing:write"),
+                409);
+        postAs(URL, replacement(Long.MAX_VALUE), operator("buyer", "purchasing:write"), 404);
+        postAs(URL, replacement(d.get("id").asLong()), operator("reader", "purchasing:read"), 403);
+        long other = warehouse;
+        setup(); // New authorized target warehouse; original belongs to the previous scope.
+        postAs(URL, replacement(d.get("id").asLong()), operator("buyer", "purchasing:write"), 403);
+        assertThat(
+                        db.queryForObject(
+                                "SELECT COUNT(*) FROM pur_document WHERE original_order_id=?",
+                                Long.class,
+                                d.get("id").asLong()))
+                .isZero();
+        assertThat(other).isNotEqualTo(warehouse);
     }
 
     @Test

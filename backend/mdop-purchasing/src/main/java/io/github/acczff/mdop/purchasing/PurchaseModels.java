@@ -1,5 +1,6 @@
 package io.github.acczff.mdop.purchasing;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
@@ -21,6 +22,7 @@ public final class PurchaseModels {
             @NotBlank @Size(max = 500) String purpose,
             @NotNull LocalDate neededDate,
             @Positive Long supplierId,
+            @Positive @JsonInclude(JsonInclude.Include.NON_NULL) Long originalOrderId,
             @NotEmpty @Size(max = 100) List<@NotNull @Valid Line> lines,
             @Size(max = 500) String reason) {}
 

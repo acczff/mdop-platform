@@ -89,6 +89,71 @@ class PurchasingTests extends InventoryScenarioSupport {
                         .getContentAsString());
     }
 
+    // Shape before originalOrderId was introduced: preserve pending legacy request hashes.
+    record LegacyDraft(
+            String idempotencyKey,
+            long warehouseId,
+            Long version,
+            String purpose,
+            java.time.LocalDate neededDate,
+            Long supplierId,
+            List<io.github.acczff.mdop.purchasing.PurchaseModels.Line> lines,
+            String reason) {}
+
+    @Test
+    void optionalOriginalOrderKeepsLegacyCreateAndEditReplayCompatible() throws Exception {
+        var body = draft(key());
+        var req = postAs(URL, body, operator("buyer", "purchasing:write"), 201);
+        for (String command : List.of("CREATE", "EDIT")) {
+            long id = command.equals("CREATE") ? 0 : req.get("id").asLong();
+            if (command.equals("EDIT")) {
+                body.put("idempotencyKey", key());
+                body.put("version", 0);
+                body.put("reason", "升级前编辑请求");
+                mvc.perform(
+                                put(URL + "/" + id)
+                                        .with(operator("buyer", "purchasing:write"))
+                                        .with(csrf())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(json.writeValueAsString(body)))
+                        .andExpect(status().isOk());
+            }
+            var legacy = json.readValue(json.writeValueAsString(body), LegacyDraft.class);
+            String oldHash =
+                    HexFormat.of()
+                            .formatHex(
+                                    java.security.MessageDigest.getInstance("SHA-256")
+                                            .digest(
+                                                    json.writeValueAsString(
+                                                                    List.of(
+                                                                            command, id, "buyer",
+                                                                            legacy))
+                                                            .getBytes(
+                                                                    java.nio.charset
+                                                                            .StandardCharsets
+                                                                            .UTF_8)));
+            assertThat(
+                            db.queryForObject(
+                                    "SELECT request_hash FROM pur_command WHERE request_key=?",
+                                    String.class,
+                                    body.get("idempotencyKey")))
+                    .isEqualTo(oldHash);
+            body.put("originalOrderId", null);
+            if (command.equals("CREATE"))
+                assertThat(postAs(URL, body, operator("buyer", "purchasing:write"), 201).get("id"))
+                        .isEqualTo(req.get("id"));
+            else
+                mvc.perform(
+                                put(URL + "/" + id)
+                                        .with(operator("buyer", "purchasing:write"))
+                                        .with(csrf())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(json.writeValueAsString(body)))
+                        .andExpect(status().isOk());
+            body.remove("originalOrderId");
+        }
+    }
+
     @Test
     void completeRequestOrderApprovalAndCancellationPreserveQuantitiesAndAudit() throws Exception {
         var req = approved();

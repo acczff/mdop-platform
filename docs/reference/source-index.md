@@ -116,3 +116,4 @@
 | [V202610090002__purchase_arrangements.sql](../../backend/mdop-purchasing/src/main/resources/db/migration/purchasing/V202610090002__purchase_arrangements.sql) | mdop-purchasing |
 | [V202610090003__purchase_arrival_source.sql](../../backend/mdop-wms/src/main/resources/db/migration/wms/V202610090003__purchase_arrival_source.sql) | mdop-wms |
 | [V202610090004__purchase_closure.sql](../../backend/mdop-purchasing/src/main/resources/db/migration/purchasing/V202610090004__purchase_closure.sql) | mdop-purchasing |
+| [V202610090005__purchase_original_order.sql](../../backend/mdop-purchasing/src/main/resources/db/migration/purchasing/V202610090005__purchase_original_order.sql) | mdop-purchasing |

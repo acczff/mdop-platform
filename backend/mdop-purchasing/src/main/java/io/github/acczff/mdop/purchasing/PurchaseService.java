@@ -102,8 +102,13 @@ public class PurchaseService {
         d.put(
                 "related",
                 db.sql(
-                                "SELECT id,document_no,kind,status FROM pur_document WHERE request_id=? OR id=? ORDER BY id")
-                        .params(id, d.get("request_id"))
+                                "SELECT id,document_no,kind,status FROM pur_document WHERE warehouse_id=? AND (request_id=? OR id=? OR original_order_id=? OR id=?) ORDER BY id")
+                        .params(
+                                n(d, "warehouse_id"),
+                                id,
+                                d.get("request_id"),
+                                id,
+                                d.get("original_order_id"))
                         .query()
                         .listOfRows());
         return d;
@@ -117,7 +122,19 @@ public class PurchaseService {
         if (in.version() != null || in.supplierId() != null) throw invalid("新需求不接受版本或供应商");
         String purpose = required(in.purpose(), "用途", 500);
         catalog.requireReceivingWarehouse(in.warehouseId());
+        if (in.originalOrderId() != null) {
+            var original = header(in.originalOrderId());
+            requireWarehouse(n(original, "warehouse_id"));
+            requireOrder(original);
+            if (n(original, "warehouse_id") != in.warehouseId()) throw conflict("补货需求必须与原采购订单同仓");
+            if (fulfillment.read(in.originalOrderId(), in.warehouseId()).lines().stream()
+                    .noneMatch(l -> new BigDecimal(l.returned()).signum() > 0))
+                throw conflict("原采购订单尚无实际退供记录");
+        }
         long id = insert("REQUEST", null, in.warehouseId(), null, null, purpose, in.neededDate());
+        db.sql("UPDATE pur_document SET original_order_id=? WHERE id=?")
+                .params(in.originalOrderId(), id)
+                .update();
         saveRequestLines(id, in.lines());
         audit(id, "CREATE", "创建手工需求", null);
         remember(in.idempotencyKey(), hash, id);
@@ -132,6 +149,9 @@ public class PurchaseService {
         version(d, in.version());
         requireState(d, "DRAFT", "REJECTED");
         if (in.warehouseId() != n(d, "warehouse_id")) throw conflict("建单后不能更换收货仓库");
+        if (in.originalOrderId() != null
+                && !Objects.equals(in.originalOrderId(), d.get("original_order_id")))
+            throw conflict("建单后不能更换补货原采购订单");
         var before = snapshot(id);
         String purpose = required(in.purpose(), "用途", 500);
         String reason = required(in.reason(), "变更原因", 500);
@@ -279,6 +299,9 @@ public class PurchaseService {
                 .params(order, now(), id)
                 .update();
         audit(id, "CONVERT", reason, before);
+        db.sql("UPDATE pur_document SET original_order_id=? WHERE id=?")
+                .params(d.get("original_order_id"), order)
+                .update();
         audit(order, "CREATE", reason, null);
         remember(in.idempotencyKey(), hash, order);
         return detail(order);
