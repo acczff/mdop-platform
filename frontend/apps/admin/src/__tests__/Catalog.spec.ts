@@ -51,8 +51,8 @@ it('loads every directory but exposes no maintenance actions to readers', async 
   await flushPromises()
   expect(view.text()).toContain('原供应商')
   expect(view.text()).not.toContain('＋ 新增')
-  expect(button(view, '维护')).toBeUndefined()
-  expect(button(view, '历史')).toBeUndefined()
+  expect(button(view, '编辑资料')).toBeUndefined()
+  expect(button(view, '变更历史')).toBeUndefined()
   await button(view, '客户').trigger('click')
   expect(view.text()).toContain('暂无匹配资料')
   view.unmount()
@@ -61,7 +61,7 @@ it('sends version and reason and keeps referenced identity fields locked', async
   const view = setup()
   await flushPromises()
   await button(view, '物料').trigger('click')
-  await button(view, '维护').trigger('click')
+  await button(view, '编辑资料').trigger('click')
   for (const name of [
     'code',
     'unitId',
@@ -103,7 +103,7 @@ it.each([
   async (failure) => {
     const view = setup()
     await flushPromises()
-    await button(view, '维护').trigger('click')
+    await button(view, '编辑资料').trigger('click')
     await view.get('textarea').setValue('变更')
     vi.mocked(request).mockRejectedValueOnce(failure)
     await view.get('form').trigger('submit')
@@ -125,7 +125,7 @@ it.each([
 it('distinguishes a committed write from a failed reload', async () => {
   const view = setup()
   await flushPromises()
-  await button(view, '维护').trigger('click')
+  await button(view, '编辑资料').trigger('click')
   await view.get('textarea').setValue('核对')
   vi.mocked(request)
     .mockResolvedValueOnce(supplier)
@@ -174,10 +174,10 @@ it('ignores history responses from a closed dialog and shows the current history
         complete = resolve
       }),
   )
-  await button(view, '历史').trigger('click')
+  await button(view, '变更历史').trigger('click')
   await button(view, '关闭').trigger('click')
   vi.mocked(request).mockRejectedValueOnce(new ApiError(500, '历史查询失败'))
-  await button(view, '历史').trigger('click')
+  await button(view, '变更历史').trigger('click')
   await flushPromises()
   complete([
     {
@@ -216,5 +216,75 @@ it('prevents a second organization and creates a material only using a registere
     requireDateCode: false,
     requireExpiry: false,
   })
+  view.unmount()
+})
+
+it('combines status and keyword filters with honest loaded counts and resets on category change', async () => {
+  const view = setup(['warehouse:read'])
+  vi.mocked(request).mockImplementation(async (path) =>
+    path.endsWith('/suppliers')
+      ? [
+          supplier,
+          {
+            ...supplier,
+            id: 9,
+            code: 'STOP-01',
+            name: '停用供应商',
+            status: 'DISABLED',
+          },
+        ]
+      : data(path),
+  )
+  await flushPromises()
+  await button(view, '刷新').trigger('click')
+  await flushPromises()
+  expect(view.text()).toContain('只读')
+  expect(view.text()).toContain('已加载 2 条 · 匹配 2 条')
+  await view.get('.catalog-filters select').setValue('DISABLED')
+  expect(view.text()).toContain('已加载 2 条 · 匹配 1 条')
+  expect(view.text()).not.toContain('原供应商')
+  await view.get('.catalog-filters input').setValue('not-found')
+  expect(view.text()).toContain('已加载 2 条 · 匹配 0 条')
+  await button(view, '清空筛选').trigger('click')
+  expect(view.text()).toContain('已加载 2 条 · 匹配 2 条')
+  await view.get('.catalog-filters select').setValue('DISABLED')
+  await button(view, '物料').trigger('click')
+  expect(view.text()).toContain('批次物料')
+  await button(view, '组织').trigger('click')
+  expect(view.find('.catalog-filters select').exists()).toBe(false)
+  view.unmount()
+})
+
+it('supports arrow and boundary keys between category tabs', async () => {
+  const view = setup(['warehouse:read'])
+  await flushPromises()
+  await view.get('[role="tablist"]').trigger('keydown', { key: 'ArrowRight' })
+  expect(view.get('#catalog-tab-customers').attributes('aria-selected')).toBe(
+    'true',
+  )
+  expect(view.get('#catalog-tab-suppliers').attributes('tabindex')).toBe('-1')
+  await view.get('[role="tablist"]').trigger('keydown', { key: 'End' })
+  expect(view.get('[role="tabpanel"]').attributes('aria-labelledby')).toBe(
+    'catalog-tab-locations',
+  )
+  await view.get('[role="tablist"]').trigger('keydown', { key: 'Home' })
+  expect(view.get('#catalog-tab-suppliers').attributes('aria-selected')).toBe(
+    'true',
+  )
+  view.unmount()
+})
+
+it('discloses the load cap rather than calling loaded rows the database total', async () => {
+  const view = setup()
+  vi.mocked(request).mockImplementation(async (path) =>
+    path.endsWith('/suppliers')
+      ? Array.from({ length: 1000 }, (_, id) => ({ ...supplier, id }))
+      : data(path),
+  )
+  await flushPromises()
+  await button(view, '刷新').trigger('click')
+  await flushPromises()
+  expect(view.text()).toContain('已达到 1000 条加载上限')
+  expect(view.text()).toContain('可能未包含全部记录')
   view.unmount()
 })

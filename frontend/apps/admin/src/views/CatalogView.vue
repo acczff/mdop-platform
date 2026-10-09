@@ -49,6 +49,11 @@ const keyword = ref(''),
   error = ref(''),
   message = ref(''),
   formError = ref('')
+const statusFilter = ref('')
+const hasStatus = computed(
+  () => !['locations', 'organizations'].includes(tab.value),
+)
+const loadedCount = computed(() => directory.value[tab.value]?.length || 0)
 const loading = ref(false),
   ready = ref(false),
   busy = ref(false),
@@ -74,8 +79,14 @@ const draft = reactive({
 })
 const blocked = computed(() => busy.value || dialog.value || !!historyRow.value)
 const rows = computed(() =>
-  (directory.value[tab.value] || []).filter((r) =>
-    (r.code + ' ' + r.name).toLowerCase().includes(keyword.value.toLowerCase()),
+  (directory.value[tab.value] || []).filter(
+    (r) =>
+      (r.code + ' ' + r.name)
+        .toLowerCase()
+        .includes(keyword.value.trim().toLowerCase()) &&
+      (!hasStatus.value ||
+        !statusFilter.value ||
+        r.status === statusFilter.value),
   ),
 )
 const canCreate = computed(
@@ -117,6 +128,31 @@ function selectTab(key: Kind) {
   if (blocked.value) return
   tab.value = key
   keyword.value = ''
+  statusFilter.value = ''
+}
+function clearFilters() {
+  keyword.value = ''
+  statusFilter.value = ''
+}
+function navigateTabs(event: KeyboardEvent) {
+  if (blocked.value) return
+  const keys = Object.keys(labels) as Kind[]
+  const index = keys.indexOf(tab.value)
+  const next =
+    event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? keys.length - 1
+        : event.key === 'ArrowRight'
+          ? (index + 1) % keys.length
+          : event.key === 'ArrowLeft'
+            ? (index - 1 + keys.length) % keys.length
+            : -1
+  if (next < 0) return
+  event.preventDefault()
+  selectTab(keys[next]!)
+  const list = event.currentTarget as HTMLElement
+  list.querySelector<HTMLButtonElement>('#catalog-tab-' + keys[next])?.focus()
 }
 function open(row?: Row) {
   if (
@@ -269,14 +305,16 @@ onBeforeUnmount(() => {
 })
 </script>
 <template>
-  <main class="page">
+  <main class="page catalog-page">
     <div class="page-heading">
       <div>
-        <p class="eyebrow">MASTER DATA</p>
-        <h1>基础资料</h1>
-        <p class="muted">
-          统一维护业务引用。停用阻止新的业务授权，已有单据按原流程收尾。
-        </p>
+        <div class="catalog-heading">
+          <h1>
+            基础资料 <span class="catalog-section">/ {{ labels[tab] }}</span>
+          </h1>
+          <span v-if="!editable" class="badge disabled">只读</span>
+        </div>
+        <p class="muted">维护往来单位、物料与组织资料。</p>
       </div>
       <button
         v-if="editable"
@@ -291,10 +329,20 @@ onBeforeUnmount(() => {
     <p v-if="message" class="success" role="status">
       {{ message }}{{ error ? '；列表刷新未成功，请先重新加载核对。' : '' }}
     </p>
-    <div class="tabs">
+    <div
+      class="tabs catalog-tabs"
+      role="tablist"
+      aria-label="资料分类"
+      @keydown="navigateTabs"
+    >
       <button
         v-for="(label, key) in labels"
         :key="key"
+        :id="'catalog-tab-' + key"
+        role="tab"
+        :aria-selected="tab === key"
+        aria-controls="catalog-panel"
+        :tabindex="tab === key ? 0 : -1"
         :disabled="blocked"
         :class="{ active: tab === key }"
         @click="selectTab(key)"
@@ -303,7 +351,7 @@ onBeforeUnmount(() => {
       </button>
     </div>
     <p v-if="tab === 'organizations'" class="hint">
-      当前使用单一组织标识，全部资料共用此归属。组织名称不会改变仓库权限；本页不提供多租户隔离。
+      维护当前工厂的组织标识，全部资料共用此归属。
     </p>
     <p v-if="tab === 'units'" class="hint">
       单位必须先登记，再供物料选择。不提供换算；已被物料引用的单位名称不可改义。
@@ -311,19 +359,44 @@ onBeforeUnmount(() => {
     <p v-if="tab === 'locations'" class="hint">
       仓库在“仓库管理”中维护；本页新增库位沿用现有仓库规则。
     </p>
-    <section class="panel">
-      <div class="filters">
+    <section
+      id="catalog-panel"
+      class="panel"
+      role="tabpanel"
+      :aria-labelledby="'catalog-tab-' + tab"
+      :aria-busy="loading"
+    >
+      <div class="filters catalog-filters">
         <label class="grow"
           >搜索{{ labels[tab]
           }}<input
             v-model="keyword"
             :disabled="blocked"
-            placeholder="编码或名称" /></label
-        ><button :disabled="blocked || loading" @click="load">
-          {{ loading ? '正在加载…' : '刷新' }}</button
-        ><span class="hint">每类最多显示 1000 条；仓库选项最多 100 个</span>
+            placeholder="输入编码或名称"
+        /></label>
+        <label v-if="hasStatus"
+          >启用状态<select v-model="statusFilter" :disabled="blocked">
+            <option value="">全部状态</option>
+            <option value="ENABLED">启用</option>
+            <option value="DISABLED">停用</option>
+          </select></label
+        >
+        <button
+          :disabled="blocked || (!keyword && !statusFilter)"
+          @click="clearFilters"
+        >
+          清空筛选
+        </button>
+        <button :disabled="blocked || loading" @click="load">
+          {{ loading ? '正在加载…' : '刷新' }}
+        </button>
       </div>
-      <div class="table-wrap">
+      <div
+        class="table-wrap"
+        role="region"
+        :aria-label="labels[tab] + '列表，可横向滚动'"
+        tabindex="0"
+      >
         <table>
           <thead>
             <tr>
@@ -340,13 +413,22 @@ onBeforeUnmount(() => {
               <td>{{ row.code }}</td>
               <td>{{ row.name }}</td>
               <td v-if="tab === 'materials'">
-                {{ row.unit }} /
-                {{ row.trackingMode === 'BATCH' ? '按批次' : '按数量'
-                }}<small>{{
-                  row.identityLocked
-                    ? '已引用：单位及追踪策略已锁定'
-                    : '尚未业务引用'
-                }}</small
+                {{ row.unit }}
+                <span class="material-tracking">{{
+                  row.trackingMode === 'BATCH' ? '按批次' : '按数量'
+                }}</span>
+                <small
+                  ><span
+                    class="reference-label"
+                    :title="
+                      row.identityLocked
+                        ? '已被业务引用，单位和追踪策略不可修改'
+                        : '尚未被业务引用'
+                    "
+                    >{{
+                      row.identityLocked ? '已引用 · 策略锁定' : '未引用'
+                    }}</span
+                  ></small
                 ><small
                   >{{ row.requireDateCode ? 'Date Code 必填；' : ''
                   }}{{ row.requireExpiry ? '有效期必填' : '' }}</small
@@ -359,14 +441,21 @@ onBeforeUnmount(() => {
                 }}<small>{{ areaNames[row.areaType || ''] }}</small>
               </td>
               <td v-if="!['locations', 'organizations'].includes(tab)">
-                {{ statuses[row.status || ''] }}
+                <span
+                  class="badge"
+                  :class="{ disabled: row.status === 'DISABLED' }"
+                  >{{ statuses[row.status || ''] }}</span
+                >
               </td>
-              <td v-if="editable && tab !== 'locations'">
+              <td
+                v-if="editable && tab !== 'locations'"
+                class="catalog-actions"
+              >
                 <button :disabled="blocked || !ready" @click="open(row)">
-                  维护
+                  编辑资料
                 </button>
                 <button :disabled="blocked || !ready" @click="history(row)">
-                  历史
+                  变更历史
                 </button>
               </td>
             </tr>
@@ -384,10 +473,21 @@ onBeforeUnmount(() => {
           </tbody>
         </table>
       </div>
+      <footer class="catalog-footer">
+        <span role="status">{{
+          ready
+            ? `已加载 ${loadedCount} 条 · 匹配 ${rows.length} 条`
+            : loading
+              ? '正在加载资料…'
+              : '资料未就绪'
+        }}</span>
+        <span v-if="ready && loadedCount >= 1000" class="hint"
+          >已达到 1000
+          条加载上限，筛选仅覆盖已加载资料，可能未包含全部记录。</span
+        >
+        <span v-else-if="ready" class="hint">筛选范围：当前已加载资料</span>
+      </footer>
     </section>
-    <p class="hint">
-      编码创建后保留。资料改名保留原业务单据快照；资料启停不替代库存冻结。客户订单将在后续销售模块接入。
-    </p>
     <div v-if="dialog" class="overlay">
       <section
         class="modal"
@@ -396,11 +496,14 @@ onBeforeUnmount(() => {
         aria-labelledby="catalog-title"
       >
         <h2 id="catalog-title">
-          {{ current ? '维护' : '新增' }}{{ labels[tab] }}
+          {{ current ? '编辑' : '新增' }}{{ labels[tab] }}
         </h2>
         <p v-if="formError" class="error" role="alert">{{ formError }}</p>
         <p v-if="current?.identityLocked" class="hint">
           已被业务引用，仅可修改名称和启停状态。
+        </p>
+        <p v-if="tab === 'locations' && warehouses.length >= 100" class="hint">
+          仓库选项已达到 100 个加载上限，可能未包含全部仓库。
         </p>
         <form @submit.prevent="save">
           <fieldset class="form-grid" :disabled="busy || !ready">
@@ -421,10 +524,17 @@ onBeforeUnmount(() => {
                 :maxlength="tab === 'units' ? 16 : 100"
             /></label>
             <label v-if="current && tab !== 'organizations'"
-              >状态<select v-model="draft.status" name="status">
+              >状态<select
+                v-model="draft.status"
+                name="status"
+                aria-label="状态"
+                aria-describedby="catalog-status-help"
+              >
                 <option value="ENABLED">启用</option>
-                <option value="DISABLED">停用</option>
-              </select></label
+                <option value="DISABLED">停用</option></select
+              ><small id="catalog-status-help" class="hint"
+                >停用后不能用于新业务授权；已有单据仍可按原流程收尾，不会冻结库存。</small
+              ></label
             >
             <template v-if="tab === 'materials'">
               <label
@@ -572,3 +682,149 @@ onBeforeUnmount(() => {
     </div>
   </main>
 </template>
+
+<style scoped>
+.catalog-page {
+  padding-top: 24px;
+}
+.catalog-page .page-heading {
+  margin-bottom: 20px;
+}
+.catalog-heading {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.catalog-heading h1 {
+  font-size: 24px;
+  margin: 0;
+}
+.catalog-section {
+  color: #6c687d;
+  font-size: 18px;
+  font-weight: 400;
+}
+.catalog-heading + p {
+  font-size: 14px;
+}
+.catalog-tabs {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 12px;
+  border-bottom: 1px solid #dfdbe8;
+  padding: 4px 4px 0;
+}
+.catalog-tabs button {
+  flex-shrink: 0;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  padding: 10px 12px;
+  color: #60586e;
+  font-size: 14px;
+}
+.catalog-tabs .active {
+  color: #6237a0;
+  border-bottom-color: #6941b5;
+  font-weight: 600;
+}
+.catalog-filters {
+  padding: 16px;
+  gap: 12px;
+}
+.catalog-filters .grow {
+  flex: 1 1 200px;
+  max-width: 380px;
+}
+.catalog-filters label {
+  min-width: 140px;
+  font-size: 13px;
+}
+.catalog-filters button {
+  font-size: 13px;
+  min-height: 40px;
+}
+.catalog-page table {
+  min-width: 560px;
+}
+.catalog-page th,
+.catalog-page td {
+  padding: 12px 16px;
+}
+.catalog-page td {
+  overflow-wrap: anywhere;
+}
+.catalog-page th {
+  color: #60586e;
+  font-size: 13px;
+}
+.catalog-page td small {
+  color: #6c687d;
+}
+.material-tracking {
+  display: inline-block;
+  margin-left: 6px;
+  color: #6c687d;
+  font-size: 12px;
+}
+.reference-label {
+  display: inline-block;
+  border: 1px solid #e2deea;
+  background: #f8f6fb;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.catalog-actions {
+  white-space: nowrap;
+}
+.catalog-actions button {
+  font-size: 13px;
+  padding: 6px 8px;
+  margin: 2px 4px 2px 0;
+}
+.catalog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  color: #60586e;
+  font-size: 13px;
+  background: #fcfbfe;
+}
+.catalog-footer .hint {
+  font-size: 12px;
+}
+.catalog-page label .hint {
+  font-weight: 400;
+  line-height: 1.6;
+}
+@media (max-width: 640px) {
+  .catalog-page {
+    padding: 16px;
+  }
+  .catalog-heading {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .catalog-heading h1 {
+    font-size: 22px;
+  }
+  .catalog-section {
+    font-size: 16px;
+  }
+  .catalog-tabs {
+    gap: 4px;
+  }
+  .catalog-tabs button {
+    padding: 10px;
+  }
+  .catalog-filters .grow {
+    flex-basis: 100%;
+    max-width: none;
+  }
+}
+</style>

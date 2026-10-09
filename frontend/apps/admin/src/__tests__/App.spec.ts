@@ -2,17 +2,35 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import App from '../App.vue'
 import { ApiError, request, refreshCsrf } from '../api'
+import { createMemoryHistory, createRouter } from 'vue-router'
 vi.mock('../api', async (original) => ({
   ...(await original<typeof import('../api')>()),
   request: vi.fn(),
   refreshCsrf: vi.fn(),
 }))
-afterEach(() => vi.resetAllMocks())
+afterEach(() => {
+  vi.resetAllMocks()
+  vi.unstubAllGlobals()
+})
 
 describe('App', () => {
   it('restores an anonymous session and logs in with form credentials', async () => {
     vi.mocked(request).mockRejectedValueOnce(new ApiError(401, 'unauthorized'))
-    const wrapper = mount(App)
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    )
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/:pathMatch(.*)*', component: { template: '<div />' } },
+      ],
+    })
+    const wrapper = mount(App, { global: { plugins: [router] } })
     await flushPromises()
     expect(wrapper.get('h1').text()).toBe('登录工作台')
     await wrapper.get('input[name="password"]').setValue('test-password')
