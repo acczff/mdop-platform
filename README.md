@@ -8,7 +8,7 @@ MDOP（Manufacturing Digital Operations Platform）使用 Java 25、Spring Boot 
 
 ## 适用范围与成熟度
 
-当前为 `0.1` 开发阶段，用于业务流程验证、工程实践和设计交流。ERP、MES、QMS **均为本地模拟输入或消费者**，并非已经交付的完整子系统。长期 MES、QMS、EAM、IoT、BI 愿景见[总体蓝图](docs/project/项目总体蓝图.md)，不应当作现有功能清单。
+当前为 `0.1` 开发阶段，用于业务流程验证、工程实践和设计交流。本分支已建立 ERP 主数据及采购需求/订单审批；采购到货与履约尚未接入。现有 WMS 的 ERP/MES/QMS 对接仍使用本地模拟输入或消费者，并非完整子系统。长期 MES、QMS、EAM、IoT、BI 愿景见[总体蓝图](docs/project/项目总体蓝图.md)，不应当作现有功能清单。
 
 文档描述**所在分支的代码**。主干、待审 PR、测试证据与部署状态分别记录在[版本与验证记录](docs/project/status.md)；CI 成功不代表生产准入。许可证暂未选择，尚未授予开源复用许可；本轮不添加 LICENSE。
 
@@ -17,6 +17,7 @@ MDOP（Manufacturing Digital Operations Platform）使用 Java 25、Spring Boot 
 | 业务 | 已实现闭环 | 主要边界 |
 |---|---|---|
 | 基础资料 | 客户/供应商、物料、单位、单组织维护，版本/审计与启停，业务引用锁及单据快照 | 一物料一个基本单位；客户订单、生产地点、换算及多组织留后续轮次 |
+| 采购需求与订单 | 手工需求、异人审核、整单转订单、订单审批、取消释放、来源和审计 | [P1 候选实现](docs/erp/采购P1实现与验收.md)；尚未连接到货/WMS，不含金额税额、付款、拆单或汇单 |
 | 采购入库 | 模拟到货、草稿、分批收货、质检、上架、差异与冲正、不合格采购退货 | 不含退款、财务、序列号、复检、部分上架 |
 | 生产物料协同 | 模拟 MES 需求、预占、发料到线边、实际消耗、余料退回、异人审批冲正 | 发料保留总库存，消耗才扣减；不实现 MES 排程/报工 |
 | 成品出入库 | 模拟完工需求、待检、判定、上架；销售预占、拣货、复核、出库 | 不含客户退货、真实 ERP/MES/QMS 适配 |
@@ -68,7 +69,7 @@ Windows 一键启动由仓库脚本提供；Linux CI 使用 Maven Wrapper/Corepa
 
 | 路径 | 内容 |
 |---|---|
-| [backend](backend/README.md) | 8 个 Maven 模块：公共契约、安全、账号、主数据、WMS、集成、测试基座与装配 |
+| [backend](backend/README.md) | 9 个 Maven 模块：公共契约、安全、账号、主数据、采购、WMS、集成、测试基座与装配 |
 | [frontend](frontend/README.md) | Vue 管理端、统一 API 客户端、数量运算与组件测试 |
 | [deploy](deploy/README.md) | 本地 Compose、环境模板、发布配置与恢复手册 |
 | [scripts](scripts/README.md) | 启停、验证、库存对账、发布/备份和文档检查 |

@@ -224,6 +224,19 @@ public class CatalogService {
         return material(id);
     }
 
+    /** Validate a draft without making its material identity a business authorization. */
+    public Material availableMaterial(long id) {
+        var value =
+                jdbc.sql("SELECT * FROM mdm_material WHERE id=? FOR SHARE")
+                        .param(id)
+                        .query(Material.class)
+                        .optional()
+                        .orElseThrow(() -> missing("物料"));
+        requireEnabled(value.status());
+        activeUnit(value.unitId());
+        return value;
+    }
+
     public record Edit(
             @NotNull @PositiveOrZero Long version,
             String name,

@@ -71,7 +71,16 @@ public final class PermissionCatalog {
             } else if (p.endsWith(":approve") || p.endsWith(":review")) review.add(p);
             else operate.add(p);
         }
+        read.add("purchasing:read");
         return List.of(
+                new Role(
+                        "PURCHASE_OPERATOR",
+                        "采购作业员",
+                        Set.of("warehouse:read", "purchasing:read", "purchasing:write")),
+                new Role(
+                        "PURCHASE_REVIEWER",
+                        "采购审批员",
+                        Set.of("warehouse:read", "purchasing:read", "purchasing:review")),
                 new Role("SYSTEM_ADMIN", "系统管理员", Set.of("iam:manage")),
                 new Role("MASTER_DATA", "基础资料管理员", Set.of("warehouse:read", "masterdata:write")),
                 new Role("WAREHOUSE_OPERATOR", "仓库作业员", operate),
@@ -83,13 +92,15 @@ public final class PermissionCatalog {
     public static Set<String> resolve(Set<String> codes, Set<Long> warehouses) {
         if (codes == null
                 || codes.isEmpty()
-                || codes.size() > 6
+                || codes.size() > roles().size()
                 || warehouses == null
                 || warehouses.size() > 1000) throw invalid("请选择角色和仓库范围");
         if (codes.contains("SYSTEM_ADMIN") && (codes.size() != 1 || !warehouses.isEmpty()))
             throw invalid("系统管理与业务职责必须使用不同账号");
         if (codes.contains("BUSINESS_REVIEWER") && codes.contains("WAREHOUSE_OPERATOR"))
             throw invalid("业务审批与作业职责必须使用不同账号");
+        if (codes.contains("PURCHASE_REVIEWER") && codes.contains("PURCHASE_OPERATOR"))
+            throw invalid("采购审批与作业职责必须使用不同账号");
         var result = new TreeSet<String>();
         for (var code : codes)
             result.addAll(

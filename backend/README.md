@@ -9,6 +9,7 @@
 - `mdop-security`
 - `mdop-system`
 - `mdop-master-data`
+- `mdop-purchasing`
 - `mdop-wms`
 - `mdop-integration`
 - `mdop-test-support`
@@ -55,10 +56,11 @@ PR 与 main 推送通过 CI 的 `Backend verify` 执行同一 Maven 验证入口
 
 - `GET /api/auth/csrf` 获取令牌；`POST /api/auth/login` 使用表单账号密码与 CSRF；`GET /api/auth/me` 查询身份；`POST /api/auth/logout` 退出。登录后令牌轮换，客户端重新获取。
 - 账号持久化与固定角色分配见[用户与权限首版](../docs/project/IAM用户与权限首版.md)。配置仅用于首次初始化管理员与导入旧操作员，系统管理员不再获得业务全权限；使用会话、CSRF、账号版本和仓库范围控制。需要异人审核的操作不能由申请人自审，即使申请人是 ADMIN。
-- `/api/master-data/suppliers|materials|locations` 提供新建和查询；策略创建后暂不支持修改。库位区域限定为收货暂存、待检或存储。
+- `/api/master-data` 提供供应商、客户、物料、基本单位与组织维护、启停和审计；已引用物料单位和策略锁定。库位区域限定为收货暂存、待检或存储。
+- `mdop-purchasing` 提供手工需求、审批、整单转采购订单、订单审核和取消；拥有独立单据、来源行、审计和幂等凭据，尚未向 WMS 安排到货。字段、权限与异常规则见[采购 P1](../docs/erp/采购P1实现与验收.md)。
 - `/api/v1/wms/arrival-notices` 和 `/receipts` 按 WMS 设计提供任务、草稿与提交。保存草稿不产生库存；提交时锁定通知和收货单，条件更新累计数量，按固定库存维度顺序锁余额，原子写流水、操作记录和 Outbox。
 - `local`/`test` 下的 `/api/local/erp-arrivals` 模拟 ERP 发布到货消息，经 RabbitMQ 与 Inbox 幂等消费建单；真实 ERP 适配器尚未接入。
-- 数据库结构由 Flyway 管理；当前候选实现包含 23 个迁移，覆盖主数据及现有 WMS 流程。日常数据库升级需单独安排，运行验收不代表已部署。
+- 数据库结构由 Flyway 管理，完整版本见[源码导航](../docs/reference/source-index.md#flyway-迁移)。日常数据库升级需单独安排，运行验收不代表已部署。
 - 收货、通知、库存与流水的数量以十进制字符串返回；前端按文本输入和定点整数计算剩余量，保留 `DECIMAL(18,6)` 精度，不经 JavaScript Number 转换。
 - Outbox 与业务事务原子落库，后台发布至 RabbitMQ，支持失败重试、隔离及人工重放；发布成功与模拟外部端收到是两个不同的核验结果。外部系统可用性不纳入库存事务。
 
