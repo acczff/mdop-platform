@@ -5,6 +5,7 @@ import static io.github.acczff.mdop.purchasing.PurchaseModels.*;
 
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
+import io.github.acczff.mdop.common.purchasing.PurchaseReceivingPort;
 import io.github.acczff.mdop.masterdata.catalog.CatalogService;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -28,18 +29,21 @@ public class PurchaseService {
     private final CurrentActorProvider actor;
     private final Clock clock;
     private final ObjectMapper json;
+    private final PurchaseReceivingPort receiving;
 
     public PurchaseService(
             JdbcClient db,
             CatalogService catalog,
             CurrentActorProvider actor,
             Clock clock,
-            ObjectMapper json) {
+            ObjectMapper json,
+            PurchaseReceivingPort receiving) {
         this.db = db;
         this.catalog = catalog;
         this.actor = actor;
         this.clock = clock;
         this.json = json;
+        this.receiving = receiving;
     }
 
     public record Page(List<Map<String, Object>> items, long total, int page, int size) {}
@@ -73,6 +77,7 @@ public class PurchaseService {
         var d = header(id);
         requireWarehouse(n(d, "warehouse_id"));
         d.put("lines", lines(id));
+        d.put("arrangements", arrangements(id, n(d, "warehouse_id"), true));
         d.put(
                 "history",
                 db.sql(
@@ -184,10 +189,11 @@ public class PurchaseService {
                 state = action.equals("approve") ? "APPROVED" : "REJECTED";
             }
             default -> {
-                requireState(d, "DRAFT", "REJECTED", "SUBMITTED", "APPROVED");
+                requireState(d, "DRAFT", "REJECTED", "SUBMITTED", "APPROVED", "FULFILLING");
                 if (d.get("active_order_id") != null) throw conflict("需求已有有效采购订单，不能撤销");
                 state = "CANCELLED";
                 if (!isRequest(d)) {
+                    if (activeArrangements(id) > 0) throw conflict("仍有未撤回的到货安排，请先确认全部撤回");
                     long request = n(d, "request_id");
                     var origin = header(request);
                     if (!Objects.equals(origin.get("active_order_id"), d.get("id"))
@@ -244,6 +250,190 @@ public class PurchaseService {
         audit(order, "CREATE", reason, null);
         remember(in.idempotencyKey(), hash, order);
         return detail(order);
+    }
+
+    public Map<String, Object> arrange(long id, ArrangementInput in) {
+        var d = lockDocument(id);
+        String hash = hash("ARRANGE", id, in);
+        Long previous = replay(in.idempotencyKey(), hash);
+        if (previous != null) return detail(previous);
+        version(d, in.version());
+        requireOrder(d);
+        requireState(d, "APPROVED", "FULFILLING");
+        String reason = required(in.reason(), "安排原因", 500);
+        catalog.requireReceivingWarehouse(n(d, "warehouse_id"));
+        catalog.referenceSupplier(n(d, "supplier_id"));
+        validateMaterials(id, false, false);
+        var before = snapshot(id);
+        var authorized = new HashMap<Long, BigDecimal>();
+        for (var l : lines(id))
+            authorized.put(n(l, "id"), new BigDecimal(l.get("quantity").toString()));
+        var seen = new HashSet<Long>();
+        for (var line : in.lines()) {
+            if (!seen.add(line.orderLineId()) || !authorized.containsKey(line.orderLineId()))
+                throw invalid("安排行必须来自当前订单且不能重复");
+            BigDecimal used =
+                    db.sql(
+                                    "SELECT COALESCE(SUM(l.quantity),0) FROM pur_arrangement_line l JOIN pur_arrangement a ON a.id=l.arrangement_id WHERE l.order_line_id=? AND a.status<>'WITHDRAWN'")
+                            .param(line.orderLineId())
+                            .query(BigDecimal.class)
+                            .single();
+            if (used.add(line.quantity()).compareTo(authorized.get(line.orderLineId())) > 0)
+                throw conflict("安排数量超过订单剩余额度");
+        }
+        var key = new GeneratedKeyHolder();
+        db.sql(
+                        "INSERT INTO pur_arrangement(order_id,expected_date,created_by,created_at) VALUES(?,?,?,?)")
+                .params(id, in.expectedDate(), actor.currentActor(), now())
+                .update(key);
+        long arrangement = key.getKey().longValue();
+        for (var line : in.lines())
+            db.sql(
+                            "INSERT INTO pur_arrangement_line(arrangement_id,order_line_id,quantity) VALUES(?,?,?)")
+                    .params(arrangement, line.orderLineId(), line.quantity())
+                    .update();
+        touch(id);
+        audit(id, "ARRANGE", reason, before);
+        remember(in.idempotencyKey(), hash, id);
+        return detail(id);
+    }
+
+    public Map<String, Object> arrangementAction(
+            long id, long arrangement, String action, Action in) {
+        if (!Set.of("deliver", "withdraw").contains(action)) throw invalid("不支持的到货操作");
+        var d = lockDocument(id);
+        String hash = hash(action + ":" + arrangement, id, in);
+        Long previous = replay(in.idempotencyKey(), hash);
+        if (previous != null) return detail(previous);
+        version(d, in.version());
+        requireOrder(d);
+        requireState(d, "APPROVED", "FULFILLING");
+        var a = arrangement(id, arrangement);
+        String reason = required(in.reason(), "操作原因", 500);
+        var before = snapshot(id);
+        if (action.equals("deliver")) {
+            if (!"PENDING".equals(a.get("status"))) throw conflict("只有待送达安排可以送达");
+            var payload = new ArrayList<PurchaseReceivingPort.Line>();
+            for (var l : arrangementLines(arrangement))
+                payload.add(
+                        new PurchaseReceivingPort.Line(
+                                n(l, "id"),
+                                n(l, "order_line_id"),
+                                n(l, "material_id"),
+                                l.get("material_code").toString(),
+                                l.get("material_name").toString(),
+                                l.get("unit").toString(),
+                                new BigDecimal(l.get("quantity").toString())));
+            var delivered =
+                    receiving.deliver(
+                            new PurchaseReceivingPort.Notice(
+                                    arrangement,
+                                    "PA-" + String.format(Locale.ROOT, "%08d", arrangement),
+                                    d.get("document_no").toString(),
+                                    n(d, "warehouse_id"),
+                                    n(d, "supplier_id"),
+                                    d.get("supplier_name").toString(),
+                                    payload));
+            if (delivered.lines().size() != payload.size()) throw conflict("WMS 到货行映射不完整");
+            for (var mapping : delivered.lines()) {
+                int updated =
+                        db.sql(
+                                        "UPDATE pur_arrangement_line SET wms_arrival_item_id=? WHERE id=? AND arrangement_id=?")
+                                .params(
+                                        mapping.arrivalItemId(),
+                                        mapping.arrangementLineId(),
+                                        arrangement)
+                                .update();
+                if (updated != 1) throw conflict("WMS 到货行映射不匹配");
+            }
+            db.sql(
+                            "UPDATE pur_arrangement SET status='DELIVERED',wms_arrival_id=?,last_error=NULL WHERE id=?")
+                    .params(delivered.arrivalId(), arrangement)
+                    .update();
+            db.sql("UPDATE pur_document SET status='FULFILLING' WHERE id=?").param(id).update();
+        } else {
+            if ("WITHDRAWN".equals(a.get("status"))) throw conflict("到货安排已撤回");
+            if ("DELIVERED".equals(a.get("status")))
+                receiving.withdraw(n(d, "warehouse_id"), arrangement, reason);
+            db.sql("UPDATE pur_arrangement SET status='WITHDRAWN',last_error=NULL WHERE id=?")
+                    .param(arrangement)
+                    .update();
+            if (activeArrangements(id) == 0)
+                db.sql("UPDATE pur_document SET status='APPROVED' WHERE id=?").param(id).update();
+        }
+        touch(id);
+        audit(id, action.equals("deliver") ? "DELIVER" : "WITHDRAW", reason, before);
+        remember(in.idempotencyKey(), hash, id);
+        return detail(id);
+    }
+
+    /** Runs only after the delivery transaction has rolled back. Failure does not release quota. */
+    public void recordDeliveryFailure(
+            long id, long arrangement, Long expectedVersion, String error) {
+        var d = lockDocument(id);
+        if (expectedVersion == null || n(d, "version") != expectedVersion) return;
+        var a = arrangement(id, arrangement);
+        if (!"PENDING".equals(a.get("status"))) return;
+        String safe = error.length() > 350 ? error.substring(0, 350) : error;
+        if (safe.equals(a.get("last_error"))) return;
+        var before = snapshot(id);
+        db.sql("UPDATE pur_arrangement SET last_error=? WHERE id=?")
+                .params(safe, arrangement)
+                .update();
+        audit(id, "DELIVERY_FAILED", "到货安排 #" + arrangement + "：" + safe, before);
+    }
+
+    private void requireOrder(Map<String, Object> d) {
+        if (isRequest(d)) throw conflict("只有采购订单可以安排到货");
+    }
+
+    private long activeArrangements(long id) {
+        return db.sql(
+                        "SELECT COUNT(*) FROM pur_arrangement WHERE order_id=? AND status<>'WITHDRAWN'")
+                .param(id)
+                .query(Long.class)
+                .single();
+    }
+
+    private void touch(long id) {
+        db.sql("UPDATE pur_document SET version=version+1,updated_at=? WHERE id=?")
+                .params(now(), id)
+                .update();
+    }
+
+    private Map<String, Object> arrangement(long order, long id) {
+        return db
+                .sql("SELECT * FROM pur_arrangement WHERE id=? AND order_id=?")
+                .params(id, order)
+                .query()
+                .listOfRows()
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> conflict("到货安排不存在或不属于当前订单"));
+    }
+
+    private List<Map<String, Object>> arrangementLines(long id) {
+        return db.sql(
+                        "SELECT a.id,a.order_line_id,CAST(a.quantity AS CHAR) quantity,a.wms_arrival_item_id,l.material_id,l.material_code,l.material_name,l.unit FROM pur_arrangement_line a JOIN pur_line l ON l.id=a.order_line_id WHERE a.arrangement_id=? ORDER BY a.id")
+                .param(id)
+                .query()
+                .listOfRows();
+    }
+
+    private List<Map<String, Object>> arrangements(long order, long warehouse, boolean withWms) {
+        var rows =
+                db.sql("SELECT * FROM pur_arrangement WHERE order_id=? ORDER BY id DESC")
+                        .param(order)
+                        .query()
+                        .listOfRows();
+        for (var a : rows) {
+            if (a.get("expected_date") instanceof java.sql.Date date)
+                a.put("expected_date", date.toLocalDate().toString());
+            a.put("lines", arrangementLines(n(a, "id")));
+            if (withWms && a.get("wms_arrival_id") != null)
+                a.put("wms", receiving.view(warehouse, n(a, "id")));
+        }
+        return rows;
     }
 
     private long insert(
@@ -371,6 +561,7 @@ public class PurchaseService {
     private Map<String, Object> snapshot(long id) {
         var d = header(id);
         d.put("lines", lines(id));
+        d.put("arrangements", arrangements(id, n(d, "warehouse_id"), false));
         return d;
     }
 

@@ -58,7 +58,7 @@
 | [SalesFeedbackController.java](../../backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/SalesFeedbackController.java) | `/api/integration/sales-orders` | 1 | — |
 | [CatalogController.java](../../backend/mdop-master-data/src/main/java/io/github/acczff/mdop/masterdata/catalog/CatalogController.java) | `/api/master-data` | 10 | — |
 | [WarehouseController.java](../../backend/mdop-master-data/src/main/java/io/github/acczff/mdop/masterdata/warehouse/api/WarehouseController.java) | `/api/master-data/warehouses` | 5 | — |
-| [PurchaseController.java](../../backend/mdop-purchasing/src/main/java/io/github/acczff/mdop/purchasing/PurchaseController.java) | `/api/v1/purchasing/documents` | 6 | — |
+| [PurchaseController.java](../../backend/mdop-purchasing/src/main/java/io/github/acczff/mdop/purchasing/PurchaseController.java) | `/api/v1/purchasing/documents` | 8 | — |
 | [SessionController.java](../../backend/mdop-security/src/main/java/io/github/acczff/mdop/security/SessionController.java) | `GET /api/auth/csrf`<br>`GET /api/auth/me` | 2 | — |
 | [AccountController.java](../../backend/mdop-system/src/main/java/io/github/acczff/mdop/system/identity/AccountController.java) | `GET /api/iam/options`<br>`GET /api/iam/users`<br>`GET /api/iam/users/{id}/audit`<br>`POST /api/iam/users`<br>`POST /api/iam/users/{id}/access`<br>`POST /api/iam/users/{id}/status`<br>`POST /api/iam/users/{id}/password`<br>`POST /api/auth/password` | 8 | — |
 | [CountController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/CountController.java) | `/api/v1/wms/counts` | 6 | — |
@@ -113,3 +113,5 @@
 | [V202610080002__catalog_lifecycle.sql](../../backend/mdop-master-data/src/main/resources/db/migration/masterdata/V202610080002__catalog_lifecycle.sql) | mdop-master-data |
 | [V202610080003__master_data_snapshots.sql](../../backend/mdop-wms/src/main/resources/db/migration/wms/V202610080003__master_data_snapshots.sql) | mdop-wms |
 | [V202610090001__purchase_documents.sql](../../backend/mdop-purchasing/src/main/resources/db/migration/purchasing/V202610090001__purchase_documents.sql) | mdop-purchasing |
+| [V202610090002__purchase_arrangements.sql](../../backend/mdop-purchasing/src/main/resources/db/migration/purchasing/V202610090002__purchase_arrangements.sql) | mdop-purchasing |
+| [V202610090003__purchase_arrival_source.sql](../../backend/mdop-wms/src/main/resources/db/migration/wms/V202610090003__purchase_arrival_source.sql) | mdop-wms |

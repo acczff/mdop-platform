@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ApiError, request, type Page, type Warehouse } from '../api'
+import { remaining, scaled } from '../quantity'
 
 const props = defineProps<{ authorities: string[]; username: string }>()
 type Kind = 'REQUEST' | 'ORDER'
@@ -40,6 +41,26 @@ interface Document {
     after_state: string
   }[]
   related: { id: number; document_no: string; status: string }[]
+  arrangements?: Arrangement[]
+}
+interface Arrangement {
+  id: number
+  expected_date: string
+  status: string
+  last_error: string | null
+  wms_arrival_id: number | null
+  lines: {
+    id: number
+    order_line_id: number
+    material_code: string
+    quantity: string
+    wms_arrival_item_id: number | null
+  }[]
+  wms?: {
+    status: string
+    lines: { arrangementLineId: number; receivedQty: string }[]
+    receipts: { id: number; number: string; status: string }[]
+  }
 }
 interface Directory {
   id: number
@@ -62,6 +83,10 @@ const statuses: Record<string, string> = {
   REJECTED: '已驳回',
   CONVERTED: '已转单',
   CANCELLED: '已取消',
+  FULFILLING: '履约中',
+  PENDING: '待送达',
+  DELIVERED: '已送达',
+  WITHDRAWN: '已撤回',
 }
 const actions: Record<string, string> = {
   submit: '提交审核',
@@ -69,6 +94,9 @@ const actions: Record<string, string> = {
   reject: '驳回',
   cancel: '取消',
   convert: '转采购订单',
+  arrange: '安排到货',
+  deliver: '送达 WMS',
+  withdraw: '撤回安排',
 }
 const auditNames: Record<string, string> = {
   CREATE: '建单',
@@ -79,6 +107,10 @@ const auditNames: Record<string, string> = {
   CANCEL: '取消',
   CONVERT: '转采购订单',
   RELEASE_ORDER: '释放订单占用',
+  ARRANGE: '安排到货',
+  DELIVER: '送达 WMS',
+  WITHDRAW: '撤回安排',
+  DELIVERY_FAILED: '送达失败',
 }
 const kind = ref<Kind>('REQUEST'),
   warehouse = ref(0),
@@ -105,6 +137,19 @@ const draft = ref({
 })
 const storageKey = `mdop-purchasing-pending:${props.username}`
 const pending = ref<Pending>()
+const arrangementId = ref(0)
+const arrangementLines = ref<{ orderLineId: number; quantity: string }[]>([])
+const canReceive = computed(() =>
+  props.authorities.includes('wms:arrival:read'),
+)
+function allocated(lineId: number) {
+  const value = (detail.value?.arrangements || [])
+    .filter((a) => a.status !== 'WITHDRAWN')
+    .flatMap((a) => a.lines)
+    .filter((l) => l.order_line_id === lineId)
+    .reduce((sum, l) => sum + scaled(l.quantity), 0n)
+  return `${value / 1000000n}.${(value % 1000000n).toString().padStart(6, '0')}`
+}
 let generation = 0,
   detailGeneration = 0
 const writable = computed(() => props.authorities.includes('purchasing:write'))
@@ -200,9 +245,12 @@ async function openDetail(id: number) {
     if (token === detailGeneration) detailError.value = (e as Error).message
   }
 }
-function open(value: string) {
+function open(value: string, target = 0) {
   if (blocked.value || !result.value) return
   mode.value = value
+  arrangementId.value = target
+  arrangementLines.value =
+    detail.value?.lines.map((l) => ({ orderLineId: l.id, quantity: '' })) || []
   reason.value = ''
   formError.value = ''
   const d = detail.value
@@ -246,6 +294,10 @@ function describeSnapshot(raw: string | null) {
         (l) =>
           `${l.material_code} · ${l.material_name}：${l.quantity} ${l.unit}`,
       ),
+      ...(d.arrangements || []).map(
+        (a) =>
+          `到货 #${a.id} · ${stateText(a.status)} · ${a.expected_date} · ${a.lines.map((l) => `${l.material_code} ${l.quantity}`).join('，')}${a.last_error ? ' · ' + a.last_error : ''}`,
+      ),
     ]
       .filter(Boolean)
       .join('\n')
@@ -281,7 +333,17 @@ async function send() {
       version: d.version,
       reason: reason.value,
     }
-    url += `/${d.id}/${mode.value === 'convert' ? 'convert' : `actions/${mode.value}`}`
+    url += `/${d.id}/${mode.value === 'arrange' ? 'arrangements' : ['deliver', 'withdraw'].includes(mode.value) ? `arrangements/${arrangementId.value}/${mode.value}` : mode.value === 'convert' ? 'convert' : `actions/${mode.value}`}`
+    if (mode.value === 'arrange') {
+      body.expectedDate = draft.value.neededDate
+      body.lines = arrangementLines.value.filter(
+        (l) => l.quantity.trim() !== '',
+      )
+      if (!(body.lines as unknown[]).length) {
+        formError.value = '至少填写一行安排数量。'
+        return
+      }
+    }
     if (mode.value === 'convert') {
       body.supplierId = draft.value.supplierId
       body.neededDate = draft.value.neededDate
@@ -552,11 +614,19 @@ onBeforeUnmount(() => {
         <button
           v-if="
             writable &&
-            ['DRAFT', 'REJECTED', 'SUBMITTED', 'APPROVED'].includes(
-              detail.status,
-            )
+            [
+              'DRAFT',
+              'REJECTED',
+              'SUBMITTED',
+              'APPROVED',
+              'FULFILLING',
+            ].includes(detail.status)
           "
-          :disabled="blocked"
+          :disabled="
+            blocked ||
+            (detail.kind === 'ORDER' &&
+              (detail.arrangements || []).some((a) => a.status !== 'WITHDRAWN'))
+          "
           @click="open('cancel')"
         >
           {{ detail.kind === 'REQUEST' ? '撤销需求' : '取消订单' }}
@@ -577,6 +647,7 @@ onBeforeUnmount(() => {
               <th>数量</th>
               <th>单位</th>
               <th v-if="detail.kind === 'ORDER'">需求行</th>
+              <th v-if="detail.kind === 'ORDER'">已安排 / 剩余</th>
             </tr>
           </thead>
           <tbody>
@@ -586,10 +657,93 @@ onBeforeUnmount(() => {
               <td>{{ l.quantity }}</td>
               <td>{{ l.unit }}</td>
               <td v-if="detail.kind === 'ORDER'">{{ l.source_line_id }}</td>
+              <td v-if="detail.kind === 'ORDER'">
+                {{ allocated(l.id) }} /
+                {{ remaining(l.quantity, allocated(l.id)) }}
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
+      <section v-if="detail.kind === 'ORDER'" class="arrangements">
+        <div class="detail-heading">
+          <h2>到货安排</h2>
+          <button
+            v-if="
+              writable && ['APPROVED', 'FULFILLING'].includes(detail.status)
+            "
+            class="primary"
+            :disabled="blocked"
+            @click="open('arrange')"
+          >
+            安排到货
+          </button>
+        </div>
+        <p class="hint">
+          待送达和送达失败仍占用数量；全部确认撤回后才可取消订单。
+        </p>
+        <p v-if="!detail.arrangements?.length" class="hint">暂无到货安排</p>
+        <article
+          v-for="a in detail.arrangements"
+          :key="a.id"
+          class="arrangement-record"
+        >
+          <strong
+            >PA-{{ String(a.id).padStart(8, '0') }} ·
+            {{ stateText(a.status) }}</strong
+          >
+          <p class="hint">
+            预计到货 {{ a.expected_date
+            }}<span v-if="a.wms_arrival_id">
+              · WMS 通知 #{{ a.wms_arrival_id }}</span
+            >
+          </p>
+          <p v-if="a.last_error" class="error">
+            送达失败：{{ a.last_error }}。核对后可重试，额度仍保留。
+          </p>
+          <p v-for="l in a.lines" :key="l.id">
+            {{ l.material_code }} · 安排 {{ l.quantity
+            }}<span v-if="a.wms">
+              · 已收
+              {{
+                a.wms.lines.find((x) => x.arrangementLineId === l.id)
+                  ?.receivedQty || '0'
+              }}</span
+            >
+          </p>
+          <div class="detail-actions">
+            <button
+              v-if="writable && a.status === 'PENDING'"
+              :disabled="blocked"
+              @click="open('deliver', a.id)"
+            >
+              {{ a.last_error ? '重试送达' : '送达 WMS' }}
+            </button>
+            <button
+              v-if="writable && a.status !== 'WITHDRAWN'"
+              :disabled="blocked || !!a.wms?.receipts.length"
+              @click="open('withdraw', a.id)"
+            >
+              撤回安排
+            </button>
+            <a
+              v-if="canReceive && a.wms_arrival_id && !blocked"
+              :href="`/receiving?warehouseId=${detail.warehouse_id}&arrivalId=${a.wms_arrival_id}`"
+              >查看 WMS 收货</a
+            >
+          </div>
+          <p v-if="a.wms?.receipts.length" class="hint">
+            已有收货记录，不能撤回。<span
+              v-for="r in a.wms.receipts"
+              :key="r.id"
+            >
+              {{ r.number }}（{{
+                r.status === 'DRAFT' ? '草稿' : '已提交'
+              }}）</span
+            >
+          </p>
+        </article>
+      </section>
       <div v-if="detail.related.length" class="related">
         <strong>关联单据</strong
         ><button
@@ -640,6 +794,13 @@ onBeforeUnmount(() => {
         <p v-if="mode === 'convert'" class="hint">
           按已批准需求整单转入一个供应商，数量与单位保持不变。
         </p>
+        <p v-if="mode === 'withdraw'" class="hint">
+          只有没有任何收货记录（含草稿）的安排才能撤回；WMS
+          确认撤回后才释放数量。
+        </p>
+        <p v-if="mode === 'deliver'" class="hint">
+          将这份安排送达 WMS 供仓管收货；重复请求不会新建另一份通知。
+        </p>
         <form @submit.prevent="send">
           <fieldset :disabled="busy || !!pending">
             <div class="form-grid">
@@ -650,12 +811,15 @@ onBeforeUnmount(() => {
                     required
                     maxlength="500" /></label
               ></template>
-              <label v-if="['create', 'edit', 'convert'].includes(mode)"
+              <label
+                v-if="['create', 'edit', 'convert', 'arrange'].includes(mode)"
                 >{{
-                  (mode === 'edit' && detail?.kind === 'ORDER') ||
-                  mode === 'convert'
-                    ? '约定到货日期'
-                    : '需要日期'
+                  mode === 'arrange'
+                    ? '预计到货日期'
+                    : (mode === 'edit' && detail?.kind === 'ORDER') ||
+                        mode === 'convert'
+                      ? '约定到货日期'
+                      : '需要日期'
                 }}<input v-model="draft.neededDate" type="date" required
               /></label>
               <label
@@ -677,6 +841,27 @@ onBeforeUnmount(() => {
                 </select></label
               >
             </div>
+            <template v-if="mode === 'arrange'">
+              <p class="hint">填写本次安排数量；不安排的物料留空。</p>
+              <label
+                v-for="(l, index) in arrangementLines"
+                :key="l.orderLineId"
+                class="reason"
+                >{{ detail?.lines[index]?.material_code }} · 剩余
+                {{
+                  remaining(
+                    detail?.lines[index]?.quantity || '0',
+                    allocated(l.orderLineId),
+                  )
+                }}
+                <input
+                  v-model="l.quantity"
+                  :aria-label="`安排数量 ${index + 1}`"
+                  inputmode="decimal"
+                  pattern="[0-9]{1,12}(\.[0-9]{1,6})?"
+                />
+              </label>
+            </template>
             <template v-if="mode === 'create' || mode === 'edit'">
               <p class="hint">
                 使用基本单位；同物料自动合并。订单保留已批准需求数量。
@@ -766,6 +951,13 @@ onBeforeUnmount(() => {
 <style scoped>
 .purchasing-page h1 {
   font-size: 24px;
+}
+.arrangements {
+  margin-top: 24px;
+}
+.arrangement-record {
+  padding: 16px 0;
+  border-top: 1px solid #ece9f1;
 }
 .purchase-tabs {
   padding: 12px 16px 0;
