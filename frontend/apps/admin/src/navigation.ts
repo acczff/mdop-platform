@@ -1,6 +1,6 @@
 export const navigation = [
   {
-    name: '基础资料',
+    name: '基础设置',
     items: [
       { path: '/catalog', name: '基础资料', permission: 'warehouse:read' },
       { path: '/warehouses', name: '仓库管理', permission: 'warehouse:read' },

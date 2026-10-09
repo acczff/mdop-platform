@@ -307,186 +307,182 @@ onBeforeUnmount(() => {
 <template>
   <main class="page catalog-page">
     <div class="page-heading">
-      <div>
-        <div class="catalog-heading">
-          <h1>
-            基础资料 <span class="catalog-section">/ {{ labels[tab] }}</span>
-          </h1>
-          <span v-if="!editable" class="badge disabled">只读</span>
-        </div>
-        <p class="muted">维护往来单位、物料与组织资料。</p>
+      <div class="catalog-heading">
+        <h1>基础资料</h1>
+        <span v-if="!editable" class="badge disabled">只读</span>
       </div>
-      <button
-        v-if="editable"
-        class="primary"
-        :disabled="!canCreate"
-        @click="open()"
-      >
-        ＋ 新增{{ labels[tab] }}
-      </button>
     </div>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="message" class="success" role="status">
       {{ message }}{{ error ? '；列表刷新未成功，请先重新加载核对。' : '' }}
     </p>
-    <div
-      class="tabs catalog-tabs"
-      role="tablist"
-      aria-label="资料分类"
-      @keydown="navigateTabs"
-    >
-      <button
-        v-for="(label, key) in labels"
-        :key="key"
-        :id="'catalog-tab-' + key"
-        role="tab"
-        :aria-selected="tab === key"
-        aria-controls="catalog-panel"
-        :tabindex="tab === key ? 0 : -1"
-        :disabled="blocked"
-        :class="{ active: tab === key }"
-        @click="selectTab(key)"
+    <section class="panel">
+      <div
+        class="tabs catalog-tabs"
+        role="tablist"
+        aria-label="资料分类"
+        @keydown="navigateTabs"
       >
-        {{ label }}
-      </button>
-    </div>
-    <p v-if="tab === 'organizations'" class="hint">
-      维护当前工厂的组织标识，全部资料共用此归属。
-    </p>
-    <p v-if="tab === 'units'" class="hint">
-      单位必须先登记，再供物料选择。不提供换算；已被物料引用的单位名称不可改义。
-    </p>
-    <p v-if="tab === 'locations'" class="hint">
-      仓库在“仓库管理”中维护；本页新增库位沿用现有仓库规则。
-    </p>
-    <section
-      id="catalog-panel"
-      class="panel"
-      role="tabpanel"
-      :aria-labelledby="'catalog-tab-' + tab"
-      :aria-busy="loading"
-    >
-      <div class="filters catalog-filters">
-        <label class="grow"
-          >搜索{{ labels[tab]
-          }}<input
-            v-model="keyword"
-            :disabled="blocked"
-            placeholder="输入编码或名称"
-        /></label>
-        <label v-if="hasStatus"
-          >启用状态<select v-model="statusFilter" :disabled="blocked">
-            <option value="">全部状态</option>
-            <option value="ENABLED">启用</option>
-            <option value="DISABLED">停用</option>
-          </select></label
-        >
         <button
-          :disabled="blocked || (!keyword && !statusFilter)"
-          @click="clearFilters"
+          v-for="(label, key) in labels"
+          :key="key"
+          :id="'catalog-tab-' + key"
+          role="tab"
+          :aria-selected="tab === key"
+          aria-controls="catalog-panel"
+          :tabindex="tab === key ? 0 : -1"
+          :disabled="blocked"
+          :class="{ active: tab === key }"
+          @click="selectTab(key)"
         >
-          清空筛选
-        </button>
-        <button :disabled="blocked || loading" @click="load">
-          {{ loading ? '正在加载…' : '刷新' }}
+          {{ label }}
         </button>
       </div>
       <div
-        class="table-wrap"
-        role="region"
-        :aria-label="labels[tab] + '列表，可横向滚动'"
-        tabindex="0"
+        id="catalog-panel"
+        role="tabpanel"
+        :aria-labelledby="'catalog-tab-' + tab"
+        :aria-busy="loading"
       >
-        <table>
-          <thead>
-            <tr>
-              <th>编码</th>
-              <th>名称</th>
-              <th v-if="tab === 'materials'">单位 / 管理方式</th>
-              <th v-if="tab === 'locations'">所属仓库 / 区域</th>
-              <th v-if="!['locations', 'organizations'].includes(tab)">状态</th>
-              <th v-if="editable && tab !== 'locations'">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in rows" :key="row.id">
-              <td>{{ row.code }}</td>
-              <td>{{ row.name }}</td>
-              <td v-if="tab === 'materials'">
-                {{ row.unit }}
-                <span class="material-tracking">{{
-                  row.trackingMode === 'BATCH' ? '按批次' : '按数量'
-                }}</span>
-                <small
-                  ><span
-                    class="reference-label"
-                    :title="
-                      row.identityLocked
-                        ? '已被业务引用，单位和追踪策略不可修改'
-                        : '尚未被业务引用'
-                    "
-                    >{{
-                      row.identityLocked ? '已引用 · 策略锁定' : '未引用'
-                    }}</span
-                  ></small
-                ><small
-                  >{{ row.requireDateCode ? 'Date Code 必填；' : ''
-                  }}{{ row.requireExpiry ? '有效期必填' : '' }}</small
-                >
-              </td>
-              <td v-if="tab === 'locations'">
-                {{
-                  warehouses.find((w) => w.id === row.warehouseId)?.name ||
-                  row.warehouseId
-                }}<small>{{ areaNames[row.areaType || ''] }}</small>
-              </td>
-              <td v-if="!['locations', 'organizations'].includes(tab)">
-                <span
-                  class="badge"
-                  :class="{ disabled: row.status === 'DISABLED' }"
-                  >{{ statuses[row.status || ''] }}</span
-                >
-              </td>
-              <td
-                v-if="editable && tab !== 'locations'"
-                class="catalog-actions"
-              >
-                <button :disabled="blocked || !ready" @click="open(row)">
-                  编辑资料
-                </button>
-                <button :disabled="blocked || !ready" @click="history(row)">
-                  变更历史
-                </button>
-              </td>
-            </tr>
-            <tr v-if="!rows.length">
-              <td colspan="6" class="empty">
-                {{
-                  loading
-                    ? '正在加载…'
-                    : ready
-                      ? '暂无匹配资料'
-                      : '资料未就绪，请刷新后操作'
-                }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <footer class="catalog-footer">
-        <span role="status">{{
-          ready
-            ? `已加载 ${loadedCount} 条 · 匹配 ${rows.length} 条`
-            : loading
-              ? '正在加载资料…'
-              : '资料未就绪'
-        }}</span>
-        <span v-if="ready && loadedCount >= 1000" class="hint"
-          >已达到 1000
-          条加载上限，筛选仅覆盖已加载资料，可能未包含全部记录。</span
+        <div class="filters catalog-filters">
+          <label class="grow">
+            <span class="sr-only">搜索{{ labels[tab] }}</span
+            ><input
+              v-model="keyword"
+              :disabled="blocked"
+              placeholder="搜索编码或名称"
+          /></label>
+          <label v-if="hasStatus">
+            <span class="sr-only">启用状态</span
+            ><select v-model="statusFilter" :disabled="blocked">
+              <option value="">全部状态</option>
+              <option value="ENABLED">启用</option>
+              <option value="DISABLED">停用</option>
+            </select></label
+          >
+          <button
+            v-if="keyword || statusFilter"
+            class="text-action"
+            :disabled="blocked"
+            @click="clearFilters"
+          >
+            清空筛选
+          </button>
+          <button
+            class="text-action"
+            :disabled="blocked || loading"
+            @click="load"
+          >
+            {{ loading ? '正在加载…' : '刷新' }}
+          </button>
+          <button
+            v-if="editable"
+            class="primary catalog-create"
+            :disabled="!canCreate"
+            @click="open()"
+          >
+            新增{{ labels[tab] }}
+          </button>
+        </div>
+        <div
+          class="table-wrap"
+          role="region"
+          :aria-label="labels[tab] + '列表，可横向滚动'"
+          tabindex="0"
         >
-        <span v-else-if="ready" class="hint">筛选范围：当前已加载资料</span>
-      </footer>
+          <table>
+            <thead>
+              <tr>
+                <th>编码</th>
+                <th>名称</th>
+                <th v-if="tab === 'materials'">单位 / 管理方式</th>
+                <th v-if="tab === 'locations'">所属仓库 / 区域</th>
+                <th v-if="!['locations', 'organizations'].includes(tab)">
+                  状态
+                </th>
+                <th v-if="editable && tab !== 'locations'">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in rows" :key="row.id">
+                <td>{{ row.code }}</td>
+                <td>{{ row.name }}</td>
+                <td v-if="tab === 'materials'">
+                  {{ row.unit }}
+                  <span class="material-tracking">{{
+                    row.trackingMode === 'BATCH' ? '按批次' : '按数量'
+                  }}</span>
+                  <small v-if="row.requireDateCode || row.requireExpiry">
+                    {{ row.requireDateCode ? 'Date Code 必填' : ''
+                    }}{{ row.requireDateCode && row.requireExpiry ? ' · ' : ''
+                    }}{{ row.requireExpiry ? '有效期必填' : '' }}
+                  </small>
+                </td>
+                <td v-if="tab === 'locations'">
+                  {{
+                    warehouses.find((w) => w.id === row.warehouseId)?.name ||
+                    row.warehouseId
+                  }}<small>{{ areaNames[row.areaType || ''] }}</small>
+                </td>
+                <td v-if="!['locations', 'organizations'].includes(tab)">
+                  <span
+                    class="catalog-status"
+                    :class="{ disabled: row.status === 'DISABLED' }"
+                    >{{ statuses[row.status || ''] }}</span
+                  >
+                </td>
+                <td
+                  v-if="editable && tab !== 'locations'"
+                  class="catalog-actions"
+                >
+                  <button
+                    class="text-action"
+                    :disabled="blocked || !ready"
+                    @click="open(row)"
+                  >
+                    编辑
+                  </button>
+                  <button
+                    class="text-action"
+                    :disabled="blocked || !ready"
+                    @click="history(row)"
+                  >
+                    变更历史
+                  </button>
+                </td>
+              </tr>
+              <tr v-if="!rows.length">
+                <td colspan="6" class="empty">
+                  {{
+                    loading
+                      ? '正在加载…'
+                      : ready
+                        ? keyword || statusFilter
+                          ? '暂无匹配资料'
+                          : '暂无' + labels[tab]
+                        : '资料未就绪，请刷新后操作'
+                  }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <footer class="catalog-footer">
+          <span role="status">{{
+            ready
+              ? keyword || statusFilter
+                ? `匹配 ${rows.length} 条 / 已加载 ${loadedCount} 条`
+                : `已加载 ${loadedCount} 条`
+              : loading
+                ? '正在加载资料…'
+                : '资料未就绪'
+          }}</span>
+          <span v-if="ready && loadedCount >= 1000" class="hint"
+            >已达到 1000
+            条加载上限，筛选仅覆盖已加载资料，可能未包含全部记录。</span
+          >
+        </footer>
+      </div>
     </section>
     <div v-if="dialog" class="overlay">
       <section
@@ -499,6 +495,15 @@ onBeforeUnmount(() => {
           {{ current ? '编辑' : '新增' }}{{ labels[tab] }}
         </h2>
         <p v-if="formError" class="error" role="alert">{{ formError }}</p>
+        <p v-if="tab === 'organizations'" class="hint">
+          维护当前工厂的组织标识，全部资料共用此归属。
+        </p>
+        <p v-if="tab === 'units'" class="hint">
+          单位必须先登记，再供物料选择。不提供换算；已被物料引用的单位名称不可改义。
+        </p>
+        <p v-if="tab === 'locations'" class="hint">
+          仓库在“仓库管理”中维护；本页新增库位沿用现有仓库规则。
+        </p>
         <p v-if="current?.identityLocked" class="hint">
           已被业务引用，仅可修改名称和启停状态。
         </p>
@@ -688,32 +693,24 @@ onBeforeUnmount(() => {
   padding-top: 24px;
 }
 .catalog-page .page-heading {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 .catalog-heading {
   display: flex;
   gap: 12px;
   align-items: center;
-  margin-bottom: 6px;
 }
 .catalog-heading h1 {
   font-size: 24px;
   margin: 0;
 }
-.catalog-section {
-  color: #6c687d;
-  font-size: 18px;
-  font-weight: 400;
-}
-.catalog-heading + p {
-  font-size: 14px;
-}
 .catalog-tabs {
   flex-wrap: nowrap;
   overflow-x: auto;
-  gap: 12px;
-  border-bottom: 1px solid #dfdbe8;
-  padding: 4px 4px 0;
+  gap: 8px;
+  border-bottom: 1px solid #e9e7ee;
+  padding: 0 16px;
+  margin: 0;
 }
 .catalog-tabs button {
   flex-shrink: 0;
@@ -721,7 +718,7 @@ onBeforeUnmount(() => {
   border-bottom: 3px solid transparent;
   border-radius: 0;
   background: transparent;
-  padding: 10px 12px;
+  padding: 14px 12px;
   color: #60586e;
   font-size: 14px;
 }
@@ -732,19 +729,25 @@ onBeforeUnmount(() => {
 }
 .catalog-filters {
   padding: 16px;
-  gap: 12px;
+  gap: 8px;
+  align-items: center;
+  border-bottom: 0;
 }
 .catalog-filters .grow {
-  flex: 1 1 200px;
-  max-width: 380px;
+  flex: 1 1 180px;
+  max-width: 300px;
 }
 .catalog-filters label {
-  min-width: 140px;
+  min-width: 116px;
   font-size: 13px;
+  font-weight: 400;
 }
 .catalog-filters button {
   font-size: 13px;
   min-height: 40px;
+}
+.catalog-create {
+  margin-left: auto;
 }
 .catalog-page table {
   min-width: 560px;
@@ -756,6 +759,9 @@ onBeforeUnmount(() => {
 .catalog-page td {
   overflow-wrap: anywhere;
 }
+.catalog-page td:first-child {
+  white-space: nowrap;
+}
 .catalog-page th {
   color: #60586e;
   font-size: 13px;
@@ -763,21 +769,28 @@ onBeforeUnmount(() => {
 .catalog-page td small {
   color: #6c687d;
 }
+.catalog-status {
+  color: #26734a;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.catalog-status.disabled {
+  color: #78717f;
+}
 .material-tracking {
   display: inline-block;
   margin-left: 6px;
   color: #6c687d;
   font-size: 12px;
 }
-.reference-label {
-  display: inline-block;
-  border: 1px solid #e2deea;
-  background: #f8f6fb;
-  padding: 2px 6px;
-  border-radius: 4px;
-}
 .catalog-actions {
   white-space: nowrap;
+}
+.text-action {
+  border-color: transparent;
+  background: transparent;
+  color: #6941b5;
+  padding: 6px 8px;
 }
 .catalog-actions button {
   font-size: 13px;
@@ -790,10 +803,9 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 10px;
   flex-wrap: wrap;
-  padding: 12px 16px;
+  padding: 10px 16px;
   color: #60586e;
-  font-size: 13px;
-  background: #fcfbfe;
+  font-size: 12px;
 }
 .catalog-footer .hint {
   font-size: 12px;
@@ -813,11 +825,9 @@ onBeforeUnmount(() => {
   .catalog-heading h1 {
     font-size: 22px;
   }
-  .catalog-section {
-    font-size: 16px;
-  }
   .catalog-tabs {
-    gap: 4px;
+    gap: 0;
+    padding: 0 8px;
   }
   .catalog-tabs button {
     padding: 10px;

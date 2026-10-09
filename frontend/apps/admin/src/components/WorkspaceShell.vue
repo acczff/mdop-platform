@@ -69,7 +69,12 @@ function resize() {
 function toggleNavigation() {
   navOpen.value = !navOpen.value
   if (narrow.value && navOpen.value)
-    void nextTick(() => sidebar.value?.querySelector('button')?.focus())
+    void nextTick(() =>
+      sidebar.value?.querySelector<HTMLElement>('button, a')?.focus(),
+    )
+}
+function toggleGroup(name: string) {
+  expanded.value = expanded.value[name] ? {} : { [name]: true }
 }
 function closeNavigation() {
   navOpen.value = false
@@ -83,7 +88,7 @@ function followLink() {
 watch(
   () => route.path,
   () => {
-    if (activeGroup.value) expanded.value[activeGroup.value.name] = true
+    expanded.value = activeGroup.value ? { [activeGroup.value.name]: true } : {}
     if (narrow.value) navOpen.value = false
     closeAccount()
   },
@@ -114,18 +119,25 @@ onBeforeUnmount(() => {
           :key="group.name"
           class="nav-group"
         >
+          <RouterLink
+            v-if="group.items.length === 1"
+            class="nav-direct"
+            :to="group.items[0]!.path"
+            @click="followLink"
+          >
+            {{ group.items[0]!.name }}
+          </RouterLink>
           <button
+            v-else
             class="nav-group-toggle"
             :aria-expanded="!!expanded[group.name]"
             :aria-controls="'navigation-group-' + index"
-            @click="expanded[group.name] = !expanded[group.name]"
+            @click="toggleGroup(group.name)"
           >
-            {{ group.name
-            }}<span aria-hidden="true">{{
-              expanded[group.name] ? '收起' : '展开'
-            }}</span>
+            {{ group.name }}<span class="nav-chevron" aria-hidden="true"></span>
           </button>
           <div
+            v-if="group.items.length > 1"
             v-show="expanded[group.name]"
             :id="'navigation-group-' + index"
             class="nav-links"
@@ -143,7 +155,6 @@ onBeforeUnmount(() => {
           暂无已授权业务菜单，可从右上角查看我的账号。
         </p>
       </nav>
-      <p class="sidebar-note">制造运营平台</p>
     </aside>
     <header class="topbar">
       <div class="workspace-heading">
@@ -153,13 +164,15 @@ onBeforeUnmount(() => {
           aria-controls="workspace-navigation"
           @click="toggleNavigation"
         >
-          {{ navOpen ? '收起导航' : '展开导航' }}
+          <span class="sr-only">{{ navOpen ? '收起导航' : '展开导航' }}</span>
+          <span aria-hidden="true">导航</span>
         </button>
         <nav class="breadcrumb" aria-label="当前位置">
-          <span>{{ activeGroup?.name || '个人中心' }}</span
-          ><span v-if="activeGroup?.name !== pageName" aria-current="page">
-            / {{ pageName }}</span
-          >
+          <span>{{
+            activeGroup?.name === pageName
+              ? '工作台'
+              : activeGroup?.name || '个人中心'
+          }}</span>
         </nav>
       </div>
       <details

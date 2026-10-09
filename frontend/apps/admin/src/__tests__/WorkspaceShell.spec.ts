@@ -52,12 +52,29 @@ it('opens the active group on direct navigation and browser history', async () =
   await router.push('/inventory')
   await flushPromises()
   expect(view.get('a[href="/inventory"]').isVisible()).toBe(true)
+  expect(view.get('a[href="/catalog"]').isVisible()).toBe(false)
   expect(view.get('a[href="/inventory"]').attributes('aria-current')).toBe(
     'page',
   )
   router.back()
   await flushPromises()
   expect(view.get('a[href="/catalog"]').attributes('aria-current')).toBe('page')
+  view.unmount()
+})
+it('keeps one group open and exposes single-item groups as direct links', async () => {
+  const { view } = await setup()
+  expect(view.find('button[aria-controls="navigation-group-4"]').exists()).toBe(
+    false,
+  )
+  expect(view.get('a[href="/sales"]').isVisible()).toBe(true)
+  const inventory = view
+    .findAll('.nav-group-toggle')
+    .find((button) => button.text() === '库存作业')!
+  await inventory.trigger('click')
+  expect(view.get('a[href="/inventory"]').isVisible()).toBe(true)
+  expect(view.get('a[href="/catalog"]').isVisible()).toBe(false)
+  await inventory.trigger('click')
+  expect(view.get('a[href="/inventory"]').isVisible()).toBe(false)
   view.unmount()
 })
 it('defaults to content on narrow screens and closes navigation after a link', async () => {
