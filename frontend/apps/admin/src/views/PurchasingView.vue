@@ -136,6 +136,7 @@ const result = ref<{ items: Document[]; total: number }>(),
 const ready = ref(false),
   loading = ref(false),
   busy = ref(false),
+  locked = ref(false),
   error = ref(''),
   notice = ref(''),
   detailError = ref('')
@@ -176,7 +177,17 @@ const writable = computed(() => props.authorities.includes('purchasing:write'))
 const reviewable = computed(() =>
   props.authorities.includes('purchasing:review'),
 )
-const blocked = computed(() => busy.value || !!pending.value || !!mode.value)
+const pendingPermission = computed(
+  () =>
+    !!pending.value &&
+    props.authorities.includes(`wms:warehouse:${pending.value.warehouse}`) &&
+    (/\/actions\/(approve|reject)$/.test(pending.value.url)
+      ? reviewable.value
+      : writable.value),
+)
+const blocked = computed(
+  () => locked.value || busy.value || !!pending.value || !!mode.value,
+)
 const canEdit = computed(
   () =>
     detail.value &&
@@ -200,7 +211,7 @@ function remember(value?: Pending) {
   pending.value = value
 }
 async function load(next = 0) {
-  if (busy.value) return
+  if (busy.value || locked.value) return
   const token = ++generation
   ++detailGeneration
   detail.value = undefined
@@ -208,9 +219,10 @@ async function load(next = 0) {
   result.value = undefined
   error.value = ''
   loading.value = true
+  ready.value = false
   page.value = next
   try {
-    if (!ready.value) {
+    {
       const all: Warehouse[] = []
       for (let p = 1; ; p++) {
         const data = await request<Page<Warehouse>>(
@@ -329,7 +341,7 @@ function describeSnapshot(raw: string | null) {
   }
 }
 async function send() {
-  if (busy.value || pending.value) return
+  if (locked.value || busy.value || pending.value) return
   const d = detail.value
   let url = base,
     method = 'POST',
@@ -387,7 +399,11 @@ async function send() {
   await retry()
 }
 async function retry() {
-  if (busy.value || !pending.value) return
+  if (locked.value || busy.value || !pending.value || !pendingPermission.value)
+    return
+  ++generation
+  ++detailGeneration
+  loading.value = false
   busy.value = true
   error.value = ''
   formError.value = ''
@@ -403,8 +419,22 @@ async function retry() {
     mode.value = ''
   } catch (e) {
     const failure = e as Error
-    if (e instanceof ApiError && e.status >= 400 && e.status < 500) {
-      remember()
+    if (
+      e instanceof ApiError &&
+      e.status >= 400 &&
+      e.status < 500 &&
+      ![401, 403].includes(e.status)
+    ) {
+      try {
+        remember()
+      } catch {
+        locked.value = true
+        result.value = undefined
+        detail.value = undefined
+        error.value = '无法清理重试凭据，请联系管理员核对；本页已停止新操作。'
+        busy.value = false
+        return
+      }
       mode.value = ''
       result.value = undefined
       detail.value = undefined
@@ -429,7 +459,14 @@ async function retry() {
   await openDetail(saved.id)
 }
 onMounted(() => {
-  const stored = sessionStorage.getItem(storageKey)
+  let stored: string | null
+  try {
+    stored = sessionStorage.getItem(storageKey)
+  } catch {
+    error.value = '无法读取重试凭据，请检查浏览器存储设置'
+    locked.value = true
+    return
+  }
   if (stored) {
     try {
       const parsed = JSON.parse(stored) as Pending
@@ -445,7 +482,7 @@ onMounted(() => {
     } catch {
       error.value =
         '保存的采购重试凭据无法读取，请联系管理员核对；本页已停止新操作。'
-      busy.value = true
+      locked.value = true
       return
     }
   }
@@ -468,7 +505,8 @@ onBeforeUnmount(() => {
     <div v-if="pending" class="pending panel">
       <strong>有一笔操作等待确认</strong>
       <p>原请求已保留。原样重试会核对同一笔操作，不会重新建单。</p>
-      <button :disabled="busy" @click="retry">
+      <p v-if="!pendingPermission">当前账号无原操作权限，请联系管理员核对。</p>
+      <button :disabled="locked || busy || !pendingPermission" @click="retry">
         {{ busy ? '正在核对…' : '原样重试' }}
       </button>
     </div>
@@ -503,7 +541,10 @@ onBeforeUnmount(() => {
             </option>
           </select></label
         >
-        <button :disabled="busy || loading || !!mode" @click="load(page)">
+        <button
+          :disabled="locked || busy || loading || !!mode"
+          @click="load(page)"
+        >
           刷新
         </button>
         <button
@@ -851,6 +892,7 @@ onBeforeUnmount(() => {
           }}
         </h2>
         <p v-if="formError" class="error" role="alert">{{ formError }}</p>
+        <p v-if="error" class="error" role="alert">{{ error }}</p>
         <p
           v-if="originalOrderId && ['create', 'edit'].includes(mode)"
           class="hint"
@@ -1014,7 +1056,14 @@ onBeforeUnmount(() => {
             </div>
           </fieldset>
         </form>
-        <button v-if="pending" :disabled="busy" @click="retry">
+        <p v-if="pending && !pendingPermission">
+          当前账号无原操作权限，请联系管理员核对。
+        </p>
+        <button
+          v-if="pending"
+          :disabled="locked || busy || !pendingPermission"
+          @click="retry"
+        >
           结果待核对，原样重试
         </button>
       </section>

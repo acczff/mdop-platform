@@ -356,8 +356,10 @@ async function send() {
   await retry()
 }
 async function retry() {
-  if (busy.value || !pending.value || !pendingPermission.value) return
+  if (locked.value || busy.value || !pending.value || !pendingPermission.value)
+    return
   busy.value = true
+  loading.value = false
   ++generation
   ++detailGeneration
   error.value = ''
@@ -372,7 +374,12 @@ async function retry() {
     detail.value = undefined
     result.value = undefined
     mode.value = ''
-    if (e instanceof ApiError && e.status >= 400 && e.status < 500) {
+    if (
+      e instanceof ApiError &&
+      e.status >= 400 &&
+      e.status < 500 &&
+      ![401, 403].includes(e.status)
+    ) {
       try {
         remember()
       } catch {
@@ -433,7 +440,7 @@ onBeforeUnmount(() => {
     <p v-if="error" role="alert" class="error">{{ error }}</p>
     <div v-if="pending" class="pending" role="status">
       有一笔操作结果待核对。<button
-        :disabled="busy || !pendingPermission"
+        :disabled="locked || busy || !pendingPermission"
         @click="retry"
       >
         原样重试</button

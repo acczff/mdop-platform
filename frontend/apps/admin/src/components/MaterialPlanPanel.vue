@@ -217,7 +217,12 @@ async function retry() {
     if (token !== generation) return
     data.value = undefined
     selection.value = undefined
-    if (e instanceof ApiError && e.status >= 400 && e.status < 500) {
+    if (
+      e instanceof ApiError &&
+      e.status >= 400 &&
+      e.status < 500 &&
+      ![401, 403].includes(e.status)
+    ) {
       try {
         remember()
       } catch {

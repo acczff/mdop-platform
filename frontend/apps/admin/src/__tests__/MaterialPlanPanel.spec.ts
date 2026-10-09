@@ -8,6 +8,30 @@ vi.mock('../api', async (original) => ({
   request: vi.fn(),
 }))
 const base = '/api/v1/manufacturing/orders/2/materials'
+it.each([401, 403])(
+  'retains unknown material plan writes after HTTP %s on retry',
+  async (status) => {
+    const key = 'mdop-material-plan-pending:planner:2'
+    const saved = JSON.stringify({
+      action: 'confirm',
+      body: JSON.stringify({
+        idempotencyKey: 'original',
+        reason: '核对',
+        planVersion: 1,
+        lineId: 8,
+      }),
+    })
+    sessionStorage.setItem(key, saved)
+    const v = setup()
+    await flushPromises()
+    vi.mocked(request).mockRejectedValueOnce(new ApiError(status, '权限失效'))
+    await btn(v, '原样重试材料请求')!.trigger('click')
+    await flushPromises()
+    expect(sessionStorage.getItem(key)).toBe(saved)
+    expect(v.text()).toContain('结果待核对')
+    v.unmount()
+  },
+)
 const line = {
   materialId: 3,
   code: 'A',

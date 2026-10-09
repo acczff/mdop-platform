@@ -211,7 +211,10 @@ async function send() {
   await retry()
 }
 async function retry() {
-  if (busy.value || !pending.value || !writable.value) return
+  if (locked.value || busy.value || !pending.value || !writable.value) return
+  ++generation
+  ++detailGeneration
+  loading.value = false
   busy.value = true
   error.value = ''
   formError.value = ''
@@ -229,8 +232,20 @@ async function retry() {
     detail.value = undefined
     result.value = undefined
     mode.value = ''
-    if (e instanceof ApiError && e.status >= 400 && e.status < 500) {
-      remember()
+    if (
+      e instanceof ApiError &&
+      e.status >= 400 &&
+      e.status < 500 &&
+      ![401, 403].includes(e.status)
+    ) {
+      try {
+        remember()
+      } catch {
+        locked.value = true
+        error.value = '无法清理重试凭据，请联系管理员核对；本页已停止新操作。'
+        busy.value = false
+        return
+      }
       error.value = `操作被拒绝：${e.message}。请刷新核对后再操作。`
     } else {
       error.value = `结果待核对：${(e as Error).message}。请原样重试，不要另建版本。`
@@ -291,7 +306,9 @@ onBeforeUnmount(() => {
     <p v-if="error" role="alert" class="error">{{ error }}</p>
     <div v-if="pending" class="pending" role="status">
       有一笔结果待核对的操作，请保留原请求。
-      <button :disabled="busy || !writable" @click="retry">原样重试</button>
+      <button :disabled="locked || busy || !writable" @click="retry">
+        原样重试
+      </button>
       <p v-if="!writable">当前账号无写权限，请联系管理员核对原操作。</p>
     </div>
     <form class="toolbar" @submit.prevent="load(0)">
