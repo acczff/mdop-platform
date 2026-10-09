@@ -127,6 +127,7 @@ class AccountTests extends MdopInfrastructureTestBase {
                 List.of(
                         Set.of("SYSTEM_ADMIN", "READER"),
                         Set.of("WAREHOUSE_OPERATOR", "BUSINESS_REVIEWER"),
+                        Set.of("SALES_OPERATOR", "SALES_REVIEWER"),
                         Set.of("ROLE_ADMIN")))
             post(
                     "/api/iam/users",

@@ -65,7 +65,15 @@ export const navigation = [
   },
   {
     name: '销售出库',
-    items: [{ path: '/sales', name: '销售出库', permission: 'wms:sales:read' }],
+    items: [
+      {
+        path: '/sales-orders',
+        name: '销售订单',
+        permission: 'sales:read',
+        legacyAdmin: false,
+      },
+      { path: '/sales', name: '销售出库', permission: 'wms:sales:read' },
+    ],
   },
   {
     name: '系统管理',

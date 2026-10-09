@@ -110,6 +110,8 @@ public class SalesService {
     }
 
     public Map<String, Object> create(Demand in) {
+        if (in.demandNo().toUpperCase(Locale.ROOT).startsWith("MDOP-SALES-"))
+            throw conflict("正式销售来源只能由 ERP 发货安排建立");
         lockWarehouse(in.warehouseId());
         var old =
                 db.sql("SELECT * FROM wms_sales_order WHERE demand_no=?")
@@ -118,6 +120,7 @@ public class SalesService {
                         .listOfRows();
         if (!old.isEmpty()) {
             var d = old.getFirst();
+            if (!"ERP_SIMULATOR".equals(d.get("source_system"))) throw conflict("不能通过模拟入口修改正式来源");
             access.requireWarehouse(n(d, "warehouse_id"));
             if (n(d, "warehouse_id") != in.warehouseId()
                     || n(d, "material_id") != in.materialId()
@@ -261,6 +264,9 @@ public class SalesService {
         db.sql("UPDATE wms_sales_order SET status='SHIPPED',closed_by=?,closed_at=? WHERE id=?")
                 .params(actor.currentActor(), now(), id)
                 .update();
+        // Formal ERP reads committed execution/ledger facts through SalesShippingPort.
+        // Do not report a formal order to the legacy simulated ERP consumer.
+        if ("MDOP_SALES".equals(d.get("source_system"))) return detail(id);
         var payload =
                 Map.of(
                         "salesOrderId",
