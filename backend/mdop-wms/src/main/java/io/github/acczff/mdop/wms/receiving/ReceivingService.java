@@ -260,15 +260,7 @@ public class ReceivingService {
     }
 
     private void lockPurchaseWarehouse(long arrivalId) {
-        var arrival = loadArrival(arrivalId, false);
-        if ("MDOP_PURCHASING".equals(arrival.sourceSystem())) {
-            // Match purchasing's warehouse -> notice order; otherwise withdrawal can deadlock a
-            // draft.
-            jdbc.sql("SELECT id FROM mdm_warehouse WHERE id=? FOR SHARE")
-                    .param(arrival.warehouseId())
-                    .query(Long.class)
-                    .single();
-        }
+        PurchaseArrivalLock.acquire(jdbc, access, arrivalId);
     }
 
     private void increaseStock(Arrival arrival, Item item) {

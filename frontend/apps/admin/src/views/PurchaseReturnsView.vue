@@ -184,7 +184,7 @@ async function act(action: 'decision' | 'confirm' | 'cancel') {
     )
     const outcome =
       action === 'confirm'
-        ? '实际退货已确认，不合格库存已扣减，ERP 模拟反馈已进入发送队列。'
+        ? '实际退货已确认，不合格库存已扣减，交接记录已保存。'
         : action === 'cancel'
           ? '申请已撤销，可退额度已释放。'
           : decision.value === 'APPROVE'

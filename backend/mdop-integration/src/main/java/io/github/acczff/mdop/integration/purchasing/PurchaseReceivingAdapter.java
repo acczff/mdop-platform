@@ -21,6 +21,10 @@ public class PurchaseReceivingAdapter implements PurchaseReceivingPort {
         return service.view(warehouseId, arrangementId);
     }
 
+    public Fulfillment fulfillment(long warehouseId, long arrangementId) {
+        return service.fulfillment(warehouseId, arrangementId);
+    }
+
     public void withdraw(long warehouseId, long arrangementId, String reason) {
         service.withdraw(warehouseId, arrangementId, reason);
     }

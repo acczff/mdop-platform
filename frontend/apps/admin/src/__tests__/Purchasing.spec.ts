@@ -41,6 +41,47 @@ const doc = {
   related: [],
   history: [],
 }
+
+it('submits closure with the original parent version and preserves an uncertain result', async () => {
+  const order = {
+    ...doc,
+    kind: 'ORDER',
+    status: 'FULFILLING',
+    fulfillment: {
+      lines: [],
+      notices: [],
+      blockers: [],
+      canClose: true,
+      outcome: 'WITH_RETURNS',
+      factHash: 'checked',
+    },
+  }
+  const view = setup()
+  vi.mocked(request).mockImplementation(async (path, options) => {
+    if (options?.method) throw new ApiError(503, '响应丢失')
+    if (path === `${base}/10`) return order
+    return data(path)
+  })
+  await flushPromises()
+  await button(view, '查看').trigger('click')
+  await flushPromises()
+  await button(view, '确认履约结案').trigger('click')
+  await view.get('textarea').setValue('已完成实物交接')
+  await view.get('form').trigger('submit')
+  await flushPromises()
+  const saved = JSON.parse(
+    sessionStorage.getItem('mdop-purchasing-pending:buyer')!,
+  )
+  expect(saved.url).toBe(`${base}/10/actions/close`)
+  expect(JSON.parse(saved.body)).toMatchObject({
+    version: 3,
+    reason: '已完成实物交接',
+  })
+  expect(view.text()).toContain('结果待核对')
+  expect(view.find('[aria-label="采购履约"]').exists()).toBe(false)
+  expect(view.get('fieldset').attributes('disabled')).toBeDefined()
+  view.unmount()
+})
 async function data(path: string) {
   if (path.includes('/warehouses?'))
     return {

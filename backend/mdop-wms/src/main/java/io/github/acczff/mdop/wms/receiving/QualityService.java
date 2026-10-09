@@ -81,6 +81,7 @@ public class QualityService {
 
     public List<Map<String, Object>> inspect(ResultInput input) {
         var reference = receipt(input.receiptId(), false);
+        PurchaseArrivalLock.acquire(db, access, reference.arrivalId());
         var arrival = arrival(reference.arrivalId(), true);
         var receipt = receipt(reference.id(), true);
         String digest = hash(List.of(actor.currentActor(), input));
@@ -187,6 +188,7 @@ public class QualityService {
                         .optional()
                         .orElseThrow(() -> new BusinessException(404, "ITEM_NOT_FOUND", "收货明细不存在"));
         var reference = receipt(item.receiptId(), false);
+        PurchaseArrivalLock.acquire(db, access, reference.arrivalId());
         var arrival = arrival(reference.arrivalId(), true);
         var receipt = receipt(reference.id(), true);
         var result =

@@ -2,6 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ApiError, request, type Page, type Warehouse } from '../api'
 import { remaining, scaled } from '../quantity'
+import PurchaseFulfillmentPanel from '../components/PurchaseFulfillmentPanel.vue'
+import type { Fulfillment, Closure } from '../purchasing'
 
 const props = defineProps<{ authorities: string[]; username: string }>()
 type Kind = 'REQUEST' | 'ORDER'
@@ -42,6 +44,9 @@ interface Document {
   }[]
   related: { id: number; document_no: string; status: string }[]
   arrangements?: Arrangement[]
+  fulfillment?: Fulfillment
+  closure?: Closure | null
+  closureMatches?: boolean
 }
 interface Arrangement {
   id: number
@@ -84,6 +89,7 @@ const statuses: Record<string, string> = {
   CONVERTED: '已转单',
   CANCELLED: '已取消',
   FULFILLING: '履约中',
+  CLOSED: '已结案',
   PENDING: '待送达',
   DELIVERED: '已送达',
   WITHDRAWN: '已撤回',
@@ -97,6 +103,7 @@ const actions: Record<string, string> = {
   arrange: '安排到货',
   deliver: '送达 WMS',
   withdraw: '撤回安排',
+  close: '履约结案',
 }
 const auditNames: Record<string, string> = {
   CREATE: '建单',
@@ -111,6 +118,7 @@ const auditNames: Record<string, string> = {
   DELIVER: '送达 WMS',
   WITHDRAW: '撤回安排',
   DELIVERY_FAILED: '送达失败',
+  CLOSE: '履约结案',
 }
 const kind = ref<Kind>('REQUEST'),
   warehouse = ref(0),
@@ -665,6 +673,17 @@ onBeforeUnmount(() => {
           </tbody>
         </table>
       </div>
+      <PurchaseFulfillmentPanel
+        v-if="detail.fulfillment"
+        :value="detail.fulfillment"
+        :closure="detail.closure"
+        :matches="detail.closureMatches !== false"
+        :can-write="writable && detail.status === 'FULFILLING'"
+        :blocked="blocked"
+        :authorities="authorities"
+        @refresh="openDetail(detail.id)"
+        @close="open('close')"
+      />
       <section v-if="detail.kind === 'ORDER'" class="arrangements">
         <div class="detail-heading">
           <h2>到货安排</h2>
@@ -793,6 +812,9 @@ onBeforeUnmount(() => {
         </p>
         <p v-if="mode === 'convert'" class="hint">
           按已批准需求整单转入一个供应商，数量与单位保持不变。
+        </p>
+        <p v-if="mode === 'close'" class="hint">
+          结案按当前收货、质量、上架及实际退供事实核对并保存快照。含退供不等于全部合格，不恢复补货额度，也不代表财务结清。
         </p>
         <p v-if="mode === 'withdraw'" class="hint">
           只有没有任何收货记录（含草稿）的安排才能撤回；WMS

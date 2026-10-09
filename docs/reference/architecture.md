@@ -1,5 +1,7 @@
 # 架构与代码阅读
 
+采购数量履约新增 `PurchaseFulfillment`：通过 common 的 `PurchaseReceivingPort` 和 integration 适配器读取 WMS 事实，按稳定来源行归集，采购不直接访问 WMS 表或用库存余额推算。详情可重复读；结案与正式来源 WMS 写入统一“仓库→通知/明细”锁序。`pur_closure` 保存不可变来源快照；当前事实不一致时保留原结案并提示核对。正式链路是同库查询契约，已有模拟 Outbox 不作为结案依据，拆库后的消息协议不在本版范围。见[采购 P3](../erp/采购P3实现与验收.md)。
+
 当前应用是一个 Spring Boot 进程配一个 Vue 管理端的模块化单体。数据库是业务事实来源，RabbitMQ 用于可靠事件，Redis 目前仅有基础设施与测试基线，尚未承载业务缓存、分布式会话或限流。完整文件入口见[源码导航](source-index.md)。
 
 ## 实际模块边界

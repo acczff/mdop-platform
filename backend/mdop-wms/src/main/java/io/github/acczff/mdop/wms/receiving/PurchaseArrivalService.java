@@ -144,6 +144,73 @@ public class PurchaseArrivalService {
                 .update();
     }
 
+    @Transactional(readOnly = true)
+    public Fulfillment fulfillment(long warehouse, long arrangement) {
+        access.requireWarehouse(warehouse);
+        long arrival = ((Number) notice(warehouse, arrangement, false).get("id")).longValue();
+        var facts =
+                db.sql(
+                                """
+            SELECT a.purchase_arrangement_line_id,r.id,r.receipt_no,i.id,r.status,
+                   r.correction_status,r.downstream_stage,CAST(i.quantity AS CHAR),
+                   q.reference_no,CAST(qi.qualified_qty AS CHAR),CAST(qi.rejected_qty AS CHAR),
+                   qi.putaway_location_id
+            FROM wms_receipt r JOIN wms_receipt_item i ON i.receipt_id=r.id
+            JOIN wms_arrival_notice_item a ON a.id=i.arrival_item_id
+            LEFT JOIN wms_quality_result q ON q.receipt_id=r.id
+            LEFT JOIN wms_quality_item qi ON qi.receipt_item_id=i.id
+            WHERE r.arrival_id=? ORDER BY i.id
+            """)
+                        .param(arrival)
+                        .query(
+                                (rs, n) ->
+                                        new Fact(
+                                                rs.getLong(1),
+                                                rs.getLong(2),
+                                                rs.getString(3),
+                                                rs.getLong(4),
+                                                rs.getString(5),
+                                                rs.getString(6),
+                                                rs.getString(7),
+                                                rs.getString(8),
+                                                rs.getString(9),
+                                                rs.getString(10),
+                                                rs.getString(11),
+                                                rs.getObject(12, Long.class)))
+                        .list();
+        var cases =
+                db.sql(
+                                "SELECT id,kind,receipt_id,status,reason FROM wms_receiving_case WHERE arrival_id=? ORDER BY id")
+                        .param(arrival)
+                        .query(
+                                (rs, n) ->
+                                        new CaseFact(
+                                                rs.getLong(1),
+                                                rs.getString(2),
+                                                rs.getObject(3, Long.class),
+                                                rs.getString(4),
+                                                rs.getString(5)))
+                        .list();
+        var returns =
+                db.sql(
+                                """
+            SELECT t.id,t.receipt_item_id,CAST(t.quantity AS CHAR),t.status,t.handover_no
+            FROM wms_purchase_return t JOIN wms_receipt r ON r.id=t.receipt_id
+            WHERE r.arrival_id=? ORDER BY t.id
+            """)
+                        .param(arrival)
+                        .query(
+                                (rs, n) ->
+                                        new ReturnFact(
+                                                rs.getLong(1),
+                                                rs.getLong(2),
+                                                rs.getString(3),
+                                                rs.getString(4),
+                                                rs.getString(5)))
+                        .list();
+        return new Fulfillment(facts, cases, returns);
+    }
+
     private Map<String, Object> notice(long warehouse, long arrangement, boolean lock) {
         return db
                 .sql(

@@ -48,6 +48,7 @@ public class CorrectionService {
     }
 
     private void lockArrival(long id) {
+        PurchaseArrivalLock.acquire(db, access, id);
         var warehouse =
                 db.sql("SELECT warehouse_id FROM wms_arrival_notice WHERE id=? FOR UPDATE")
                         .param(id)

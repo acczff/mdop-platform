@@ -30,6 +30,7 @@ public class PurchaseService {
     private final Clock clock;
     private final ObjectMapper json;
     private final PurchaseReceivingPort receiving;
+    private final PurchaseFulfillment fulfillment;
 
     public PurchaseService(
             JdbcClient db,
@@ -37,13 +38,15 @@ public class PurchaseService {
             CurrentActorProvider actor,
             Clock clock,
             ObjectMapper json,
-            PurchaseReceivingPort receiving) {
+            PurchaseReceivingPort receiving,
+            PurchaseFulfillment fulfillment) {
         this.db = db;
         this.catalog = catalog;
         this.actor = actor;
         this.clock = clock;
         this.json = json;
         this.receiving = receiving;
+        this.fulfillment = fulfillment;
     }
 
     public record Page(List<Map<String, Object>> items, long total, int page, int size) {}
@@ -72,12 +75,23 @@ public class PurchaseService {
                 size);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Map<String, Object> detail(long id) {
         var d = header(id);
         requireWarehouse(n(d, "warehouse_id"));
         d.put("lines", lines(id));
         d.put("arrangements", arrangements(id, n(d, "warehouse_id"), true));
+        if (!isRequest(d)) {
+            var facts = fulfillment.read(id, n(d, "warehouse_id"));
+            d.put("fulfillment", facts);
+            var closed = closure(id);
+            d.put("closure", closed);
+            d.put(
+                    "closureMatches",
+                    closed == null
+                            || (facts.canClose()
+                                    && facts.factHash().equals(closed.get("fact_hash"))));
+        }
         d.put(
                 "history",
                 db.sql(
@@ -160,7 +174,7 @@ public class PurchaseService {
     }
 
     public Map<String, Object> action(long id, String action, Action in) {
-        if (!Set.of("submit", "approve", "reject", "cancel").contains(action))
+        if (!Set.of("submit", "approve", "reject", "cancel", "close").contains(action))
             throw invalid("不支持的采购动作");
         var d = lockDocument(id);
         String hash = hash(action, id, in);
@@ -171,6 +185,24 @@ public class PurchaseService {
         var before = snapshot(id);
         String state;
         switch (action) {
+            case "close" -> {
+                requireOrder(d);
+                requireState(d, "FULFILLING");
+                var facts = fulfillment.read(id, n(d, "warehouse_id"));
+                if (!facts.canClose()) throw conflict("不能结案：" + String.join("；", facts.blockers()));
+                db.sql(
+                                "INSERT INTO pur_closure(document_id,outcome,fact_hash,snapshot,reason,closed_by,closed_at) VALUES(?,?,?,?,?,?,?)")
+                        .params(
+                                id,
+                                facts.outcome(),
+                                facts.factHash(),
+                                json.writeValueAsString(facts),
+                                reason,
+                                actor.currentActor(),
+                                now())
+                        .update();
+                state = "CLOSED";
+            }
             case "submit" -> {
                 requireState(d, "DRAFT", "REJECTED");
                 validateAuthorization(d, false);
@@ -562,7 +594,20 @@ public class PurchaseService {
         var d = header(id);
         d.put("lines", lines(id));
         d.put("arrangements", arrangements(id, n(d, "warehouse_id"), false));
+        d.put("closure", closure(id));
         return d;
+    }
+
+    private Map<String, Object> closure(long id) {
+        return db
+                .sql(
+                        "SELECT outcome,fact_hash,snapshot,reason,closed_by,closed_at FROM pur_closure WHERE document_id=?")
+                .param(id)
+                .query()
+                .listOfRows()
+                .stream()
+                .findFirst()
+                .orElse(null);
     }
 
     private void audit(long id, String action, String reason, Map<String, Object> before) {
