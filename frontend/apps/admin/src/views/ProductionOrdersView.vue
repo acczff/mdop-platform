@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ApiError, request, type Page, type Warehouse } from '../api'
+import MaterialPlanPanel from '../components/MaterialPlanPanel.vue'
 
 const props = defineProps<{ authorities: string[]; username: string }>()
 interface Directory {
@@ -149,6 +150,8 @@ const labels: Record<string, string> = {
   REJECT: '驳回',
   CANCEL: '取消工单',
   CANCEL_DEMAND: '取消需求',
+  MATERIAL_CALCULATE: '计算材料需求',
+  MATERIAL_PURCHASE: '确认采购建议',
 }
 const label = (s: string) => labels[s] || s
 let generation = 0,
@@ -610,8 +613,15 @@ onBeforeUnmount(() => {
               </tbody>
             </table>
           </div>
-          <p class="muted">原始 BOM 用量依据；尚未展开工单材料需求。</p>
+          <p class="muted">工单批准时固定的 BOM 用量依据。</p>
         </details>
+        <MaterialPlanPanel
+          v-if="['APPROVED', 'CANCELLED'].includes(o.status)"
+          :key="`${o.id}:${o.version}`"
+          :order-id="o.id"
+          :authorities="authorities"
+          :username="username"
+        />
       </article>
       <details>
         <summary>操作历史（{{ detail.history.length }}，最多 1000 条）</summary>

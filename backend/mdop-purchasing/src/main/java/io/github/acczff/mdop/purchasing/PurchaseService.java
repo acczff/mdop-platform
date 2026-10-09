@@ -23,7 +23,8 @@ import tools.jackson.databind.ObjectMapper;
 
 @Service
 @Transactional(isolation = Isolation.READ_COMMITTED)
-public class PurchaseService {
+public class PurchaseService
+        implements io.github.acczff.mdop.common.manufacturing.ProductionPurchasePort {
     private final JdbcClient db;
     private final CatalogService catalog;
     private final CurrentActorProvider actor;
@@ -50,6 +51,87 @@ public class PurchaseService {
     }
 
     public record Page(List<Map<String, Object>> items, long total, int page, int size) {}
+
+    @Override
+    public long create(io.github.acczff.mdop.common.manufacturing.ProductionPurchasePort.Input in) {
+        lockWarehouse(in.warehouseId());
+        catalog.requireReceivingWarehouse(in.warehouseId());
+        var m = catalog.referenceMaterial(in.materialId());
+        if (!m.unit().equals(in.unit())) throw conflict("生产建议与物料基本单位不一致");
+        long id =
+                insert(
+                        "REQUEST",
+                        null,
+                        in.warehouseId(),
+                        null,
+                        null,
+                        "生产工单 " + in.orderNo() + " 材料需求",
+                        in.neededDate());
+        db.sql(
+                        "UPDATE pur_document SET source_type='MANUFACTURING',production_order_id=?,production_order_no=?,production_plan_line_id=? WHERE id=?")
+                .params(in.orderId(), in.orderNo(), in.planLineId(), id)
+                .update();
+        saveRequestLines(id, List.of(new Line(in.materialId(), in.quantity())));
+        audit(id, "PRODUCTION", in.reason(), null);
+        return id;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean hasActive(long orderId) {
+        return db.sql(
+                                "SELECT COUNT(*) FROM pur_document WHERE production_order_id=? AND kind='REQUEST' AND status<>'CANCELLED'")
+                        .param(orderId)
+                        .query(Long.class)
+                        .single()
+                > 0;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> references(long orderId) {
+        var rows =
+                db.sql(
+                                "SELECT d.id,d.document_no,d.status,d.version,d.warehouse_id,d.active_order_id,d.production_plan_line_id,l.material_id,CAST(l.quantity AS CHAR) quantity FROM pur_document d JOIN pur_line l ON l.document_id=d.id WHERE d.production_order_id=? AND d.kind='REQUEST' ORDER BY d.id")
+                        .param(orderId)
+                        .query()
+                        .listOfRows();
+        for (var row : rows) {
+            BigDecimal putaway = BigDecimal.ZERO, returned = BigDecimal.ZERO;
+            boolean closed = false;
+            var downstream = new ArrayList<Map<String, Object>>();
+            for (var o :
+                    db.sql(
+                                    "SELECT id,document_no,status,version FROM pur_document WHERE request_id=? ORDER BY id")
+                            .param(n(row, "id"))
+                            .query()
+                            .listOfRows()) {
+                // Include cancelled order history; a completed receipt can never be silently
+                // released.
+                var f = fulfillment.read(n(o, "id"), n(row, "warehouse_id"));
+                for (var l : f.lines()) {
+                    putaway = putaway.add(new BigDecimal(l.putaway()));
+                    returned = returned.add(new BigDecimal(l.returned()));
+                }
+                o.put("factHash", f.factHash());
+                if ("CLOSED".equals(o.get("status"))) closed = true;
+                downstream.add(o);
+            }
+            row.put("putaway", putaway.toPlainString());
+            row.put("returned", returned.toPlainString());
+            row.put("orders", downstream);
+            row.put(
+                    "outstanding",
+                    "CANCELLED".equals(row.get("status")) || closed
+                            ? "0"
+                            : new BigDecimal(row.get("quantity").toString())
+                                    .subtract(putaway)
+                                    .subtract(returned)
+                                    .max(BigDecimal.ZERO)
+                                    .toPlainString());
+        }
+        return rows;
+    }
 
     @Transactional(readOnly = true)
     public Page list(long warehouse, String kind, int page, int size) {
@@ -80,6 +162,12 @@ public class PurchaseService {
         var d = header(id);
         requireWarehouse(n(d, "warehouse_id"));
         d.put("lines", lines(id));
+        if (d.get("request_id") != null) {
+            var source = header(n(d, "request_id"));
+            d.put("production_order_no", source.get("production_order_no"));
+            d.put("production_order_id", source.get("production_order_id"));
+            d.put("production_plan_line_id", source.get("production_plan_line_id"));
+        }
         d.put("arrangements", arrangements(id, n(d, "warehouse_id"), true));
         if (!isRequest(d)) {
             var facts = fulfillment.read(id, n(d, "warehouse_id"));
@@ -146,6 +234,8 @@ public class PurchaseService {
         String hash = hash("EDIT", id, in);
         Long replay = replay(in.idempotencyKey(), hash);
         if (replay != null) return detail(replay);
+        if ("MANUFACTURING".equals(d.get("source_type")))
+            throw conflict("生产来源需求的物料、数量和日期来自确认快照，不可改写；需要变更请安全取消后回生产重新计算");
         version(d, in.version());
         requireState(d, "DRAFT", "REJECTED");
         if (in.warehouseId() != n(d, "warehouse_id")) throw conflict("建单后不能更换收货仓库");

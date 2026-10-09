@@ -30,6 +30,9 @@ interface Document {
   supplier_name: string | null
   request_id: number | null
   original_order_id?: number | null
+  source_type?: string
+  production_order_no?: string | null
+  production_plan_line_id?: number | null
   created_by: string
   last_edited_by: string
   submitted_by: string | null
@@ -107,6 +110,7 @@ const actions: Record<string, string> = {
   close: '履约结案',
 }
 const auditNames: Record<string, string> = {
+  PRODUCTION: '生产采购建议',
   CREATE: '建单',
   EDIT: '编辑',
   SUBMIT: '提交审核',
@@ -592,6 +596,11 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <p>{{ detail.purpose }}</p>
+      <p v-if="detail.production_order_no" class="hint">
+        生产来源：{{ detail.production_order_no }} · 建议行 #{{
+          detail.production_plan_line_id
+        }}。数量来自已确认快照；仍须完成采购审核。
+      </p>
       <p v-if="detail.original_order_id" class="hint">
         补货原订单：
         <button
@@ -616,7 +625,11 @@ onBeforeUnmount(() => {
         >
           新建关联补货需求
         </button>
-        <button v-if="canEdit" :disabled="blocked" @click="open('edit')">
+        <button
+          v-if="canEdit && detail.source_type !== 'MANUFACTURING'"
+          :disabled="blocked"
+          @click="open('edit')"
+        >
           编辑
         </button>
         <button
