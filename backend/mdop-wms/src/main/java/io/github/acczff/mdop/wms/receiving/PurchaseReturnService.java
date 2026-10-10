@@ -58,14 +58,14 @@ public class PurchaseReturnService {
         access.requireWarehouse(warehouseId);
         return db.sql(
                         """
-            SELECT i.id AS receipt_item_id,r.receipt_no,i.receipt_id,m.code AS material_code,m.name AS material_name,
-                s.name AS supplier_name,l.name AS location_name,i.batch_no,
+            SELECT i.id AS receipt_item_id,r.receipt_no,i.receipt_id,ai.material_code,ai.material_name,
+                a.supplier_name,l.name AS location_name,i.batch_no,
                 CAST(q.rejected_qty AS CHAR) AS rejected_qty,
                 CAST(COALESCE(t.committed,0) AS CHAR) AS committed_qty,
                 CAST(q.rejected_qty-COALESCE(t.committed,0) AS CHAR) AS remaining_qty
             FROM wms_quality_item q JOIN wms_receipt_item i ON i.id=q.receipt_item_id
             JOIN wms_receipt r ON r.id=i.receipt_id JOIN wms_arrival_notice a ON a.id=r.arrival_id
-            JOIN mdm_material m ON m.id=i.material_id JOIN mdm_supplier s ON s.id=a.supplier_id
+            JOIN wms_arrival_notice_item ai ON ai.id=i.arrival_item_id
             JOIN mdm_location l ON l.id=i.location_id
             LEFT JOIN (SELECT receipt_item_id,SUM(quantity) AS committed FROM wms_purchase_return
                 WHERE status IN ('PENDING','APPROVED','RETURNED') GROUP BY receipt_item_id) t ON t.receipt_item_id=i.id

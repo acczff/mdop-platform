@@ -52,7 +52,9 @@ public final class ReceivingModels {
             long supplierId,
             long warehouseId,
             String status,
-            long version) {}
+            long version,
+            String supplierCode,
+            String supplierName) {}
 
     public record ArrivalItem(
             long id,

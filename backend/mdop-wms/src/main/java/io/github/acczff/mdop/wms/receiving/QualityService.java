@@ -66,11 +66,11 @@ public class QualityService {
         access.requireWarehouse(arrival(receipt.arrivalId(), false).warehouseId());
         return db.sql(
                         """
-            SELECT i.id,i.material_id,m.code AS material_code,m.name AS material_name,i.location_id,
+            SELECT i.id,i.material_id,a.material_code,a.material_name,i.location_id,
                    CAST(i.quantity AS CHAR) AS quantity,i.batch_no,i.date_code,i.expiry_date,
                    CAST(q.qualified_qty AS CHAR) AS qualified_qty,CAST(q.rejected_qty AS CHAR) AS rejected_qty,
                    q.putaway_location_id,q.putaway_by,q.putaway_at
-            FROM wms_receipt_item i JOIN mdm_material m ON m.id=i.material_id
+            FROM wms_receipt_item i JOIN wms_arrival_notice_item a ON a.id=i.arrival_item_id
             LEFT JOIN wms_quality_item q ON q.receipt_item_id=i.id
             WHERE i.receipt_id=? ORDER BY i.id
             """)

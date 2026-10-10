@@ -95,6 +95,7 @@
 
 - 提示端口被占用：先查明 `8080` 或 `5173` 的监听程序，不要结束未知进程。
 - 提示 Docker Engine 不可用：启动 Docker Desktop，并检查 `docker version` 与 `docker context show`。
+- Windows 当前用户安装出现缺少 `SOFTWARE\Docker Inc.\Docker Desktop`，或启动反复报 `sailor-ingest.sock` 无法重命名时，可执行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-docker-desktop.ps1 -RecoverStaleSockets -NoDashboard`。脚本从实际安装登记读取路径，固定启动工作目录；引擎已就绪时直接复用，不重启。只有 Docker 进程与 WSL 均已停止、两个运行目录仅含零字节 socket 文件时，才将目录原样改名保留后重建；不处理容器、镜像、数据卷和 WSL 磁盘。遇到其他文件或正在运行的进程会保留现场并报错，不能自动强杀或恢复出厂设置。此方式是当前版本启动问题的可回退处理，不代表已修复 Docker 上游缺陷。
 - 应用未能就绪：查看错误信息列出的 `logs/local/` 日志文件。
 - 提示已有应用正在运行：先执行 `.\mdop.cmd status`，确认后使用 `.\mdop.cmd stop`。
 - 仅需操作基础设施时：使用 [deploy/README.md](../deploy/README.md) 中的底层 Compose 命令。

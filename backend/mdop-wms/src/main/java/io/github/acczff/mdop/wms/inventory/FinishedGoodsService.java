@@ -57,7 +57,7 @@ public class FinishedGoodsService {
     }
 
     private static final String SELECT =
-            "SELECT d.*,CAST(d.quantity AS CHAR) AS amount,m.name AS material_name,m.code AS material_code,m.unit,rl.name AS received_location,sl.name AS stored_location FROM wms_finished_receipt d JOIN mdm_material m ON m.id=d.material_id LEFT JOIN mdm_location rl ON rl.id=d.received_location_id LEFT JOIN mdm_location sl ON sl.id=d.stored_location_id";
+            "SELECT d.*,CAST(d.quantity AS CHAR) AS amount,rl.name AS received_location,sl.name AS stored_location FROM wms_finished_receipt d LEFT JOIN mdm_location rl ON rl.id=d.received_location_id LEFT JOIN mdm_location sl ON sl.id=d.stored_location_id";
 
     public InventoryService.Page list(long warehouse, int page, int size) {
         access.requireWarehouse(warehouse);
@@ -107,14 +107,14 @@ public class FinishedGoodsService {
             return detail(n(old.getFirst(), "id"));
         }
         eligible(in.warehouseId());
-        var m = catalog.material(in.materialId());
+        var m = catalog.referenceMaterial(in.materialId());
         if (m.requireDateCode() && code.isBlank()) throw conflict("此成品必须填写 Date Code");
         if (m.requireExpiry() && in.expiryDate() == null) throw conflict("此成品必须填写有效期");
         if (in.productionDate().isAfter(LocalDate.now(clock))
                 || (in.expiryDate() != null && in.expiryDate().isBefore(in.productionDate())))
             throw conflict("生产日期或有效期不合法");
         db.sql(
-                        "INSERT INTO wms_finished_receipt(demand_no,request_hash,work_order_no,warehouse_id,material_id,quantity,batch_no,date_code,production_date,expiry_date,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")
+                        "INSERT INTO wms_finished_receipt(demand_no,request_hash,work_order_no,warehouse_id,material_id,quantity,batch_no,date_code,production_date,expiry_date,created_by,created_at,material_code,material_name,unit) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
                 .params(
                         in.demandNo(),
                         hash,
@@ -127,7 +127,10 @@ public class FinishedGoodsService {
                         in.productionDate(),
                         in.expiryDate(),
                         actor.currentActor(),
-                        now())
+                        now(),
+                        m.code(),
+                        m.name(),
+                        m.unit())
                 .update();
         return detail(
                 db.sql("SELECT id FROM wms_finished_receipt WHERE demand_no=?")

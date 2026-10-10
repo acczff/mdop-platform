@@ -63,7 +63,7 @@ public class IssueService {
         SELECT d.id,d.demand_no,d.work_order_no,d.warehouse_id,d.target_warehouse_id,d.material_id,
         CAST(d.quantity AS CHAR) AS quantity,CAST(d.consumed_qty AS CHAR) AS consumed_qty,CAST(d.returned_qty AS CHAR) AS returned_qty,CAST(d.quantity-d.consumed_qty-d.returned_qty AS CHAR) AS remaining_qty,d.status,d.source_balance_id,d.target_location_id,d.target_balance_id,
         d.created_by,d.created_at,d.reserved_by,d.reserved_at,d.closed_by,d.closed_at,d.cancel_reason,
-        m.code AS material_code,m.name AS material_name,m.unit,s.name AS warehouse_name,w.name AS target_warehouse_name,
+        d.material_code,d.material_name,d.unit,s.name AS warehouse_name,w.name AS target_warehouse_name,
         b.batch_no,l.name AS source_location,t.name AS target_location
         FROM wms_material_issue d JOIN mdm_material m ON m.id=d.material_id
         JOIN mdm_warehouse s ON s.id=d.warehouse_id JOIN mdm_warehouse w ON w.id=d.target_warehouse_id
@@ -130,13 +130,9 @@ public class IssueService {
             return detail(n(d, "id"));
         }
         eligibleWarehouses(input.warehouseId(), input.targetWarehouseId());
-        if (db.sql("SELECT COUNT(*) FROM mdm_material WHERE id=?")
-                        .param(input.materialId())
-                        .query(Long.class)
-                        .single()
-                == 0) throw conflict("物料不存在");
+        var material = catalog.referenceMaterial(input.materialId());
         db.sql(
-                        "INSERT INTO wms_material_issue(demand_no,work_order_no,warehouse_id,target_warehouse_id,material_id,quantity,created_by,created_at) VALUES(?,?,?,?,?,?,?,?)")
+                        "INSERT INTO wms_material_issue(demand_no,work_order_no,warehouse_id,target_warehouse_id,material_id,quantity,created_by,created_at,material_code,material_name,unit) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
                 .params(
                         input.demandNo(),
                         input.workOrderNo().trim(),
@@ -145,7 +141,10 @@ public class IssueService {
                         input.materialId(),
                         input.quantity(),
                         actor.currentActor(),
-                        now())
+                        now(),
+                        material.code(),
+                        material.name(),
+                        material.unit())
                 .update();
         return detail(
                 db.sql("SELECT id FROM wms_material_issue WHERE demand_no=?")
