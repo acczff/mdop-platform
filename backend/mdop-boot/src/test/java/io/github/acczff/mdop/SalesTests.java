@@ -325,6 +325,18 @@ class SalesTests extends InventoryScenarioSupport {
                                 .isNull())
                 .isFalse();
         postAs(path(id, "cancel"), Map.of("reason", "已发货不可取消"), admin(), 409);
+        long baseline = salesFeedbackMismatches();
+        assertThat(baseline).isZero();
+        // Temporarily hide the simulated feedback; the real audit SQL must detect its absence.
+        try {
+            db.update("UPDATE wms_outbox SET event_type='AuditProbe' WHERE message_id=?", message);
+            assertThat(salesFeedbackMismatches()).isEqualTo(baseline + 1);
+        } finally {
+            db.update(
+                    "UPDATE wms_outbox SET event_type='SalesOutboundConfirmed' WHERE message_id=?",
+                    message);
+        }
+        assertThat(salesFeedbackMismatches()).isEqualTo(baseline);
     }
 
     @Test

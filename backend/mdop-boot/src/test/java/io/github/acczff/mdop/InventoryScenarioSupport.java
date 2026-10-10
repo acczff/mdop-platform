@@ -26,6 +26,18 @@ abstract class InventoryScenarioSupport extends MdopInfrastructureTestBase {
 
     long warehouse, location, material, supplier, arrival, line;
 
+    long salesFeedbackMismatches() throws Exception {
+        return db
+                .queryForList(
+                        java.nio.file.Files.readString(
+                                java.nio.file.Path.of("../../scripts/audit-inventory.sql")))
+                .stream()
+                .filter(row -> "sales_feedback".equals(row.get("check_name")))
+                .mapToLong(row -> ((Number) row.get("mismatch_count")).longValue())
+                .findFirst()
+                .orElseThrow();
+    }
+
     @BeforeEach
     void setup() throws Exception {
         String code = UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT);

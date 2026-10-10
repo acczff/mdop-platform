@@ -93,6 +93,8 @@
 
 `scripts/audit-inventory.sql` 为只读库存对账入口，当前包含 47 项检查，覆盖余额/流水、质量可用量、预占、生产归属、销售、调拨在途/分批收货及冻结状态。应在已确认的目标数据库执行，全部差异为零后再结合业务验收判断，不以单次健康响应代替完整验收。
 
+销售反馈按来源检查：`ERP_SIMULATOR` 已出库必须恰好一条模拟反馈；`MDOP_SALES` 正式来源不应发送模拟反馈，履约通过 ERP 详情中的 WMS 事实和结案快照核对。脚本要求使用匹配当前应用的数据库迁移；不要将新版 SQL 用于尚未升级的旧库。采购/销售联合验收及恢复记录见 [R1 验收报告](../docs/project/R1采购销售联合验收.md)。
+
 - 提示端口被占用：先查明 `8080` 或 `5173` 的监听程序，不要结束未知进程。
 - 提示 Docker Engine 不可用：启动 Docker Desktop，并检查 `docker version` 与 `docker context show`。
 - Windows 当前用户安装出现缺少 `SOFTWARE\Docker Inc.\Docker Desktop`，或启动反复报 `sailor-ingest.sock` 无法重命名时，可执行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-docker-desktop.ps1 -RecoverStaleSockets -NoDashboard`。脚本从实际安装登记读取路径，固定启动工作目录；引擎已就绪时直接复用，不重启。只有 Docker 进程与 WSL 均已停止、两个运行目录仅含零字节 socket 文件时，才将目录原样改名保留后重建；不处理容器、镜像、数据卷和 WSL 磁盘。遇到其他文件或正在运行的进程会保留现场并报错，不能自动强杀或恢复出厂设置。此方式是当前版本启动问题的可回退处理，不代表已修复 Docker 上游缺陷。
