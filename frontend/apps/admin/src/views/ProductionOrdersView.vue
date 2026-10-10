@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ApiError, request, type Page, type Warehouse } from '../api'
+import MaterialPlanPanel from '../components/MaterialPlanPanel.vue'
 
 const props = defineProps<{ authorities: string[]; username: string }>()
 interface Directory {
@@ -149,6 +150,8 @@ const labels: Record<string, string> = {
   REJECT: '驳回',
   CANCEL: '取消工单',
   CANCEL_DEMAND: '取消需求',
+  MATERIAL_CALCULATE: '计算材料需求',
+  MATERIAL_PURCHASE: '确认采购建议',
 }
 const label = (s: string) => labels[s] || s
 let generation = 0,
@@ -353,8 +356,10 @@ async function send() {
   await retry()
 }
 async function retry() {
-  if (busy.value || !pending.value || !pendingPermission.value) return
+  if (locked.value || busy.value || !pending.value || !pendingPermission.value)
+    return
   busy.value = true
+  loading.value = false
   ++generation
   ++detailGeneration
   error.value = ''
@@ -369,7 +374,12 @@ async function retry() {
     detail.value = undefined
     result.value = undefined
     mode.value = ''
-    if (e instanceof ApiError && e.status >= 400 && e.status < 500) {
+    if (
+      e instanceof ApiError &&
+      e.status >= 400 &&
+      e.status < 500 &&
+      ![401, 403].includes(e.status)
+    ) {
       try {
         remember()
       } catch {
@@ -430,7 +440,7 @@ onBeforeUnmount(() => {
     <p v-if="error" role="alert" class="error">{{ error }}</p>
     <div v-if="pending" class="pending" role="status">
       有一笔操作结果待核对。<button
-        :disabled="busy || !pendingPermission"
+        :disabled="locked || busy || !pendingPermission"
         @click="retry"
       >
         原样重试</button
@@ -610,8 +620,15 @@ onBeforeUnmount(() => {
               </tbody>
             </table>
           </div>
-          <p class="muted">原始 BOM 用量依据；尚未展开工单材料需求。</p>
+          <p class="muted">工单批准时固定的 BOM 用量依据。</p>
         </details>
+        <MaterialPlanPanel
+          v-if="['APPROVED', 'CANCELLED'].includes(o.status)"
+          :key="`${o.id}:${o.version}`"
+          :order-id="o.id"
+          :authorities="authorities"
+          :username="username"
+        />
       </article>
       <details>
         <summary>操作历史（{{ detail.history.length }}，最多 1000 条）</summary>

@@ -8,6 +8,27 @@ vi.mock('../api', async (original) => ({
   request: vi.fn(),
 }))
 const base = '/api/v1/manufacturing'
+it.each([401, 403])(
+  'retains unknown production writes after HTTP %s on retry',
+  async (status) => {
+    const key = 'mdop-production-order-pending:planner'
+    const saved = JSON.stringify({
+      url: base + '/demands',
+      method: 'POST',
+      warehouse: 1,
+      body: '{"idempotencyKey":"original"}',
+    })
+    sessionStorage.setItem(key, saved)
+    const v = setup()
+    await flushPromises()
+    vi.mocked(request).mockRejectedValueOnce(new ApiError(status, '权限失效'))
+    await btn(v, '原样重试')!.trigger('click')
+    await flushPromises()
+    expect(sessionStorage.getItem(key)).toBe(saved)
+    expect(v.text()).toContain('结果待核对')
+    v.unmount()
+  },
+)
 const order = {
   id: 2,
   order_no: 'MFG-00000002',

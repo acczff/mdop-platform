@@ -11,6 +11,52 @@ afterEach(() => {
   sessionStorage.clear()
 })
 const base = '/api/v1/manufacturing/boms'
+it.each([401, 403])(
+  'retains unknown BOM writes after HTTP %s on retry',
+  async (status) => {
+    const key = 'mdop-bom-pending:bomuser'
+    const saved = JSON.stringify({
+      url: base,
+      method: 'POST',
+      body: '{"idempotencyKey":"original"}',
+    })
+    sessionStorage.setItem(key, saved)
+    const v = setup()
+    await flushPromises()
+    vi.mocked(request).mockRejectedValueOnce(new ApiError(status, '权限失效'))
+    await button(v, '原样重试').trigger('click')
+    await flushPromises()
+    expect(sessionStorage.getItem(key)).toBe(saved)
+    expect(v.text()).toContain('结果待核对')
+    v.unmount()
+  },
+)
+it('invalidates a pending list read before retrying a rejected BOM write', async () => {
+  sessionStorage.setItem(
+    'mdop-bom-pending:bomuser',
+    JSON.stringify({ url: base, method: 'POST', body: '{}' }),
+  )
+  let resolve!: (value: unknown) => void
+  vi.mocked(request).mockImplementation(async (path, options) => {
+    if (options?.method) throw new ApiError(409, '冲突')
+    if (path.startsWith(base + '?'))
+      return new Promise((done) => {
+        resolve = done
+      })
+    return data(path)
+  })
+  const deferredView = mount(BomsView, {
+    props: { username: 'bomuser', authorities: ['bom:read', 'bom:write'] },
+  })
+  await flushPromises()
+  await button(deferredView, '原样重试').trigger('click')
+  await flushPromises()
+  resolve({ items: [{ ...doc, product_name: '迟到产品' }], total: 1 })
+  await flushPromises()
+  expect(deferredView.text()).not.toContain('迟到产品')
+  expect(deferredView.text()).toContain('操作被拒绝')
+  deferredView.unmount()
+})
 const doc = {
   id: 1,
   product_id: 1,

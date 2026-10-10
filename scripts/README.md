@@ -97,7 +97,10 @@
 
 - 提示端口被占用：先查明 `8080` 或 `5173` 的监听程序，不要结束未知进程。
 - 提示 Docker Engine 不可用：启动 Docker Desktop，并检查 `docker version` 与 `docker context show`。
-- Windows 当前用户安装出现缺少 `SOFTWARE\Docker Inc.\Docker Desktop`，或启动反复报 `sailor-ingest.sock` 无法重命名时，可执行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-docker-desktop.ps1 -RecoverStaleSockets -NoDashboard`。脚本从实际安装登记读取路径，固定启动工作目录；引擎已就绪时直接复用，不重启。只有 Docker 进程与 WSL 均已停止、两个运行目录仅含零字节 socket 文件时，才将目录原样改名保留后重建；不处理容器、镜像、数据卷和 WSL 磁盘。遇到其他文件或正在运行的进程会保留现场并报错，不能自动强杀或恢复出厂设置。此方式是当前版本启动问题的可回退处理，不代表已修复 Docker 上游缺陷。
+- Windows Docker 启动异常：先在开始菜单打开 Docker Desktop，再检查 `docker info` 是否返回服务端版本和 `OSType: linux`。只有客户端版本或命令退出码为零，不足以证明引擎已就绪。
+- 若桌面提示安装登记缺失，或 WSL 挂载 `docker_data.vhdx` 报 `ERROR_PATH_NOT_FOUND`，但从某个应用终端查看文件却存在，先核对是否受 [MSIX 文件和注册表重定向](https://learn.microsoft.com/en-us/windows/msix/desktop/desktop-to-uwp-behind-the-scenes)影响。不要从 Codex 等打包应用的子进程安装、修复或启动 Docker；这可能使配置和磁盘落入应用私有 `LocalCache`，普通桌面进程和 WSL 无法通过同一路径访问。应从正常 Windows 用户会话检查安装登记、实际磁盘路径和 WSL `BasePath`，停止 Docker 后备份并校验磁盘，再修复安装和迁移路径。启动脚本会在读写 Docker 配置前拒绝打包进程环境；不会自动迁移或重置数据。
+- 安装与数据路径已确认正常，仅遇到 `sailor-ingest.sock` 等陈旧 socket 报错时，可在**从开始菜单单独打开的 PowerShell** 中执行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-docker-desktop.ps1 -RecoverStaleSockets -NoDashboard`。脚本固定正确的启动工作目录；引擎已就绪时复用，不重启。只有 Docker 进程与 WSL 均已停止、运行目录仅含零字节 socket 文件时，才将目录原样改名保留后重建；不处理容器、镜像、数据卷和 WSL 磁盘。其他文件或正在运行的进程会阻止恢复。该脚本不能修复安装缺失或磁盘路径错误，不应将这些问题统称为 Docker 上游缺陷。
+- 启动检查的 Windows 回归测试：`powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\docker-startup-checks.test.ps1`。测试使用临时模拟 CLI，覆盖空响应、仅客户端信息、缺失服务端版本、错误输出、超时及正常响应，不启动 Docker。
 - 应用未能就绪：查看错误信息列出的 `logs/local/` 日志文件。
 - 提示已有应用正在运行：先执行 `.\mdop.cmd status`，确认后使用 `.\mdop.cmd stop`。
 - 仅需操作基础设施时：使用 [deploy/README.md](../deploy/README.md) 中的底层 Compose 命令。

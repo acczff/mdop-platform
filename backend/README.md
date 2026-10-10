@@ -16,6 +16,8 @@
 - `mdop-integration`
 - `mdop-test-support`
 
+生产模块通过公共契约读取 WMS 可用参考、生成带工单来源的采购需求草稿；材料计算不直接改库存。接口、事务和数量口径见[材料需求实现](../docs/erp/材料需求实现与验收.md)。
+
 ## 共享基础设施测试
 
 `mdop-test-support` 集中提供 MySQL、RabbitMQ 和 Redis 的 Testcontainers 测试基座。测试使用固定镜像版本、随机宿主机端口和运行时临时凭据，不依赖本地 Compose、固定容器或 `.env.local`。

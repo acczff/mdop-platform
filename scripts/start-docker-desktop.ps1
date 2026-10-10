@@ -5,6 +5,9 @@ param(
     [ValidateRange(10, 180)] [int] $TimeoutSeconds = 60
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'docker-startup-checks.ps1')
+# Must run before any registry lookup, AppData write, or child process launch.
+Assert-UnpackagedDockerStartup
 $install = Get-ItemProperty 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Docker Desktop' -ErrorAction SilentlyContinue
 if (-not $install) {
     $install = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Docker Desktop' -ErrorAction Stop
@@ -24,19 +27,7 @@ try {
     throw 'Another Docker startup check is in progress. Wait for it to finish.'
 }
 function Test-Engine {
-    # Process APIs avoid Windows PowerShell treating native stderr as a terminating error.
-    $info = New-Object Diagnostics.ProcessStartInfo
-    $info.FileName = $docker
-    $info.Arguments = 'info --format "{{.OSType}}"'
-    $info.UseShellExecute = $false
-    $info.CreateNoWindow = $true
-    $info.RedirectStandardOutput = $true
-    $info.RedirectStandardError = $true
-    $probe = [Diagnostics.Process]::Start($info)
-    if (-not $probe.WaitForExit(5000)) { $probe.Kill(); $probe.Dispose(); return $false }
-    $ok = $probe.ExitCode -eq 0
-    $probe.Dispose()
-    return $ok
+    Test-DockerEngine -DockerPath $docker
 }
 function Docker-Processes {
     @(Get-Process -Name 'Docker Desktop','com.docker.backend','com.docker.build','com.docker.service','docker-desktop' -ErrorAction SilentlyContinue)

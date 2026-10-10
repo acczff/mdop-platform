@@ -30,6 +30,7 @@ public class ProductionOrderService implements ProductionDemandUsage {
     private final CurrentActorProvider actor;
     private final Clock clock;
     private final ObjectMapper json;
+    private final ProductionPurchasePort purchasing;
 
     public ProductionOrderService(
             JdbcClient db,
@@ -38,7 +39,8 @@ public class ProductionOrderService implements ProductionDemandUsage {
             SalesDemandSource sales,
             CurrentActorProvider actor,
             Clock clock,
-            ObjectMapper json) {
+            ObjectMapper json,
+            ProductionPurchasePort purchasing) {
         this.db = db;
         this.catalog = catalog;
         this.boms = boms;
@@ -46,6 +48,7 @@ public class ProductionOrderService implements ProductionDemandUsage {
         this.actor = actor;
         this.clock = clock;
         this.json = json;
+        this.purchasing = purchasing;
     }
 
     public record Page(List<Map<String, Object>> items, long total, int page, int size) {}
@@ -274,8 +277,8 @@ public class ProductionOrderService implements ProductionDemandUsage {
             }
             default -> {
                 state(o, "DRAFT", "REJECTED", "SUBMITTED", "APPROVED");
-                // This slice has no downstream dispatch; MFG- numbers are rejected by legacy
-                // inputs.
+                if (purchasing.hasActive(orderId))
+                    throw conflict("请先安全取消关联采购订单和采购需求；有效供给未释放，不能取消工单");
                 next = "CANCELLED";
                 touchDemand(id);
             }

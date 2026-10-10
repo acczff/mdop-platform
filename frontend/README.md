@@ -27,6 +27,8 @@ frontend
 
 admin 应用的职责、源码结构和验证方式见 [apps/admin/README.md](apps/admin/README.md)。
 
+生产工单中的 `MaterialPlanPanel` 承载材料需求核对和采购建议确认，复用统一请求客户端并保留未知写入的原请求。业务口径及页面边界见[材料需求实现](../docs/erp/材料需求实现与验收.md)。
+
 ## 首次准备
 
 在仓库根目录执行（无需修改全局 Corepack 安装）：

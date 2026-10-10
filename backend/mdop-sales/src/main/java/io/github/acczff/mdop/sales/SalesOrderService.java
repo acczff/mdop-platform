@@ -373,7 +373,8 @@ public class SalesOrderService {
                     approve
                             ? catalog.referenceMaterial(n(l, "material_id"))
                             : catalog.availableMaterial(n(l, "material_id"));
-            if (!refresh && !m.unit().equals(l.get("unit"))) throw conflict("单位在授权前发生变化，请驳回重新核对数量");
+            if (!m.unit().equals(l.get("unit")))
+                throw conflict("物料基本单位已变化，请在草稿或驳回状态编辑并重新核对数量；待审核单请先驳回");
             if (refresh)
                 db.sql("UPDATE sal_line SET material_code=?,material_name=?,unit=? WHERE id=?")
                         .params(m.code(), m.name(), m.unit(), n(l, "id"))

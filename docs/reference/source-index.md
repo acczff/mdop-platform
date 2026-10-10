@@ -62,6 +62,7 @@
 | [IssueFeedbackController.java](../../backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/IssueFeedbackController.java) | `/api/integration/material-issues` | 1 | — |
 | [SalesFeedbackController.java](../../backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/SalesFeedbackController.java) | `/api/integration/sales-orders` | 1 | — |
 | [BomController.java](../../backend/mdop-manufacturing/src/main/java/io/github/acczff/mdop/manufacturing/BomController.java) | `/api/v1/manufacturing/boms` | 6 | — |
+| [MaterialPlanController.java](../../backend/mdop-manufacturing/src/main/java/io/github/acczff/mdop/manufacturing/MaterialPlanController.java) | `/api/v1/manufacturing/orders/{id}/materials` | 3 | — |
 | [ProductionOrderController.java](../../backend/mdop-manufacturing/src/main/java/io/github/acczff/mdop/manufacturing/ProductionOrderController.java) | `/api/v1/manufacturing` | 8 | — |
 | [CatalogController.java](../../backend/mdop-master-data/src/main/java/io/github/acczff/mdop/masterdata/catalog/CatalogController.java) | `/api/master-data` | 10 | — |
 | [WarehouseController.java](../../backend/mdop-master-data/src/main/java/io/github/acczff/mdop/masterdata/warehouse/api/WarehouseController.java) | `/api/master-data/warehouses` | 5 | — |
@@ -130,3 +131,4 @@
 | [V202610090008__bom_versions.sql](../../backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610090008__bom_versions.sql) | mdop-manufacturing |
 | [V202610090009__production_sites.sql](../../backend/mdop-master-data/src/main/resources/db/migration/masterdata/V202610090009__production_sites.sql) | mdop-master-data |
 | [V202610090010__production_orders.sql](../../backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610090010__production_orders.sql) | mdop-manufacturing |
+| [V202610090011__material_planning.sql](../../backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610090011__material_planning.sql) | mdop-manufacturing |
