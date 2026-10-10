@@ -21,6 +21,10 @@
   <dependencies>
     <dependency>
       <groupId>io.github.acczff.mdop</groupId>
+      <artifactId>mdop-sales</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.github.acczff.mdop</groupId>
       <artifactId>mdop-purchasing</artifactId>
     </dependency>
     <dependency>

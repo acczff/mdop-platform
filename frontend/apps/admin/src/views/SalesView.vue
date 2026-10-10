@@ -4,6 +4,8 @@ import { request, type Page, type Warehouse } from '../api'
 const props = defineProps<{ authorities: string[]; username: string }>()
 interface Sale {
   id: number
+  warehouse_id: number
+  source_system?: string
   demand_no: string
   sales_order_no: string
   customer_reference: string
@@ -37,6 +39,7 @@ const warehouses = ref<Warehouse[]>([]),
   notice = ref(''),
   simulator = ref(false),
   materials = ref<{ id: number; code: string; name: string }[]>([])
+const linkedSale = ref(0)
 const modal = ref<
     'create' | 'reserve' | 'pick' | 'review' | 'ship' | 'cancel' | 'history'
   >(),
@@ -126,10 +129,29 @@ async function load(page = 0) {
   result.value = undefined
   modal.value = undefined
   row.value = undefined
+  if (linkedSale.value) {
+    const sale = await request<Sale>(
+      `/api/v1/wms/sales-orders/${linkedSale.value}`,
+    )
+    if (sale.warehouse_id !== warehouse.value)
+      throw new Error('执行单与所选仓库不一致，请核对来源链接')
+    result.value = {
+      items: [sale],
+      page: 0,
+      size: 20,
+      totalElements: 1,
+      totalPages: 1,
+    }
+    return
+  }
   if (warehouse.value)
     result.value = await request(
       `/api/v1/wms/sales-orders?warehouseId=${warehouse.value}&page=${page}&size=20`,
     )
+}
+function showAll() {
+  linkedSale.value = 0
+  void perform(() => load())
 }
 async function open(type: typeof modal.value, r?: Sale) {
   await perform(async () => {
@@ -155,9 +177,10 @@ async function open(type: typeof modal.value, r?: Sale) {
       reservations.value = await request(
         `/api/v1/wms/sales-orders/${r!.id}/reservations`,
       )
-      feedback.value = await request(
-        `/api/integration/sales-orders/${r!.id}/feedback`,
-      )
+      feedback.value =
+        r!.source_system === 'MDOP_SALES'
+          ? []
+          : await request(`/api/integration/sales-orders/${r!.id}/feedback`)
     }
     modal.value = type
     row.value = r
@@ -217,7 +240,9 @@ async function submit() {
     modal.value = undefined
     notice.value =
       type === 'ship'
-        ? '实际出库已记账，ERP 反馈已进入发送队列。'
+        ? row.value?.source_system === 'MDOP_SALES'
+          ? '实际出库已记账，销售订单可核对最新履约数量。'
+          : '实际出库已记账，ERP 反馈已进入发送队列。'
         : type === 'cancel'
           ? '单据已取消，已释放预占。'
           : '操作已保存，请按单据状态继续处理。'
@@ -242,6 +267,19 @@ onMounted(() =>
       if (page >= data.totalPages) break
     }
     warehouse.value = warehouses.value[0]?.id || 0
+    const query = new URLSearchParams(window.location.search)
+    if (query.has('salesOrderId') || query.has('warehouseId')) {
+      const selectedWarehouse = Number(query.get('warehouseId'))
+      const selectedSale = Number(query.get('salesOrderId'))
+      if (
+        !Number.isSafeInteger(selectedSale) ||
+        selectedSale <= 0 ||
+        !warehouses.value.some((w) => w.id === selectedWarehouse)
+      )
+        throw new Error('来源链接无效或没有该仓库权限')
+      warehouse.value = selectedWarehouse
+      linkedSale.value = selectedSale
+    }
     if (
       props.authorities.includes('ROLE_ADMIN') ||
       props.authorities.includes('integration:simulate')
@@ -279,16 +317,15 @@ onMounted(() =>
     <p v-if="notice" role="status">{{ notice }}</p>
     <section class="panel filters">
       <label
-        >成品仓<select
-          v-model="warehouse"
-          :disabled="busy"
-          @change="perform(() => load())"
-        >
+        >成品仓<select v-model="warehouse" :disabled="busy" @change="showAll">
           <option v-for="w in warehouses" :key="w.id" :value="w.id">
             {{ w.name }}
           </option>
         </select></label
       ><button :disabled="busy" @click="perform(() => load())">刷新</button>
+      <button v-if="linkedSale" :disabled="busy" @click="showAll">
+        查看全部出库单
+      </button>
     </section>
     <p v-if="!warehouse">请先维护成品仓并配置仓库权限。</p>
     <section class="panel">
@@ -308,6 +345,11 @@ onMounted(() =>
                 SO-{{ r.id
                 }}<small>{{ r.demand_no }} · {{ r.sales_order_no }}</small
                 ><small>{{ r.customer_reference }}</small>
+                <small>{{
+                  r.source_system === 'MDOP_SALES'
+                    ? '正式销售订单'
+                    : '模拟 ERP 来源'
+                }}</small>
               </td>
               <td>
                 {{ r.material_name
@@ -425,7 +467,10 @@ onMounted(() =>
             </li>
           </ul>
           <h3>ERP 出库反馈</h3>
-          <p v-if="!feedback.length">实际出库后生成反馈。</p>
+          <p v-if="row?.source_system === 'MDOP_SALES'">
+            正式销售订单直接核对已提交的出库事实，无模拟 ERP 反馈队列。
+          </p>
+          <p v-else-if="!feedback.length">实际出库后生成反馈。</p>
           <ul>
             <li v-for="f in feedback" :key="f.message_id">
               {{ names[f.status] }} ·
@@ -507,8 +552,7 @@ onMounted(() =>
               >取消原因<textarea v-model="reason" required maxlength="500" />
             </label>
             <p v-if="modal === 'ship'">
-              确认实物已经出库。本操作扣减现有库存并发送 ERP
-              反馈，完成后不可取消。
+              确认实物已经出库。本操作扣减现有库存并记录出库事实，完成后不可取消。
             </p>
             <p v-if="modal === 'cancel'">
               已拣货时，应先核对实物已归还原库位，再释放预占。

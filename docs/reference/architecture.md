@@ -14,11 +14,14 @@
 | `mdop-system` | 账号持久化、角色、初始化、权限修改和审计 | `AccountService`、`PermissionCatalog` |
 | `mdop-master-data` | 仓库聚合及供应商、物料、库位目录 | `WarehouseService`、`CatalogService` |
 | `mdop-purchasing` | 采购需求、订单、异人审核、来源和审计 | `PurchaseService`、`PurchaseController`；不写 WMS 库存 |
+| `mdop-sales` | 客户订单、分批发货授权、数量履约与结案 | `SalesOrderService`、`SalesFulfillment`；只通过公共契约读取 WMS 事实 |
 | `mdop-wms` | 收货、库存、生产协同、出入库与操作规则 | `receiving`、`inventory` 两个实际包 |
 | `mdop-integration` | 消息发布、消费、重试、重放与模拟接收 | `DeliveryService`、`DeliveryWorker`、各 Listener |
 | `mdop-test-support` | Testcontainers 共享隔离基础设施 | `MdopInfrastructureTestBase`；应用仅测试依赖 |
 
 采购到货使用 `common/PurchaseReceivingPort` 契约，由 `integration/PurchaseReceivingAdapter` 转给 WMS `PurchaseArrivalService`。当前同进程同库：采购安排/映射与 WMS 通知送达、撤回均加入调用方事务；采购不读写 WMS 表。WMS 正式采购收货按“仓库→通知”锁顺序与撤回协调。待送达安排及失败原因归采购自身持久化，显式送达/重试；这条本地链路不经过模拟 ERP 或 RabbitMQ，不宣称已实现远程可靠投递。
+
+销售使用 `common/SalesShippingPort`、`integration/SalesShippingAdapter` 与 WMS `SalesDispatchService`。订单行→单行发货安排→WMS 单批次执行保持稳定 ID 和载荷摘要；来源 `MDOP_SALES` 与 `ERP_SIMULATOR` 分离。审批锁定物料单位，送达保留已批准名称快照。预占、拣货、异人复核仍由 WMS 执行，只有 `SALES_OUT` 流水形成已发量；核对执行状态、来源库存、数量和操作者后才保存 `sal_closure`。仓库锁协调并发撤回/出库/结案；正式销售不投递给旧模拟 ERP 消费者。详见[销售实现](../erp/销售实现与验收.md)。
 
 ```mermaid
 flowchart LR
@@ -27,6 +30,9 @@ flowchart LR
   BOOT --> SYS[System 账号]
   BOOT --> WMS[WMS 业务]
   BOOT --> PUR[Purchasing 采购]
+  BOOT --> SAL[Sales 销售]
+  SAL --> MDM
+  SAL --> DB
   PUR --> MDM
   PUR --> DB
   BOOT --> INT[Integration 消息]

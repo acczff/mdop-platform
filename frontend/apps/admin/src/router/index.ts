@@ -4,6 +4,10 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
+      path: '/sales-orders',
+      component: () => import('../views/SalesOrdersView.vue'),
+    },
+    {
       path: '/purchasing',
       component: () => import('../views/PurchasingView.vue'),
     },

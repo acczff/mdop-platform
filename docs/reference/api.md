@@ -73,6 +73,21 @@
 
 采购 P3 的同一详情接口返回 `fulfillment`（逐行数量字符串、来源 `notices`、`blockers`、`canClose`、`outcome`）、`closure`（不可变快照、原因、操作者/时间）和 `closureMatches`。POST `/api/v1/purchasing/documents/{id}/actions/close` 使用原动作请求和 `purchasing:write` 权限；服务端重查事实，不接受客户端累计数或 `canClose`。少收、未决差异、待检/上架/退供、版本/来源冲突均返回 409。结案为 `CLOSED`，结果 `QUALIFIED` 或 `WITH_RETURNS`；`closureMatches=false` 表示需核对，不能覆盖原快照。详细口径见[采购 P3](../erp/采购P3实现与验收.md)。
 
+## 销售订单与发货安排
+
+入口 `/api/v1/sales/documents`。GET 列表带 `warehouseId`、零基 `page`、`size`，返回 `items/total/page/size`；GET `/{id}` 返回订单、`lines`、`arrangements`、`fulfillment`、`closure`、`closureMatches` 和审计。角色 `SALES_OPERATOR` 拥有 `sales:read/write`，`SALES_REVIEWER` 拥有 `sales:read/review`；每次均校验仓库范围。两个销售角色不能同账号授予，旧账号不会因角色目录扩展自动获得权限。
+
+| 动作 | 路径与请求要点 |
+|---|---|
+| 新建 / 编辑 | POST 根路径 / PUT `/{id}`；`idempotencyKey,warehouseId,customerId,purpose,neededDate,customerReference?,lines[{materialId,quantity}]`；编辑还需 `version,reason` |
+| 提交 / 审批 / 驳回 / 取消 / 结案 | POST `/{id}/actions/{submit,approve,reject,cancel,close}`；`idempotencyKey,version,reason` |
+| 安排发货 | POST `/{id}/arrangements`；`idempotencyKey,version,orderLineId,quantity,expectedDate,reason`；一次一行，不接受客户端累计数 |
+| 送达 / 撤回 | POST `/{id}/arrangements/{arrangementId}/{deliver,withdraw}`；`idempotencyKey,version,reason` |
+
+已批准订单不允许改客户、仓库和数量。PENDING 安排包含尚未送达和失败待重试，继续占授权；WITHDRAWN 才释放。详情的 WMS 引用、批次、状态及实际数量用于跟踪，`fulfillment.lines` 给出 ordered/allocated/shipped/remaining 字符串。服务端重算结案门禁与流水，客户端 `canClose` 只控制展示。`closureMatches=false` 不覆盖原结案快照。正式销售不使用 `/api/local/sales-orders` 建单；该接口仅保留旧模拟来源，并拒绝 `MDOP-SALES-` 保留前缀。
+
+## 重试与模拟边界
+
 带幂等键的接口重试须复用原键和原业务载荷；版本冲突先读最新状态。有些操作仅由状态/版本控制，账号创建、授权等并不提供通用幂等键。账号写入网络失败、409、5xx 或解析失败后必须成功刷新核对，不能通过关闭弹窗绕过限制。
 
 `/api/local/*` 仅在 `local`/`test` 下启用，并需模拟权限；模拟接口与消息管理员的能力不能当作细粒度业务仓库隔离。真正的外部接入还需单独确定身份、签名、契约、重试和对账责任，不开放这些模拟端点代替生产集成。
