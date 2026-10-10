@@ -41,6 +41,130 @@ const doc = {
   related: [],
   history: [],
 }
+
+it('submits closure with the original parent version and preserves an uncertain result', async () => {
+  const order = {
+    ...doc,
+    kind: 'ORDER',
+    status: 'FULFILLING',
+    fulfillment: {
+      lines: [],
+      notices: [],
+      blockers: [],
+      canClose: true,
+      outcome: 'WITH_RETURNS',
+      factHash: 'checked',
+    },
+  }
+  const view = setup()
+  vi.mocked(request).mockImplementation(async (path, options) => {
+    if (options?.method) throw new ApiError(503, '响应丢失')
+    if (path === `${base}/10`) return order
+    return data(path)
+  })
+  await flushPromises()
+  await button(view, '查看').trigger('click')
+  await flushPromises()
+  await button(view, '确认履约结案').trigger('click')
+  await view.get('textarea').setValue('已完成实物交接')
+  await view.get('form').trigger('submit')
+  await flushPromises()
+  const saved = JSON.parse(
+    sessionStorage.getItem('mdop-purchasing-pending:buyer')!,
+  )
+  expect(saved.url).toBe(`${base}/10/actions/close`)
+  expect(JSON.parse(saved.body)).toMatchObject({
+    version: 3,
+    reason: '已完成实物交接',
+  })
+  expect(view.text()).toContain('结果待核对')
+  expect(view.find('[aria-label="采购履约"]').exists()).toBe(false)
+  expect(view.get('fieldset').attributes('disabled')).toBeDefined()
+  view.unmount()
+})
+it('creates an independently approved replacement with a fixed original order and keeps uncertain payload', async () => {
+  const order = {
+    ...doc,
+    kind: 'ORDER',
+    status: 'CLOSED',
+    document_no: 'PO-ORIGINAL',
+    fulfillment: {
+      lines: [
+        {
+          orderLineId: 8,
+          code: 'M01',
+          unit: '千克',
+          ordered: '20',
+          received: '20',
+          reversed: '0',
+          netReceived: '20',
+          remaining: '0',
+          pendingInspection: '0',
+          pendingPutaway: '0',
+          putaway: '0',
+          rejectedPendingReturn: '0',
+          returned: '20',
+        },
+      ],
+      notices: [],
+      blockers: [],
+      canClose: true,
+      outcome: 'WITH_RETURNS',
+      factHash: 'fixed',
+    },
+  }
+  const view = setup()
+  vi.mocked(request).mockImplementation(async (path, options) => {
+    if (options?.method) throw new ApiError(503, '响应丢失')
+    if (path === `${base}/10`) return order
+    return data(path)
+  })
+  await flushPromises()
+  await button(view, '查看').trigger('click')
+  await flushPromises()
+  await button(view, '新建关联补货需求').trigger('click')
+  expect(view.text()).toContain('补货原订单 #10')
+  expect(
+    (view.get('.draft-line input').element as HTMLInputElement).value,
+  ).toBe('')
+  await view.get('input[type="date"]').setValue('2026-11-01')
+  await view.get('.draft-line select').setValue('2')
+  await view.get('.draft-line input').setValue('20')
+  await view.get('form').trigger('submit')
+  await flushPromises()
+  const saved = JSON.parse(
+    sessionStorage.getItem('mdop-purchasing-pending:buyer')!,
+  )
+  expect(saved.url).toBe(base)
+  expect(JSON.parse(saved.body)).toMatchObject({
+    originalOrderId: 10,
+    purpose: '原订单 PO-ORIGINAL 退供后补货',
+  })
+  expect(view.text()).toContain('结果待核对')
+  view.unmount()
+})
+
+it('shows the original order link without offering replacement actions to readers', async () => {
+  const view = setup([])
+  vi.mocked(request).mockImplementation(async (path) =>
+    path === `${base}/10`
+      ? {
+          ...doc,
+          original_order_id: 4,
+          related: [{ id: 4, document_no: 'PO-SOURCE', status: 'CLOSED' }],
+        }
+      : data(path),
+  )
+  await flushPromises()
+  await button(view, '查看').trigger('click')
+  await flushPromises()
+  expect(button(view, '新建关联补货需求')).toBeUndefined()
+  await button(view, 'PO-SOURCE').trigger('click')
+  await flushPromises()
+  expect(request).toHaveBeenCalledWith(`${base}/4`)
+  view.unmount()
+})
+
 async function data(path: string) {
   if (path.includes('/warehouses?'))
     return {

@@ -303,6 +303,7 @@ public class PurchaseReturnService {
                         .param(id)
                         .query(Long.class)
                         .single();
+        PurchaseArrivalLock.acquire(db, access, arrivalId);
         db.sql("SELECT id FROM wms_arrival_notice WHERE id=? FOR UPDATE")
                 .param(arrivalId)
                 .query(Long.class)

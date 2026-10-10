@@ -2,6 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ApiError, request, type Page, type Warehouse } from '../api'
 import { remaining, scaled } from '../quantity'
+import PurchaseFulfillmentPanel from '../components/PurchaseFulfillmentPanel.vue'
+import type { Fulfillment, Closure } from '../purchasing'
 
 const props = defineProps<{ authorities: string[]; username: string }>()
 type Kind = 'REQUEST' | 'ORDER'
@@ -27,6 +29,7 @@ interface Document {
   supplier_id: number | null
   supplier_name: string | null
   request_id: number | null
+  original_order_id?: number | null
   created_by: string
   last_edited_by: string
   submitted_by: string | null
@@ -42,6 +45,9 @@ interface Document {
   }[]
   related: { id: number; document_no: string; status: string }[]
   arrangements?: Arrangement[]
+  fulfillment?: Fulfillment
+  closure?: Closure | null
+  closureMatches?: boolean
 }
 interface Arrangement {
   id: number
@@ -84,6 +90,7 @@ const statuses: Record<string, string> = {
   CONVERTED: '已转单',
   CANCELLED: '已取消',
   FULFILLING: '履约中',
+  CLOSED: '已结案',
   PENDING: '待送达',
   DELIVERED: '已送达',
   WITHDRAWN: '已撤回',
@@ -97,6 +104,7 @@ const actions: Record<string, string> = {
   arrange: '安排到货',
   deliver: '送达 WMS',
   withdraw: '撤回安排',
+  close: '履约结案',
 }
 const auditNames: Record<string, string> = {
   CREATE: '建单',
@@ -111,6 +119,7 @@ const auditNames: Record<string, string> = {
   DELIVER: '送达 WMS',
   WITHDRAW: '撤回安排',
   DELIVERY_FAILED: '送达失败',
+  CLOSE: '履约结案',
 }
 const kind = ref<Kind>('REQUEST'),
   warehouse = ref(0),
@@ -138,6 +147,13 @@ const draft = ref({
 const storageKey = `mdop-purchasing-pending:${props.username}`
 const pending = ref<Pending>()
 const arrangementId = ref(0)
+const originalOrderId = ref<number | null>(null)
+const canReplenish = computed(
+  () =>
+    writable.value &&
+    detail.value?.kind === 'ORDER' &&
+    detail.value.fulfillment?.lines.some((l) => scaled(l.returned) > 0n),
+)
 const arrangementLines = ref<{ orderLineId: number; quantity: string }[]>([])
 const canReceive = computed(() =>
   props.authorities.includes('wms:arrival:read'),
@@ -254,10 +270,12 @@ function open(value: string, target = 0) {
   reason.value = ''
   formError.value = ''
   const d = detail.value
+  originalOrderId.value =
+    value === 'create' ? target || null : d?.original_order_id || null
   draft.value =
     value === 'create'
       ? {
-          purpose: '',
+          purpose: target && d ? `原订单 ${d.document_no} 退供后补货` : '',
           neededDate: '',
           supplierId: 0,
           lines: [{ materialId: 0, quantity: '' }],
@@ -290,6 +308,7 @@ function describeSnapshot(raw: string | null) {
       d.purpose,
       `${d.warehouse_name} · ${d.needed_date}`,
       d.supplier_name,
+      d.original_order_id ? `补货原订单 #${d.original_order_id}` : '',
       ...d.lines.map(
         (l) =>
           `${l.material_code} · ${l.material_name}：${l.quantity} ${l.unit}`,
@@ -318,6 +337,7 @@ async function send() {
       purpose: draft.value.purpose,
       neededDate: draft.value.neededDate,
       lines: draft.value.lines,
+      originalOrderId: originalOrderId.value,
     }
     if (mode.value === 'edit' && d) {
       url += `/${d.id}`
@@ -572,11 +592,30 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <p>{{ detail.purpose }}</p>
+      <p v-if="detail.original_order_id" class="hint">
+        补货原订单：
+        <button
+          :disabled="blocked"
+          @click="openDetail(detail.original_order_id)"
+        >
+          {{
+            detail.related.find((d) => d.id === detail?.original_order_id)
+              ?.document_no || `#${detail.original_order_id}`
+          }}
+        </button>
+      </p>
       <p class="hint">
         {{ detail.warehouse_name }} · {{ detail.needed_date
         }}{{ detail.supplier_name ? ' · ' + detail.supplier_name : '' }}
       </p>
       <div class="detail-actions">
+        <button
+          v-if="canReplenish"
+          :disabled="blocked"
+          @click="open('create', detail.id)"
+        >
+          新建关联补货需求
+        </button>
         <button v-if="canEdit" :disabled="blocked" @click="open('edit')">
           编辑
         </button>
@@ -665,6 +704,17 @@ onBeforeUnmount(() => {
           </tbody>
         </table>
       </div>
+      <PurchaseFulfillmentPanel
+        v-if="detail.fulfillment"
+        :value="detail.fulfillment"
+        :closure="detail.closure"
+        :matches="detail.closureMatches !== false"
+        :can-write="writable && detail.status === 'FULFILLING'"
+        :blocked="blocked"
+        :authorities="authorities"
+        @refresh="openDetail(detail.id)"
+        @close="open('close')"
+      />
       <section v-if="detail.kind === 'ORDER'" class="arrangements">
         <div class="detail-heading">
           <h2>到货安排</h2>
@@ -788,11 +838,22 @@ onBeforeUnmount(() => {
           }}
         </h2>
         <p v-if="formError" class="error" role="alert">{{ formError }}</p>
+        <p
+          v-if="originalOrderId && ['create', 'edit'].includes(mode)"
+          class="hint"
+        >
+          补货原订单 #{{
+            originalOrderId
+          }}，建单后保留关联。数量需人工填写并重新审批，不恢复原单额度。
+        </p>
         <p v-if="mode === 'cancel'" class="hint">
           取消保留原单和历史。采购订单取消成功后，对应需求可重新转单。
         </p>
         <p v-if="mode === 'convert'" class="hint">
           按已批准需求整单转入一个供应商，数量与单位保持不变。
+        </p>
+        <p v-if="mode === 'close'" class="hint">
+          结案按当前收货、质量、上架及实际退供事实核对并保存快照。含退供不等于全部合格，不恢复补货额度，也不代表财务结清。
         </p>
         <p v-if="mode === 'withdraw'" class="hint">
           只有没有任何收货记录（含草稿）的安排才能撤回；WMS

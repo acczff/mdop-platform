@@ -30,6 +30,29 @@ public interface PurchaseReceivingPort {
 
     record Delivery(long arrivalId, String status, List<Mapping> lines, List<Receipt> receipts) {}
 
+    record Fact(
+            long arrangementLineId,
+            long receiptId,
+            String receiptNumber,
+            long receiptItemId,
+            String status,
+            String correctionStatus,
+            String stage,
+            String quantity,
+            String qualityReference,
+            String qualified,
+            String rejected,
+            Long putawayLocation) {}
+
+    record CaseFact(long id, String kind, Long receiptId, String status, String reason) {}
+
+    record ReturnFact(
+            long id, long receiptItemId, String quantity, String status, String handover) {}
+
+    record Fulfillment(List<Fact> receipts, List<CaseFact> cases, List<ReturnFact> returns) {}
+
+    Fulfillment fulfillment(long warehouseId, long arrangementId);
+
     Delivery deliver(Notice notice);
 
     Delivery view(long warehouseId, long arrangementId);
