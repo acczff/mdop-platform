@@ -15,6 +15,7 @@ spring:
     locations:
       - classpath:db/migration/system
       - classpath:db/migration/masterdata
+      - classpath:db/migration/purchasing
       - classpath:db/migration/wms
       - classpath:db/migration/integration
     encoding: UTF-8

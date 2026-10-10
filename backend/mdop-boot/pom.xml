@@ -20,6 +20,10 @@
 
   <dependencies>
     <dependency>
+      <groupId>io.github.acczff.mdop</groupId>
+      <artifactId>mdop-purchasing</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-webmvc</artifactId>
     </dependency>

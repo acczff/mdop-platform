@@ -25,6 +25,7 @@
     <module>mdop-security</module>
     <module>mdop-system</module>
     <module>mdop-master-data</module>
+    <module>mdop-purchasing</module>
     <module>mdop-wms</module>
     <module>mdop-integration</module>
     <module>mdop-test-support</module>
@@ -40,6 +41,11 @@
 
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>mdop-purchasing</artifactId>
+        <version>${project.version}</version>
+      </dependency>
       <dependency>
         <groupId>${project.groupId}</groupId>
         <artifactId>mdop-common</artifactId>

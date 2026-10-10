@@ -33,6 +33,8 @@
 
 ## 工程与长期设计
 
+- [采购 P1：需求与订单](erp/采购P1实现与验收.md)：当前采购候选实现的状态、权限、幂等和验收边界；到货衔接与履约结案仍待后续工作包。
+
 - [后端](../backend/README.md)、[前端工作区](../frontend/README.md)、[管理端](../frontend/apps/admin/README.md)。
 - [I0 工程基线](project/I0工程基线方案.md)：保留初始设计与演进记录，实际目录以源码导航为准。
 - [Java 25 决策](adr/ADR-0001-采用Java25作为项目基线.md)。

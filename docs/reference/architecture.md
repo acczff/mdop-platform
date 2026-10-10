@@ -11,6 +11,7 @@
 | `mdop-security` | Session/CSRF、认证配置、逐请求账号版本校验 | `MdopSecurityConfiguration`、`AccountSessionFilter` |
 | `mdop-system` | 账号持久化、角色、初始化、权限修改和审计 | `AccountService`、`PermissionCatalog` |
 | `mdop-master-data` | 仓库聚合及供应商、物料、库位目录 | `WarehouseService`、`CatalogService` |
+| `mdop-purchasing` | 采购需求、订单、异人审核、来源和审计 | `PurchaseService`、`PurchaseController`；不写 WMS 库存 |
 | `mdop-wms` | 收货、库存、生产协同、出入库与操作规则 | `receiving`、`inventory` 两个实际包 |
 | `mdop-integration` | 消息发布、消费、重试、重放与模拟接收 | `DeliveryService`、`DeliveryWorker`、各 Listener |
 | `mdop-test-support` | Testcontainers 共享隔离基础设施 | `MdopInfrastructureTestBase`；应用仅测试依赖 |
@@ -21,6 +22,9 @@ flowchart LR
   BOOT --> SEC[Security 认证]
   BOOT --> SYS[System 账号]
   BOOT --> WMS[WMS 业务]
+  BOOT --> PUR[Purchasing 采购]
+  PUR --> MDM
+  PUR --> DB
   BOOT --> INT[Integration 消息]
   WMS --> MDM[Master Data 目录]
   WMS --> DB[(MySQL)]
@@ -52,7 +56,7 @@ flowchart LR
 
 ## 前端结构与修改位置
 
-路由在 `src/router/index.ts`；App 负责会话和导航；页面组件负责各自查询/操作状态，只有真实复用时才提取组件。目前 Pinia 已装配但没有业务 Store；`packages/*` 只是工作区预留项。
+路由在 `src/router/index.ts`；App 负责会话，WorkspaceShell 和 navigation 负责导航；页面组件负责各自查询/操作状态，只有真实复用时才提取组件。目前 Pinia 已装配但没有业务 Store；`packages/*` 只是工作区预留项。
 
 现有页面多数将表单、列表和状态处理放在同一个 Vue SFC 中。较大的收货、库存、领料页面应在下一次修改对应功能时按查询/表单职责拆分，并保持失败、迟到响应、切仓与重复点击保护。此次文档整理不批量移动业务类或改变事务边界。
 

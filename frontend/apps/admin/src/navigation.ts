@@ -9,6 +9,12 @@ export const navigation = [
   {
     name: '采购收货',
     items: [
+      {
+        path: '/purchasing',
+        name: '采购需求与订单',
+        permission: 'purchasing:read',
+        legacyAdmin: false,
+      },
       { path: '/receiving', name: '采购收货', permission: 'wms:arrival:read' },
       { path: '/quality', name: '质检与上架', permission: 'wms:quality:read' },
       {

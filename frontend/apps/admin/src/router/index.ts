@@ -3,6 +3,10 @@ import { createRouter, createWebHistory } from 'vue-router'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    {
+      path: '/purchasing',
+      component: () => import('../views/PurchasingView.vue'),
+    },
     { path: '/users', component: () => import('../views/UsersView.vue') },
     { path: '/account', component: () => import('../views/AccountView.vue') },
     { path: '/freezes', component: () => import('../views/FreezesView.vue') },
