@@ -73,7 +73,12 @@ public final class PermissionCatalog {
         }
         read.add("purchasing:read");
         read.add("sales:read");
+        read.add("bom:read");
         return List.of(
+                new Role(
+                        "BOM_MAINTAINER",
+                        "BOM 资料员",
+                        Set.of("warehouse:read", "bom:read", "bom:write")),
                 new Role(
                         "SALES_OPERATOR",
                         "销售作业员",

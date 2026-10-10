@@ -17,6 +17,7 @@ spring:
       - classpath:db/migration/masterdata
       - classpath:db/migration/purchasing
       - classpath:db/migration/sales
+      - classpath:db/migration/manufacturing
       - classpath:db/migration/wms
       - classpath:db/migration/integration
     encoding: UTF-8

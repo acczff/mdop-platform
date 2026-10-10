@@ -15,6 +15,7 @@
 | `mdop-master-data` | 仓库聚合及供应商、物料、库位目录 | `WarehouseService`、`CatalogService` |
 | `mdop-purchasing` | 采购需求、订单、异人审核、来源和审计 | `PurchaseService`、`PurchaseController`；不写 WMS 库存 |
 | `mdop-sales` | 客户订单、分批发货授权、数量履约与结案 | `SalesOrderService`、`SalesFulfillment`；只通过公共契约读取 WMS 事实 |
+| `mdop-manufacturing` | BOM 版本、组件快照、发布/停用及历史 | `BomService`、`BomController`；生产订单与材料执行尚未接入 |
 | `mdop-wms` | 收货、库存、生产协同、出入库与操作规则 | `receiving`、`inventory` 两个实际包 |
 | `mdop-integration` | 消息发布、消费、重试、重放与模拟接收 | `DeliveryService`、`DeliveryWorker`、各 Listener |
 | `mdop-test-support` | Testcontainers 共享隔离基础设施 | `MdopInfrastructureTestBase`；应用仅测试依赖 |
