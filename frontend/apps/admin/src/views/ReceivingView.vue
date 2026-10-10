@@ -87,6 +87,31 @@ async function loadFoundation() {
       }
     }
     await load()
+    const query = new URLSearchParams(window.location.search)
+    const linkedWarehouse = Number(query.get('warehouseId'))
+    const linkedArrival = Number(query.get('arrivalId'))
+    if (
+      Number.isSafeInteger(linkedArrival) &&
+      linkedArrival > 0 &&
+      Number.isSafeInteger(linkedWarehouse) &&
+      linkedWarehouse > 0
+    ) {
+      if (
+        !admin.value &&
+        !props.authorities.includes(`wms:warehouse:${linkedWarehouse}`)
+      )
+        throw new Error('没有目标仓库的数据权限')
+      warehouseId.value = linkedWarehouse
+      await load()
+      await selectArrival(linkedArrival)
+      if (
+        selected.value &&
+        selected.value.arrival.warehouseId !== linkedWarehouse
+      ) {
+        clearSelection()
+        throw new Error('到货通知不属于目标仓库')
+      }
+    }
   } catch (e) {
     error.value = (e as Error).message
   } finally {
@@ -427,6 +452,7 @@ onMounted(loadFoundation)
               editor ||
               simulator ||
               selected.arrival.status === 'RECEIVED' ||
+              selected.arrival.status === 'WITHDRAWN' ||
               !eligibleLocations.length
             "
             @click="newDraft"

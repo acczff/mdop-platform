@@ -236,3 +236,92 @@ it('keeps approved request quantities fixed while editing an order', async () =>
   expect(button(view, '添加物料')).toBeUndefined()
   view.unmount()
 })
+
+it('retains failed arrangement quota and posts stable order line ids with decimal strings', async () => {
+  const view = setup()
+  await flushPromises()
+  const order = {
+    ...doc,
+    kind: 'ORDER',
+    status: 'APPROVED',
+    arrangements: [
+      {
+        id: 4,
+        expected_date: '2026-11-01',
+        status: 'PENDING',
+        last_error: '物料停用',
+        wms_arrival_id: null,
+        lines: [
+          {
+            id: 21,
+            order_line_id: 8,
+            material_code: 'M01',
+            quantity: '10.000000',
+          },
+        ],
+      },
+    ],
+  }
+  vi.mocked(request).mockResolvedValueOnce(order)
+  await button(view, '查看').trigger('click')
+  await flushPromises()
+  expect(view.text()).toContain('10.000000 / 2.123456')
+  expect(button(view, '取消订单').attributes('disabled')).toBeDefined()
+  expect(button(view, '重试送达')).toBeDefined()
+  await button(view, '安排到货').trigger('click')
+  await view.get('[aria-label="安排数量 1"]').setValue('2.123456')
+  await view.get('textarea').setValue('剩余分批')
+  vi.mocked(request).mockRejectedValueOnce(new ApiError(0, '响应丢失'))
+  await view.get('form').trigger('submit')
+  await flushPromises()
+  const call = vi
+    .mocked(request)
+    .mock.calls.find(([path]) => path.endsWith('/10/arrangements'))!
+  expect(JSON.parse(call[1]!.body as string)).toMatchObject({
+    version: 3,
+    lines: [{ orderLineId: 8, quantity: '2.123456' }],
+  })
+  expect(button(view, '安排到货')).toBeUndefined()
+  expect(sessionStorage.getItem('mdop-purchasing-pending:buyer')).toContain(
+    '2.123456',
+  )
+  view.unmount()
+})
+
+it('blocks withdrawal once WMS has even a draft and exposes receiving links only with permission', async () => {
+  const view = setup(['purchasing:write', 'wms:arrival:read'])
+  await flushPromises()
+  vi.mocked(request).mockResolvedValueOnce({
+    ...doc,
+    kind: 'ORDER',
+    status: 'FULFILLING',
+    arrangements: [
+      {
+        id: 5,
+        status: 'DELIVERED',
+        expected_date: '2026-11-01',
+        wms_arrival_id: 9,
+        lines: [
+          {
+            id: 21,
+            order_line_id: 8,
+            material_code: 'M01',
+            quantity: '12.123456',
+          },
+        ],
+        wms: {
+          lines: [{ arrangementLineId: 21, receivedQty: '0.000000' }],
+          receipts: [{ id: 11, number: 'REC-11', status: 'DRAFT' }],
+        },
+      },
+    ],
+  })
+  await button(view, '查看').trigger('click')
+  await flushPromises()
+  expect(button(view, '撤回安排').attributes('disabled')).toBeDefined()
+  expect(view.get('a[href*="arrivalId=9"]').attributes('href')).toBe(
+    '/receiving?warehouseId=1&arrivalId=9',
+  )
+  expect(view.text()).toContain('REC-11（草稿）')
+  view.unmount()
+})

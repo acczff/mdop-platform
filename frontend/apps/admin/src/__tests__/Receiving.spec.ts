@@ -7,6 +7,52 @@ vi.mock('../api', async (original) => ({
   request: vi.fn(),
 }))
 afterEach(() => vi.resetAllMocks())
+it('opens a linked purchase notice and prevents receiving a withdrawn notice', async () => {
+  window.history.replaceState({}, '', '/receiving?warehouseId=2&arrivalId=77')
+  vi.mocked(request).mockImplementation(async (path) => {
+    if (path.includes('/warehouses'))
+      return {
+        items: [
+          { id: 1, name: '仓库1' },
+          { id: 2, name: '仓库2' },
+        ],
+      }
+    if (path.includes('/locations'))
+      return [{ id: 2, warehouseId: 2, areaType: 'INSPECTION' }]
+    if (path === '/api/v1/wms/arrival-notices/77')
+      return {
+        arrival: {
+          id: 77,
+          warehouseId: 2,
+          externalNoticeNo: 'PA-77',
+          status: 'WITHDRAWN',
+        },
+        items: [],
+      }
+    return []
+  })
+  const view = mount(ReceivingView, {
+    props: {
+      authorities: [
+        'wms:arrival:read',
+        'wms:inventory:read',
+        'wms:receipt:create',
+        'wms:warehouse:2',
+      ],
+    },
+  })
+  try {
+    await flushPromises()
+    expect(view.text()).toContain('PA-77')
+    const create = view
+      .findAll('button')
+      .find((b) => b.text() === '登记本次收货')!
+    expect(create.attributes('disabled')).toBeDefined()
+  } finally {
+    view.unmount()
+    window.history.replaceState({}, '', '/')
+  }
+})
 it.each(['detail', 'list'])(
   'clears previous receiving actions after a failed %s refresh',
   async (failure) => {

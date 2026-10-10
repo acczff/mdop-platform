@@ -50,6 +50,7 @@ public class ReceivingService {
     }
 
     public ArrivalDetail receiveArrival(String sourceSystem, ArrivalInput input) {
+        if ("MDOP_PURCHASING".equals(sourceSystem)) throw invalid("采购正式来源必须通过采购到货契约");
         access.requireWarehouse(input.warehouseId());
         catalog.requireReceivingWarehouse(input.warehouseId());
         var supplier = catalog.referenceSupplier(input.supplierId());
@@ -127,6 +128,7 @@ public class ReceivingService {
     }
 
     public ReceiptDetail createDraft(long arrivalId, DraftInput input) {
+        lockPurchaseWarehouse(arrivalId);
         var arrival = loadArrival(arrivalId, true);
         String digest = hash(json.writeValueAsString(input.items()));
         var previous =
@@ -140,6 +142,7 @@ public class ReceivingService {
                 throw conflict("IDEMPOTENCY_CONFLICT", "同一幂等键不能用于不同收货内容");
             return receipt(old.id());
         }
+        if (arrival.status().equals("WITHDRAWN")) throw conflict("ARRIVAL_WITHDRAWN", "到货通知已撤回");
         if (arrival.status().equals("RECEIVED")) throw conflict("ARRIVAL_COMPLETED", "此通知已经全部收货");
         catalog.requireReceivingWarehouse(arrival.warehouseId());
         long id =
@@ -173,6 +176,7 @@ public class ReceivingService {
     public ReceiptDetail submit(long id, SubmitInput input) {
         // All submissions lock the arrival first, then the receipt, then sorted balance keys.
         var reference = loadReceipt(id, false);
+        lockPurchaseWarehouse(reference.arrivalId());
         var arrival = loadArrival(reference.arrivalId(), true);
         var receipt = loadReceipt(id, true);
         if (receipt.status().equals("SUBMITTED")) {
@@ -180,6 +184,7 @@ public class ReceivingService {
                 throw conflict("RECEIPT_IMMUTABLE", "此收货单已提交，请查看处理结果");
             return receipt(id);
         }
+        if (arrival.status().equals("WITHDRAWN")) throw conflict("ARRIVAL_WITHDRAWN", "到货通知已撤回");
         if (receipt.version() != input.version())
             throw conflict("VERSION_CONFLICT", "草稿已变化，请刷新后提交");
         catalog.requireReceivingWarehouse(arrival.warehouseId());
@@ -252,6 +257,18 @@ public class ReceivingService {
                     .update();
         }
         return receipt(id);
+    }
+
+    private void lockPurchaseWarehouse(long arrivalId) {
+        var arrival = loadArrival(arrivalId, false);
+        if ("MDOP_PURCHASING".equals(arrival.sourceSystem())) {
+            // Match purchasing's warehouse -> notice order; otherwise withdrawal can deadlock a
+            // draft.
+            jdbc.sql("SELECT id FROM mdm_warehouse WHERE id=? FOR SHARE")
+                    .param(arrival.warehouseId())
+                    .query(Long.class)
+                    .single();
+        }
     }
 
     private void increaseStock(Arrival arrival, Item item) {

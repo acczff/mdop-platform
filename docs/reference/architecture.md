@@ -16,6 +16,8 @@
 | `mdop-integration` | 消息发布、消费、重试、重放与模拟接收 | `DeliveryService`、`DeliveryWorker`、各 Listener |
 | `mdop-test-support` | Testcontainers 共享隔离基础设施 | `MdopInfrastructureTestBase`；应用仅测试依赖 |
 
+采购到货使用 `common/PurchaseReceivingPort` 契约，由 `integration/PurchaseReceivingAdapter` 转给 WMS `PurchaseArrivalService`。当前同进程同库：采购安排/映射与 WMS 通知送达、撤回均加入调用方事务；采购不读写 WMS 表。WMS 正式采购收货按“仓库→通知”锁顺序与撤回协调。待送达安排及失败原因归采购自身持久化，显式送达/重试；这条本地链路不经过模拟 ERP 或 RabbitMQ，不宣称已实现远程可靠投递。
+
 ```mermaid
 flowchart LR
   UI[Vue 管理端] -->|同源 API / Session / CSRF| BOOT[Boot 装配]

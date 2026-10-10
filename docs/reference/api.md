@@ -67,6 +67,8 @@
 
 ## 重试和外部边界
 
+采购 P2 在 `/api/v1/purchasing/documents/{id}/arrangements` POST 创建安排，字段为 `idempotencyKey`、父单 `version`、`expectedDate`、`reason` 及 `lines[{orderLineId,quantity}]`。同路径追加 `/{arrangementId}/deliver` 或 `/withdraw` POST，使用 P1 动作请求（键、版本、原因），返回父单最新详情。详情 `arrangements` 带持久化行映射及 WMS 收货引用；未知结果仍按原键原载荷重试。待送达/失败占用额度，撤回确认才释放；所有安排撤回前拒绝取消订单。完整事务及来源边界见[采购 P2](../erp/采购P2实现与验收.md)。
+
 带幂等键的接口重试须复用原键和原业务载荷；版本冲突先读最新状态。有些操作仅由状态/版本控制，账号创建、授权等并不提供通用幂等键。账号写入网络失败、409、5xx 或解析失败后必须成功刷新核对，不能通过关闭弹窗绕过限制。
 
 `/api/local/*` 仅在 `local`/`test` 下启用，并需模拟权限；模拟接口与消息管理员的能力不能当作细粒度业务仓库隔离。真正的外部接入还需单独确定身份、签名、契约、重试和对账责任，不开放这些模拟端点代替生产集成。

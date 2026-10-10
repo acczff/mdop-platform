@@ -75,6 +75,7 @@ export interface Ledger {
   afterQty: string
 }
 export const arrivalStatuses: Record<string, string> = {
+  WITHDRAWN: '已撤回',
   PENDING_RECEIPT: '待收货',
   PARTIALLY_RECEIVED: '部分收货',
   RECEIVED: '全部收货',

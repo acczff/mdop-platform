@@ -68,6 +68,36 @@ public class PurchaseController {
         return write(() -> service.convert(id, input));
     }
 
+    @PostMapping("/{id}/arrangements")
+    @PreAuthorize("hasAuthority('purchasing:write')")
+    public Map<String, Object> arrange(
+            @PathVariable @Positive long id, @Valid @RequestBody ArrangementInput input) {
+        return write(() -> service.arrange(id, input));
+    }
+
+    @PostMapping("/{id}/arrangements/{arrangementId}/{action}")
+    @PreAuthorize("hasAuthority('purchasing:write')")
+    public Map<String, Object> arrangementAction(
+            @PathVariable @Positive long id,
+            @PathVariable @Positive long arrangementId,
+            @PathVariable String action,
+            @Valid @RequestBody Action input) {
+        try {
+            return write(() -> service.arrangementAction(id, arrangementId, action, input));
+        } catch (BusinessException failure) {
+            if (action.equals("deliver")) {
+                // Failure recording is best effort after rollback, never mask the original outcome.
+                try {
+                    service.recordDeliveryFailure(
+                            id, arrangementId, input.version(), failure.getMessage());
+                } catch (RuntimeException ignored) {
+                    /* Original failure remains authoritative. */
+                }
+            }
+            throw failure;
+        }
+    }
+
     private Map<String, Object> write(Supplier<Map<String, Object>> operation) {
         try {
             return operation.get();
