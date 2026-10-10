@@ -61,7 +61,7 @@ PR 与 main 推送通过 CI 的 `Backend verify` 执行同一 Maven 验证入口
 - `/api/master-data` 提供供应商、客户、物料、基本单位与组织维护、启停和审计；已引用物料单位和策略锁定。库位区域限定为收货暂存、待检或存储。
 - `mdop-purchasing` 提供需求/订单、分批到货与正式 WMS 衔接、收货/上架/退供事实核对和数量结案，见[采购 P3](../docs/erp/采购P3实现与验收.md)。
 - `mdop-sales` 提供客户订单、分批发货及实际出库数量结案，见[销售实现](../docs/erp/销售实现与验收.md)。
-- `mdop-manufacturing` 提供 [BOM 版本生命周期](../docs/erp/BOM版本实现与验收.md)及循环、单位快照保护，不直接操作库存，生产订单与材料展开后续接入。
+- `mdop-manufacturing` 提供 [BOM 版本生命周期](../docs/erp/BOM版本实现与验收.md)及[生产需求、工单审核和安全取消](../docs/erp/生产订单实现与验收.md)，通过销售来源契约保护来源与额度；不直接操作库存，材料展开及正式执行后续接入。
 - `/api/v1/wms/arrival-notices` 和 `/receipts` 按 WMS 设计提供任务、草稿与提交。保存草稿不产生库存；提交时锁定通知和收货单，条件更新累计数量，按固定库存维度顺序锁余额，原子写流水、操作记录和 Outbox。
 - `local`/`test` 下的 `/api/local/erp-arrivals` 模拟 ERP 发布到货消息，经 RabbitMQ 与 Inbox 幂等消费建单；真实 ERP 适配器尚未接入。
 - 数据库结构由 Flyway 管理，完整版本见[源码导航](../docs/reference/source-index.md#flyway-迁移)。日常数据库升级需单独安排，运行验收不代表已部署。

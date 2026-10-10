@@ -84,6 +84,8 @@ public class FinishedGoodsService {
     }
 
     public Map<String, Object> create(Demand in) {
+        io.github.acczff.mdop.common.manufacturing.ProductionNumbers.requireLegacy(
+                in.workOrderNo());
         lockWarehouse(in.warehouseId());
         String code = in.dateCode() == null ? "" : in.dateCode().trim();
         String hash =

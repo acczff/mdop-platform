@@ -74,7 +74,24 @@ public final class PermissionCatalog {
         read.add("purchasing:read");
         read.add("sales:read");
         read.add("bom:read");
+        read.add("manufacturing:read");
         return List.of(
+                new Role(
+                        "PRODUCTION_PLANNER",
+                        "生产计划员",
+                        Set.of(
+                                "warehouse:read",
+                                "bom:read",
+                                "manufacturing:read",
+                                "manufacturing:write")),
+                new Role(
+                        "PRODUCTION_REVIEWER",
+                        "生产审批员",
+                        Set.of(
+                                "warehouse:read",
+                                "bom:read",
+                                "manufacturing:read",
+                                "manufacturing:review")),
                 new Role(
                         "BOM_MAINTAINER",
                         "BOM 资料员",
@@ -117,6 +134,8 @@ public final class PermissionCatalog {
             throw invalid("采购审批与作业职责必须使用不同账号");
         if (codes.contains("SALES_REVIEWER") && codes.contains("SALES_OPERATOR"))
             throw invalid("销售审批与作业职责必须使用不同账号");
+        if (codes.contains("PRODUCTION_REVIEWER") && codes.contains("PRODUCTION_PLANNER"))
+            throw invalid("生产审批与计划职责必须使用不同账号");
         var result = new TreeSet<String>();
         for (var code : codes)
             result.addAll(

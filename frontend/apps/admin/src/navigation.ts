@@ -51,6 +51,12 @@ export const navigation = [
     name: '生产协同',
     items: [
       {
+        path: '/production-orders',
+        name: '生产需求与订单',
+        permission: 'manufacturing:read',
+        legacyAdmin: false,
+      },
+      {
         path: '/boms',
         name: 'BOM 版本',
         permission: 'bom:read',

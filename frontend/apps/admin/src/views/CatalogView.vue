@@ -9,6 +9,7 @@ const labels = {
   materials: '物料',
   units: '基本单位',
   organizations: '组织',
+  'production-sites': '生产地点',
   locations: '库位',
 }
 type Kind = keyof typeof labels
