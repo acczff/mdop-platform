@@ -2,6 +2,7 @@ package io.github.acczff.mdop.wms.inventory;
 
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -34,6 +35,25 @@ public class ProductionService {
             @NotBlank @Pattern(regexp = "QUALIFIED|REJECTED") String qualityStatus,
             @Positive long targetLocationId,
             @NotBlank @Size(max = 500) String reason) {}
+
+    public record ManualConsumption(
+            @Valid @NotNull Consumption consumption, @NotBlank @Size(max = 500) String reason) {}
+
+    public Map<String, Object> reportConsumption(ManualConsumption input) {
+        return consume(
+                input.consumption(),
+                true,
+                io.github.acczff.mdop.common.BusinessText.required(input.reason(), "原因", 500));
+    }
+
+    public Map<String, Object> reportReturn(ReturnInput input) {
+        return requestReturn(input, true);
+    }
+
+    private void source(Map<String, Object> issue, boolean manual) {
+        if ((issue.get("production_order_id") != null) != manual)
+            throw conflict("正式工单须使用生产登记入口，模拟入口只接受模拟领料单");
+    }
 
     private final JdbcClient db;
     private final IssueService issues;
@@ -86,8 +106,8 @@ public class ProductionService {
                         .single();
         String columns =
                 returns
-                        ? "id,event_no,issue_id,CAST(quantity AS CHAR) AS quantity,quality_status,status,target_location_id,target_balance_id,reason,requested_by,requested_at,closed_by,closed_at,cancel_reason"
-                        : "id,event_no,issue_id,CAST(quantity AS CHAR) AS quantity,reported_by,reported_at";
+                        ? "source_type,id,event_no,issue_id,CAST(quantity AS CHAR) AS quantity,quality_status,status,target_location_id,target_balance_id,reason,requested_by,requested_at,closed_by,closed_at,cancel_reason"
+                        : "source_type,reason,id,event_no,issue_id,CAST(quantity AS CHAR) AS quantity,reported_by,reported_at";
         return new InventoryService.Page(
                 db.sql(
                                 "SELECT "
@@ -105,7 +125,12 @@ public class ProductionService {
     }
 
     public Map<String, Object> consume(Consumption input) {
+        return consume(input, false, null);
+    }
+
+    private Map<String, Object> consume(Consumption input, boolean manual, String reason) {
         var d = issues.locked(input.issueId());
+        source(d, manual);
         issued(d, input.workOrderNo());
         var old =
                 db.sql("SELECT * FROM wms_production_consumption WHERE event_no=?")
@@ -115,21 +140,26 @@ public class ProductionService {
         if (!old.isEmpty()) {
             var o = old.getFirst();
             if (n(o, "issue_id") != input.issueId()
-                    || q(o, "quantity").compareTo(input.quantity()) != 0)
-                throw conflict("MES 消耗事件号内容不一致");
+                    || q(o, "quantity").compareTo(input.quantity()) != 0
+                    || (manual
+                            && (!Objects.equals(reason, o.get("reason"))
+                                    || !actor.currentActor().equals(o.get("reported_by")))))
+                throw conflict("消耗事件号已用于其他登记内容或记录人");
             return consumption(n(o, "id"));
         }
         issues.eligibleWarehouses(n(d, "warehouse_id"), n(d, "target_warehouse_id"));
         if (input.quantity().compareTo(free(d)) > 0) throw conflict("消耗超过领料剩余额度，请先核对已消耗和待退数量");
         var b = balance(n(d, "target_balance_id"));
         db.sql(
-                        "INSERT INTO wms_production_consumption(event_no,issue_id,quantity,reported_by,reported_at) VALUES(?,?,?,?,?)")
+                        "INSERT INTO wms_production_consumption(event_no,issue_id,quantity,reported_by,reported_at,source_type,reason) VALUES(?,?,?,?,?,?,?)")
                 .params(
                         input.eventNo(),
                         input.issueId(),
                         input.quantity(),
                         actor.currentActor(),
-                        now())
+                        now(),
+                        manual ? "MANUAL" : "SIMULATED",
+                        reason)
                 .update();
         long id =
                 db.sql("SELECT id FROM wms_production_consumption WHERE event_no=?")
@@ -148,14 +178,19 @@ public class ProductionService {
 
     private Map<String, Object> consumption(long id) {
         return db.sql(
-                        "SELECT id,event_no,issue_id,CAST(quantity AS CHAR) AS quantity,reported_by,reported_at FROM wms_production_consumption WHERE id=?")
+                        "SELECT source_type,reason,id,event_no,issue_id,CAST(quantity AS CHAR) AS quantity,reported_by,reported_at FROM wms_production_consumption WHERE id=?")
                 .param(id)
                 .query()
                 .singleRow();
     }
 
     public Map<String, Object> requestReturn(ReturnInput input) {
+        return requestReturn(input, false);
+    }
+
+    private Map<String, Object> requestReturn(ReturnInput input, boolean manual) {
         var d = issues.locked(input.issueId());
+        source(d, manual);
         issued(d, input.workOrderNo());
         var old =
                 db.sql("SELECT * FROM wms_production_return WHERE event_no=?")
@@ -168,8 +203,9 @@ public class ProductionService {
                     || q(o, "quantity").compareTo(input.quantity()) != 0
                     || !input.qualityStatus().equals(o.get("quality_status"))
                     || n(o, "target_location_id") != input.targetLocationId()
-                    || !input.reason().trim().equals(o.get("reason")))
-                throw conflict("MES 退料事件号内容不一致");
+                    || !input.reason().trim().equals(o.get("reason"))
+                    || (manual && !actor.currentActor().equals(o.get("requested_by"))))
+                throw conflict("退料事件号已用于其他登记内容或记录人");
             return returned(n(o, "id"));
         }
         issues.eligibleWarehouses(n(d, "warehouse_id"), n(d, "target_warehouse_id"));
@@ -177,7 +213,7 @@ public class ProductionService {
         var b = balance(n(d, "target_balance_id"));
         destination(d, b, input.targetLocationId(), input.qualityStatus());
         db.sql(
-                        "INSERT INTO wms_production_return(event_no,issue_id,quantity,quality_status,reason,target_location_id,requested_by,requested_at) VALUES(?,?,?,?,?,?,?,?)")
+                        "INSERT INTO wms_production_return(event_no,issue_id,quantity,quality_status,reason,target_location_id,requested_by,requested_at,source_type) VALUES(?,?,?,?,?,?,?,?,?)")
                 .params(
                         input.eventNo(),
                         input.issueId(),
@@ -186,7 +222,8 @@ public class ProductionService {
                         input.reason().trim(),
                         input.targetLocationId(),
                         actor.currentActor(),
-                        now())
+                        now(),
+                        manual ? "MANUAL" : "SIMULATED")
                 .update();
         return returned(
                 db.sql("SELECT id FROM wms_production_return WHERE event_no=?")

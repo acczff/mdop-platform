@@ -270,3 +270,74 @@ it('discards late reads after unmount and rejects malformed saved requests', asy
   expect(fresh.text()).toContain('重试凭据无法读取')
   expect(btn(fresh, '刷新材料需求')!.attributes('disabled')).toBeDefined()
 })
+
+it('authorizes a scoped partial issue and preserves the exact request across unknown-result recovery', async () => {
+  vi.mocked(request).mockImplementation(async (url, options) => {
+    if (options?.method === 'POST') throw new ApiError(503, '响应丢失')
+    if (url.startsWith('/api/master-data/warehouses'))
+      return {
+        items: [
+          ...warehouses.items,
+          {
+            id: 2,
+            code: 'LINE',
+            name: '线边仓',
+            purpose: 'LINE_SIDE',
+            status: 'ENABLED',
+          },
+        ],
+        totalPages: 1,
+      }
+    return structuredClone(current)
+  })
+  let v = setup()
+  await v.setProps({
+    authorities: [
+      'manufacturing:read',
+      'manufacturing:write',
+      'wms:warehouse:1',
+      'wms:warehouse:2',
+    ],
+  })
+  await open(v)
+  await v
+    .findAll('label')
+    .find((l) => l.text().startsWith('核对说明'))!
+    .find('input')
+    .setValue('首批领料')
+  await v
+    .findAll('label')
+    .find((l) => l.text().startsWith('领料材料'))!
+    .find('select')
+    .setValue('3')
+  await v
+    .findAll('label')
+    .find((l) => l.text().startsWith('本次领料数量'))!
+    .find('input')
+    .setValue('12')
+  await btn(v, '生成领料单')!.trigger('click')
+  await flushPromises()
+  const call = vi
+    .mocked(request)
+    .mock.calls.find((c) => c[0] === base + '/issues')!
+  expect(JSON.parse(call[1]!.body as string)).toMatchObject({
+    planVersion: 1,
+    lineId: 8,
+    targetWarehouseId: 2,
+    quantity: '12',
+    reason: '首批领料',
+  })
+  expect(v.text()).toContain('结果待核对')
+  v.unmount()
+  v = setup()
+  await flushPromises()
+  vi.mocked(request).mockResolvedValueOnce(current)
+  await btn(v, '原样重试材料请求')!.trigger('click')
+  await flushPromises()
+  const retries = vi
+    .mocked(request)
+    .mock.calls.filter((c) => c[0] === base + '/issues')
+  expect(retries[1]![1]!.body).toBe(call[1]!.body)
+  expect(sessionStorage.length).toBe(0)
+  v.unmount()
+})

@@ -49,6 +49,8 @@ public class ProductionEvents {
                         .param(issueId)
                         .query()
                         .singleRow();
+        // Formal ERP reads committed WMS facts directly; simulated MES must not receive them.
+        if (d.get("production_order_id") != null) return;
         var payload =
                 Map.of(
                         "issueId",

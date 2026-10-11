@@ -3,9 +3,11 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { request, type Page } from '../api'
 import ProductionReversals from '../components/ProductionReversals.vue'
+import ProductionReport from '../components/ProductionReport.vue'
 const props = defineProps<{ authorities: string[]; username?: string }>()
 const route = useRoute()
 interface Issue {
+  production_order_id?: number | null
   id: number
   warehouse_id: number
   work_order_no: string
@@ -134,9 +136,11 @@ async function load() {
       request<Page<RecordRow>>(
         `/api/v1/wms/production/issues/${current.id}/records?returns=true&page=0&size=20`,
       ),
-      request<Feedback[]>(
-        `/api/integration/material-issues/${current.id}/feedback`,
-      ),
+      current.production_order_id
+        ? Promise.resolve([] as Feedback[])
+        : request<Feedback[]>(
+            `/api/integration/material-issues/${current.id}/feedback`,
+          ),
     ])
   // Publish one complete issue snapshot; late results from failed loads cannot mutate it.
   issue.value = current
@@ -207,7 +211,7 @@ async function submit() {
           ? '退料需求已接收，额度已保留，等待仓管确认实物。'
           : type === 'cancel'
             ? '退料已取消，待退额度已释放。'
-            : '退料已记账，已生成反馈。'
+            : '退料已记账，请核对库存与流水。'
     await load()
   })
 }
@@ -285,7 +289,17 @@ onMounted(() =>
         <p class="muted">
           线边剩余保留工单归属，普通移库和盘点不能动用；已消耗数量不能退回。
         </p>
-        <div v-if="simulator" class="row-actions">
+        <ProductionReport
+          v-if="issue.production_order_id"
+          :key="issue.id"
+          :issue-id="issue.id"
+          :work-order-no="issue.work_order_no"
+          :warehouse-id="issue.warehouse_id"
+          :username="username || ''"
+          :authorities="authorities"
+          @changed="perform(load)"
+        />
+        <div v-if="simulator && !issue.production_order_id" class="row-actions">
           <button :disabled="busy" @click="open('consume')">
             模拟 MES 消耗</button
           ><button :disabled="busy" @click="open('request')">
@@ -370,7 +384,7 @@ onMounted(() =>
           <table>
             <thead>
               <tr>
-                <th>记录 / MES 事件</th>
+                <th>记录 / 事件编号</th>
                 <th>消耗数量</th>
                 <th>记录人</th>
               </tr>
@@ -381,7 +395,9 @@ onMounted(() =>
                   PC-{{ row.id }}<small>{{ row.event_no }}</small>
                 </td>
                 <td>{{ row.quantity }} {{ issue.unit }}</td>
-                <td>{{ row.reported_by }}</td>
+                <td>
+                  {{ row.reported_by }}<small>{{ row.reason }}</small>
+                </td>
               </tr>
               <tr v-if="!consumptions?.items.length">
                 <td colspan="3">暂无消耗记录</td>
@@ -404,7 +420,7 @@ onMounted(() =>
           </button>
         </div>
       </section>
-      <section class="panel panel-body">
+      <section v-if="!issue.production_order_id" class="panel panel-body">
         <h2>MES 反馈状态</h2>
         <p class="muted">
           已发布表示消息已交给消息服务；显示接收时间后，才代表模拟 MES 已接收。

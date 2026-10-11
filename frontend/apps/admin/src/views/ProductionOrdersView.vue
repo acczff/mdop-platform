@@ -434,7 +434,7 @@ onBeforeUnmount(() => {
       <span v-if="!write && !review" class="muted">只读</span>
     </div>
     <p class="muted">
-      按需求整量建单，审核后固定生产依据。领料与完工将在后续接入。
+      按需求整量建单，审核后固定生产依据，并按材料需求办理领料。完工另行接入。
     </p>
     <p v-if="notice" role="status">{{ notice }}</p>
     <p v-if="error" role="alert" class="error">{{ error }}</p>
