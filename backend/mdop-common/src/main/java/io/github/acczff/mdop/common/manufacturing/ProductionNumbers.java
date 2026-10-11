@@ -11,6 +11,6 @@ public final class ProductionNumbers {
             throw new BusinessException(
                     409,
                     "ERP_PRODUCTION_NOT_CONNECTED",
-                    "MFG- 为 ERP 生产订单保留编号，领料和完工关联尚未开放，不能从模拟入口绕过授权");
+                    "MFG- 为 ERP 生产订单保留编号，请使用已开放的正式工单入口，不能从模拟入口绕过授权");
     }
 }

@@ -2,6 +2,8 @@ package io.github.acczff.mdop.wms.inventory;
 
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
+import io.github.acczff.mdop.common.manufacturing.ProductionMaterialGuard;
+import io.github.acczff.mdop.common.manufacturing.ProductionMaterialPort;
 import io.github.acczff.mdop.masterdata.catalog.CatalogService;
 import io.github.acczff.mdop.wms.receiving.ReceivingAccess;
 import jakarta.validation.constraints.*;
@@ -19,7 +21,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Service
 @Transactional(isolation = Isolation.READ_COMMITTED)
-public class IssueService {
+public class IssueService implements ProductionMaterialPort {
     public record Demand(
             @NotBlank @Pattern(regexp = "[A-Za-z0-9_-]{1,64}") String demandNo,
             @NotBlank @Size(max = 64) String workOrderNo,
@@ -40,6 +42,7 @@ public class IssueService {
     private final Clock clock;
     private final ObjectMapper json;
     private final ProductionEvents feedback;
+    private final ProductionMaterialGuard manufacturing;
 
     public IssueService(
             JdbcClient db,
@@ -48,7 +51,8 @@ public class IssueService {
             CurrentActorProvider actor,
             Clock clock,
             ObjectMapper json,
-            ProductionEvents feedback) {
+            ProductionEvents feedback,
+            ProductionMaterialGuard manufacturing) {
         this.db = db;
         this.access = access;
         this.catalog = catalog;
@@ -56,11 +60,12 @@ public class IssueService {
         this.clock = clock;
         this.json = json;
         this.feedback = feedback;
+        this.manufacturing = manufacturing;
     }
 
     private static final String SELECT =
             """
-        SELECT d.id,d.demand_no,d.work_order_no,d.warehouse_id,d.target_warehouse_id,d.material_id,
+        SELECT d.production_order_id,d.production_plan_line_id,d.id,d.demand_no,d.work_order_no,d.warehouse_id,d.target_warehouse_id,d.material_id,
         CAST(d.quantity AS CHAR) AS quantity,CAST(d.consumed_qty AS CHAR) AS consumed_qty,CAST(d.returned_qty AS CHAR) AS returned_qty,CAST(d.quantity-d.consumed_qty-d.returned_qty AS CHAR) AS remaining_qty,d.status,d.source_balance_id,d.target_location_id,d.target_balance_id,
         d.created_by,d.created_at,d.reserved_by,d.reserved_at,d.closed_by,d.closed_at,d.cancel_reason,
         d.material_code,d.material_name,d.unit,s.name AS warehouse_name,w.name AS target_warehouse_name,
@@ -113,6 +118,10 @@ public class IssueService {
     public Map<String, Object> create(Demand input) {
         io.github.acczff.mdop.common.manufacturing.ProductionNumbers.requireLegacy(
                 input.workOrderNo());
+        return createDemand(input, null, null);
+    }
+
+    private Map<String, Object> createDemand(Demand input, Long orderId, Long planLineId) {
         lockWarehouses(input.warehouseId(), input.targetWarehouseId());
         var existing =
                 db.sql("SELECT * FROM wms_material_issue WHERE demand_no=?")
@@ -123,7 +132,9 @@ public class IssueService {
             var d = existing.getFirst();
             access.requireWarehouse(n(d, "warehouse_id"));
             access.requireWarehouse(n(d, "target_warehouse_id"));
-            if (n(d, "warehouse_id") != input.warehouseId()
+            if (!Objects.equals(d.get("production_order_id"), orderId)
+                    || !Objects.equals(d.get("production_plan_line_id"), planLineId)
+                    || n(d, "warehouse_id") != input.warehouseId()
                     || n(d, "target_warehouse_id") != input.targetWarehouseId()
                     || n(d, "material_id") != input.materialId()
                     || q(d, "quantity").compareTo(input.quantity()) != 0
@@ -134,7 +145,7 @@ public class IssueService {
         eligibleWarehouses(input.warehouseId(), input.targetWarehouseId());
         var material = catalog.referenceMaterial(input.materialId());
         db.sql(
-                        "INSERT INTO wms_material_issue(demand_no,work_order_no,warehouse_id,target_warehouse_id,material_id,quantity,created_by,created_at,material_code,material_name,unit) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
+                        "INSERT INTO wms_material_issue(demand_no,work_order_no,warehouse_id,target_warehouse_id,material_id,quantity,created_by,created_at,material_code,material_name,unit,production_order_id,production_plan_line_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)")
                 .params(
                         input.demandNo(),
                         input.workOrderNo().trim(),
@@ -146,13 +157,57 @@ public class IssueService {
                         now(),
                         material.code(),
                         material.name(),
-                        material.unit())
+                        material.unit(),
+                        orderId,
+                        planLineId)
                 .update();
         return detail(
                 db.sql("SELECT id FROM wms_material_issue WHERE demand_no=?")
                         .param(input.demandNo())
                         .query(Long.class)
                         .single());
+    }
+
+    @Override
+    public long create(ProductionMaterialPort.Input in) {
+        return n(
+                createDemand(
+                        new Demand(
+                                in.demandNo(),
+                                in.orderNo(),
+                                in.warehouseId(),
+                                in.targetWarehouseId(),
+                                in.materialId(),
+                                in.quantity()),
+                        in.orderId(),
+                        in.planLineId()),
+                "id");
+    }
+
+    @Override
+    public List<Map<String, Object>> references(long orderId) {
+        return db.sql(
+                        """
+            SELECT id,demand_no,production_plan_line_id,material_id,warehouse_id,target_warehouse_id,status,
+             CAST(quantity AS CHAR) quantity,CAST(consumed_qty AS CHAR) consumed_qty,
+             CAST(returned_qty AS CHAR) returned_qty,
+             CAST(CASE WHEN status='ISSUED' THEN quantity-consumed_qty-returned_qty ELSE 0 END AS CHAR) remaining_qty,
+             CAST((SELECT COALESCE(SUM(r.quantity),0) FROM wms_production_return r WHERE r.issue_id=d.id AND r.status='PENDING') AS CHAR) pending_return_qty
+            FROM wms_material_issue d WHERE production_order_id=? ORDER BY id
+            """)
+                .param(orderId)
+                .query()
+                .listOfRows();
+    }
+
+    @Override
+    public boolean hasActive(long orderId) {
+        return db.sql(
+                                "SELECT COUNT(*) FROM wms_material_issue WHERE production_order_id=? AND status<>'CANCELLED'")
+                        .param(orderId)
+                        .query(Long.class)
+                        .single()
+                > 0;
     }
 
     public Map<String, Object> reserve(long id, Reserve input) {
@@ -361,9 +416,10 @@ public class IssueService {
     Map<String, Object> locked(long id) {
         var d =
                 find(
-                        "SELECT warehouse_id,target_warehouse_id FROM wms_material_issue WHERE id=?",
+                        "SELECT warehouse_id,target_warehouse_id,production_order_id FROM wms_material_issue WHERE id=?",
                         id);
         lockWarehouses(n(d, "warehouse_id"), n(d, "target_warehouse_id"));
+        if (d.get("production_order_id") != null) manufacturing.lock();
         return find("SELECT * FROM wms_material_issue WHERE id=? FOR UPDATE", id);
     }
 

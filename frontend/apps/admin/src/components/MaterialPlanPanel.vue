@@ -15,6 +15,7 @@ interface MaterialLine {
   required: string
   available: string
   outstanding: string
+  committed?: string
   gap: string
   suggested: string
   activePurchase: boolean
@@ -33,7 +34,19 @@ interface Purchase {
   returned: string
   outstanding: string
 }
+interface MaterialIssue {
+  id: number
+  material_id: number
+  status: string
+  quantity: string
+  consumed_qty: string
+  returned_qty: string
+  remaining_qty: string
+  pending_return_qty: string
+}
 interface Plan {
+  issues?: MaterialIssue[]
+  targetWarehouseId?: number | null
   orderStatus: string
   orderVersion: number
   planVersion: number
@@ -57,7 +70,7 @@ interface Plan {
   }[]
 }
 interface Pending {
-  action: 'calculate' | 'confirm'
+  action: 'calculate' | 'confirm' | 'issues'
   body: string
 }
 const base = `/api/v1/manufacturing/orders/${props.orderId}/materials`
@@ -69,9 +82,13 @@ const opened = ref(false),
 const error = ref(''),
   notice = ref(''),
   reason = ref(''),
-  warehouse = ref(0)
+  warehouse = ref(0),
+  targetWarehouse = ref(0),
+  issueQuantity = ref(''),
+  issueMaterial = ref(0)
 const data = ref<Plan>(),
   warehouses = ref<Warehouse[]>([]),
+  lineWarehouses = ref<Warehouse[]>([]),
   pending = ref<Pending>(),
   selection = ref<MaterialLine>()
 const write = computed(() => props.authorities.includes('manufacturing:write'))
@@ -96,6 +113,25 @@ const labels: Record<string, string> = {
   CONVERTED: '已转订单',
   CANCELLED: '已取消',
 }
+const issueStatuses: Record<string, string> = {
+  OPEN: '待预占',
+  RESERVED: '已预占',
+  ISSUED: '已发料',
+  CANCELLED: '已取消',
+}
+function authorized(material: number) {
+  // Sum fixed six-decimal integers so large ERP quantities never pass through floating point.
+  const fixed = (s: string) => {
+    const [a, b = ''] = s.split('.')
+    return BigInt(a!) * 1000000n + BigInt(b.padEnd(6, '0'))
+  }
+  const total = (data.value?.issues || [])
+    .filter((i) => i.material_id === material && i.status !== 'CANCELLED')
+    .reduce((n, i) => n + fixed(i.quantity), 0n)
+  return fmt(
+    String(total / 1000000n) + '.' + String(total % 1000000n).padStart(6, '0'),
+  )
+}
 let generation = 0
 function remember(p?: Pending) {
   if (p) sessionStorage.setItem(storageKey, JSON.stringify(p))
@@ -103,6 +139,7 @@ function remember(p?: Pending) {
   pending.value = p
 }
 function accept(plan: Plan) {
+  if (plan.targetWarehouseId) targetWarehouse.value = plan.targetWarehouseId
   if (plan.plan) {
     const snapshot = JSON.parse(plan.plan.snapshot)
     if (!Array.isArray(snapshot.lines))
@@ -129,7 +166,7 @@ async function load() {
       all.push(
         ...batch.items.filter(
           (w) =>
-            w.purpose === 'RAW_MATERIAL' &&
+            ['RAW_MATERIAL', 'LINE_SIDE'].includes(w.purpose) &&
             w.status === 'ENABLED' &&
             props.authorities.includes(`wms:warehouse:${w.id}`),
         ),
@@ -137,9 +174,12 @@ async function load() {
       if (page >= batch.totalPages) break
     }
     if (token !== generation) return
-    warehouses.value = all
+    warehouses.value = all.filter((w) => w.purpose === 'RAW_MATERIAL')
+    lineWarehouses.value = all.filter((w) => w.purpose === 'LINE_SIDE')
+    targetWarehouse.value =
+      plan.targetWarehouseId || lineWarehouses.value[0]?.id || 0
     accept(plan)
-    if (!warehouse.value) warehouse.value = all[0]?.id || 0
+    if (!warehouse.value) warehouse.value = warehouses.value[0]?.id || 0
   } catch (e) {
     if (token === generation) error.value = (e as Error).message
   } finally {
@@ -170,6 +210,22 @@ async function save(action: Pending['action']) {
   if (action === 'calculate') {
     body.warehouseId = warehouse.value
     body.orderVersion = data.value.orderVersion
+  } else if (action === 'issues') {
+    const line = data.value.lines?.find(
+      (l) => l.material_id === issueMaterial.value,
+    )
+    if (
+      !line ||
+      !targetWarehouse.value ||
+      !/^[0-9]{1,12}(\.[0-9]{1,6})?$/.test(issueQuantity.value) ||
+      !positive(issueQuantity.value)
+    ) {
+      error.value = '请选择材料、线边仓并填写正数领料数量'
+      return
+    }
+    body.lineId = line.id
+    body.targetWarehouseId = targetWarehouse.value
+    body.quantity = issueQuantity.value
   } else {
     const line = data.value.lines?.find(
       (l) => l.material_id === selection.value?.materialId,
@@ -210,9 +266,11 @@ async function retry() {
     selection.value = undefined
     reason.value = ''
     notice.value =
-      p.action === 'confirm'
-        ? '已生成采购需求草稿，请交采购人员提交审核。其他建议需重新计算后确认。'
-        : '计算已保存，请核对快照后确认采购建议。'
+      p.action === 'issues'
+        ? '领料单已生成，交仓管预占并确认发至线边。'
+        : p.action === 'confirm'
+          ? '已生成采购需求草稿，请交采购人员提交审核。其他建议需重新计算后确认。'
+          : '计算已保存，请核对快照后确认采购建议。'
   } catch (e) {
     if (token !== generation) return
     data.value = undefined
@@ -230,7 +288,7 @@ async function retry() {
       }
       error.value = `操作被拒绝：${e.message}。请刷新核对。`
     } else
-      error.value = `结果待核对：${(e as Error).message}。请原样重试，不要另建采购需求。`
+      error.value = `结果待核对：${(e as Error).message}。请原样重试，不要另建业务单据。`
   } finally {
     if (token === generation) busy.value = false
   }
@@ -241,7 +299,7 @@ onMounted(() => {
     if (raw) {
       const p = JSON.parse(raw) as Pending
       if (
-        !['calculate', 'confirm'].includes(p.action) ||
+        !['calculate', 'confirm', 'issues'].includes(p.action) ||
         typeof p.body !== 'string'
       )
         throw Error('invalid')
@@ -310,7 +368,7 @@ onBeforeUnmount(() => {
               v-model="reason"
               maxlength="500"
               :disabled="blocked"
-              placeholder="填写计算或采购确认依据"
+              placeholder="填写计算、采购确认或领料依据"
           /></label>
           <button
             v-if="write && data.orderStatus === 'APPROVED'"
@@ -336,6 +394,7 @@ onBeforeUnmount(() => {
                   <th>理论需求</th>
                   <th>可用库存</th>
                   <th>关联采购未入库</th>
+                  <th>本工单已落实</th>
                   <th>缺口</th>
                   <th>采购建议</th>
                 </tr>
@@ -348,6 +407,7 @@ onBeforeUnmount(() => {
                   <td>{{ fmt(l.required) }}</td>
                   <td>{{ fmt(l.available) }}</td>
                   <td>{{ fmt(l.outstanding) }}</td>
+                  <td>{{ fmt(l.committed || '0') }}</td>
                   <td>{{ fmt(l.gap) }}</td>
                   <td>
                     <template
@@ -403,11 +463,128 @@ onBeforeUnmount(() => {
               {{ l.roundingNumerator }} / {{ l.roundingDenominator }}）。
             </p>
             <p>
-              缺口 = 理论需求 − 当前可用库存 −
-              本工单关联采购未入库参考，最小为零。已入库与已退货数量从采购参考中扣除。草稿也是待办意向，不代表采购已批准或保证到货；已有有效采购时只提示差额，不追加采购。
+              缺口 = 理论需求 − 当前可用库存 − 本工单关联采购未入库参考 −
+              已预占及已发料净额（含消耗），最小为零。已入库与已退货数量从采购参考中扣除。草稿也是待办意向，不代表采购已批准或保证到货；已有有效采购时只提示差额，不追加采购。
             </p>
           </details>
         </template>
+        <section v-if="data.plan" aria-label="工单领料执行">
+          <h4>领料执行</h4>
+          <p class="muted">
+            以下为当前执行量。可分次授权，累计不超过理论需求；退料不自动恢复额度。
+          </p>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>材料</th>
+                  <th>理论需求</th>
+                  <th>累计授权</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="l in lines" :key="l.materialId">
+                  <td>{{ l.code }}</td>
+                  <td>{{ fmt(l.required) }}</td>
+                  <td>{{ authorized(l.materialId) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div
+            v-if="write && data.orderStatus === 'APPROVED'"
+            class="plan-controls"
+          >
+            <label
+              >领料材料<select v-model="issueMaterial" :disabled="blocked">
+                <option :value="0">请选择</option>
+                <option
+                  v-for="l in lines"
+                  :key="l.materialId"
+                  :value="l.materialId"
+                >
+                  {{ l.code }} · {{ l.name }}
+                </option>
+              </select></label
+            >
+            <label
+              >线边仓<select
+                v-model="targetWarehouse"
+                :disabled="blocked || !!data.targetWarehouseId"
+              >
+                <option :value="0">请选择</option>
+                <option v-for="w in lineWarehouses" :key="w.id" :value="w.id">
+                  {{ w.name }}
+                </option>
+                <option
+                  v-if="
+                    data.targetWarehouseId &&
+                    !lineWarehouses.some(
+                      (w) => w.id === data?.targetWarehouseId,
+                    )
+                  "
+                  :value="data.targetWarehouseId"
+                >
+                  原线边仓 #{{ data.targetWarehouseId }}
+                </option>
+              </select></label
+            >
+            <label
+              >本次领料数量<input
+                v-model="issueQuantity"
+                :disabled="blocked"
+                inputmode="decimal"
+            /></label>
+            <button :disabled="blocked" @click="save('issues')">
+              生成领料单
+            </button>
+          </div>
+          <p v-if="!data.issues?.length" class="muted">尚未生成领料单。</p>
+          <div v-else class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>领料单 / 材料</th>
+                  <th>状态</th>
+                  <th>授权量</th>
+                  <th>已消耗 / 已退回</th>
+                  <th>线边剩余 / 待退</th>
+                  <th>办理</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="i in data.issues" :key="i.id">
+                  <td>
+                    MI-{{ i.id
+                    }}<small>{{
+                      lines.find((l) => l.materialId === i.material_id)?.code
+                    }}</small>
+                  </td>
+                  <td>{{ issueStatuses[i.status] || i.status }}</td>
+                  <td>{{ fmt(i.quantity) }}</td>
+                  <td>{{ fmt(i.consumed_qty) }} / {{ fmt(i.returned_qty) }}</td>
+                  <td>
+                    {{ fmt(i.remaining_qty) }} / {{ fmt(i.pending_return_qty) }}
+                  </td>
+                  <td>
+                    <a
+                      v-if="
+                        i.status === 'ISSUED' &&
+                        authorities.includes('wms:production:read')
+                      "
+                      :href="'/production?issueId=' + i.id"
+                      >消耗与退料</a
+                    ><a
+                      v-else-if="authorities.includes('wms:issue:read')"
+                      href="/issues"
+                      >仓库办理</a
+                    ><span v-else>交对应作业人员</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
         <div v-if="data.purchases.length">
           <h4>关联采购需求</h4>
           <p v-for="p in data.purchases" :key="p.id">

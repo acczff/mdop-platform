@@ -30,6 +30,7 @@ public final class PermissionCatalog {
                     "wms:finished:receive",
                     "wms:finished:putaway",
                     "wms:production:read",
+                    "wms:production:report",
                     "wms:production:reverse",
                     "wms:production:review",
                     "wms:production:confirm",
@@ -69,13 +70,21 @@ public final class PermissionCatalog {
                 operate.add(p);
                 review.add(p);
             } else if (p.endsWith(":approve") || p.endsWith(":review")) review.add(p);
-            else operate.add(p);
+            else if (!p.equals("wms:production:report")) operate.add(p);
         }
         read.add("purchasing:read");
         read.add("sales:read");
         read.add("bom:read");
         read.add("manufacturing:read");
         return List.of(
+                new Role(
+                        "PRODUCTION_RECORDER",
+                        "生产记录员",
+                        Set.of(
+                                "warehouse:read",
+                                "wms:issue:read",
+                                "wms:production:read",
+                                "wms:production:report")),
                 new Role(
                         "PRODUCTION_PLANNER",
                         "生产计划员",

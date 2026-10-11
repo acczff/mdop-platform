@@ -41,6 +41,7 @@ public class MaterialPlanService {
     private final CatalogService catalog;
     private final MaterialStockReference stock;
     private final ProductionPurchasePort purchase;
+    private final ProductionMaterialPort materials;
 
     public MaterialPlanService(
             JdbcClient db,
@@ -49,7 +50,8 @@ public class MaterialPlanService {
             CurrentActorProvider actor,
             CatalogService catalog,
             MaterialStockReference stock,
-            ProductionPurchasePort purchase) {
+            ProductionPurchasePort purchase,
+            ProductionMaterialPort materials) {
         this.db = db;
         this.json = json;
         this.clock = clock;
@@ -57,6 +59,7 @@ public class MaterialPlanService {
         this.catalog = catalog;
         this.stock = stock;
         this.purchase = purchase;
+        this.materials = materials;
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -66,6 +69,8 @@ public class MaterialPlanService {
         var plan = latest(orderId);
         if (plan != null) access(n(plan, "warehouse_id"));
         var result = new LinkedHashMap<String, Object>();
+        result.put("issues", plan == null ? List.of() : materials.references(orderId));
+        result.put("targetWarehouseId", order.get("material_target_warehouse_id"));
         result.put("orderId", orderId);
         result.put("orderNo", order.get("order_no"));
         result.put("orderStatus", order.get("status"));
@@ -192,6 +197,80 @@ public class MaterialPlanService {
         return detail(orderId);
     }
 
+    public record Issue(
+            @NotBlank @Pattern(regexp = "[A-Za-z0-9_-]{1,64}") String idempotencyKey,
+            @NotNull @Positive Long planVersion,
+            @Positive long lineId,
+            @Positive long targetWarehouseId,
+            @NotNull @DecimalMin(value = "0", inclusive = false) @Digits(integer = 12, fraction = 6)
+                    BigDecimal quantity,
+            @NotBlank @Size(max = 500) String reason) {}
+
+    public Map<String, Object> issue(long orderId, Issue in) {
+        var before = latest(orderId);
+        if (before == null) throw conflict("请先计算材料需求");
+        var o = lock(orderId, n(before, "warehouse_id"), in.targetWarehouseId());
+        String hash = hash(List.of("ISSUE", orderId, actor.currentActor(), in));
+        if (replay(in.idempotencyKey(), hash)) return detail(orderId);
+        var plan = latest(orderId);
+        if (n(plan, "version") != in.planVersion()) throw conflict("材料计划版本已变化，请刷新核对");
+        var line =
+                db
+                        .sql("SELECT * FROM mfg_material_plan_line WHERE id=? AND plan_id=?")
+                        .params(in.lineId(), n(plan, "id"))
+                        .query()
+                        .listOfRows()
+                        .stream()
+                        .findFirst()
+                        .orElseThrow(() -> conflict("组件不属于当前材料计划"));
+        if (o.get("material_target_warehouse_id") != null
+                && n(o, "material_target_warehouse_id") != in.targetWarehouseId())
+            throw conflict("首张领料单已固定线边仓，不支持跨线边仓领料");
+        var facts = calculateFacts(o, n(plan, "warehouse_id"));
+        var component =
+                rows(facts.get("lines")).stream()
+                        .filter(l -> n(l, "materialId") == n(line, "material_id"))
+                        .findFirst()
+                        .orElseThrow();
+        var authorized =
+                materials.references(orderId).stream()
+                        .filter(
+                                i ->
+                                        n(i, "material_id") == n(line, "material_id")
+                                                && !"CANCELLED".equals(i.get("status")))
+                        .map(i -> q(i, "quantity"))
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (authorized.add(in.quantity()).compareTo(q(component, "required")) > 0)
+            throw conflict("累计领料超过工单理论需求；退料不会自动恢复授权额度");
+        long issueId =
+                materials.create(
+                        new ProductionMaterialPort.Input(
+                                orderId,
+                                in.lineId(),
+                                o.get("order_no").toString(),
+                                hash(List.of("FORMAL_ISSUE", in.idempotencyKey())),
+                                n(plan, "warehouse_id"),
+                                in.targetWarehouseId(),
+                                n(line, "material_id"),
+                                in.quantity()));
+        db.sql("UPDATE mfg_order SET material_target_warehouse_id=? WHERE id=?")
+                .params(in.targetWarehouseId(), orderId)
+                .update();
+        audit(
+                o,
+                "MATERIAL_ISSUE",
+                in.reason(),
+                Map.of(
+                        "issueId",
+                        issueId,
+                        "planLineId",
+                        in.lineId(),
+                        "quantity",
+                        in.quantity().toPlainString()));
+        remember(in.idempotencyKey(), hash, orderId);
+        return detail(orderId);
+    }
+
     private Map<String, Object> calculateFacts(Map<String, Object> o, long warehouse) {
         if (!"APPROVED".equals(o.get("status"))) throw conflict("只允许已批准且未取消的生产工单计算/确认材料建议");
         catalog.requireReceivingWarehouse(warehouse);
@@ -209,6 +288,7 @@ public class MaterialPlanService {
         Collections.sort(ids);
         var balances = stock.read(warehouse, ids);
         var supplies = purchase.references(n(o, "id"));
+        var issues = materials.references(n(o, "id"));
         var lines = new ArrayList<Map<String, Object>>();
         for (long material : ids) {
             var c =
@@ -241,7 +321,21 @@ public class MaterialPlanService {
                     putaway = putaway.add(q(p, "putaway"));
                     returned = returned.add(q(p, "returned"));
                 }
-            var gap = required.subtract(available).subtract(outstanding).max(BigDecimal.ZERO);
+            BigDecimal committed = BigDecimal.ZERO;
+            for (var issue : issues)
+                if (n(issue, "material_id") == material) {
+                    if ("RESERVED".equals(issue.get("status")))
+                        committed = committed.add(q(issue, "quantity"));
+                    if ("ISSUED".equals(issue.get("status")))
+                        committed =
+                                committed.add(
+                                        q(issue, "quantity").subtract(q(issue, "returned_qty")));
+                }
+            var gap =
+                    required.subtract(available)
+                            .subtract(outstanding)
+                            .subtract(committed)
+                            .max(BigDecimal.ZERO);
             var l = new LinkedHashMap<String, Object>();
             l.put("materialId", material);
             l.put("code", c.get("material_code").asText());
@@ -261,6 +355,7 @@ public class MaterialPlanService {
             l.put("outstanding", outstanding.toPlainString());
             l.put("putaway", putaway.toPlainString());
             l.put("returned", returned.toPlainString());
+            l.put("committed", committed.toPlainString());
             l.put("gap", gap.toPlainString());
             l.put("activePurchase", active);
             l.put("suggested", active ? "0" : gap.toPlainString());
@@ -270,18 +365,24 @@ public class MaterialPlanService {
         result.put("orderVersion", o.get("version"));
         result.put("warehouseId", warehouse);
         result.put("date", LocalDate.now(clock).toString());
+        result.put("issues", issues);
         result.put("balances", balances);
         result.put("purchases", supplies);
         result.put("lines", lines);
         return result;
     }
 
-    private Map<String, Object> lock(long id, long raw) {
+    private Map<String, Object> lock(long id, long raw, long... targets) {
         var o = order(id);
         long fg = n(o, "warehouse_id");
         access(fg);
         access(raw);
-        for (long w : new TreeSet<>(List.of(fg, raw)))
+        var warehouses = new TreeSet<>(List.of(fg, raw));
+        for (long target : targets) {
+            access(target);
+            warehouses.add(target);
+        }
+        for (long w : warehouses)
             if (db.sql("SELECT id FROM mdm_warehouse WHERE id=? FOR UPDATE")
                     .param(w)
                     .query(Long.class)

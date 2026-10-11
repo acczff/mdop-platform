@@ -31,6 +31,7 @@ public class ProductionOrderService implements ProductionDemandUsage {
     private final Clock clock;
     private final ObjectMapper json;
     private final ProductionPurchasePort purchasing;
+    private final io.github.acczff.mdop.common.manufacturing.ProductionMaterialPort materials;
 
     public ProductionOrderService(
             JdbcClient db,
@@ -40,7 +41,8 @@ public class ProductionOrderService implements ProductionDemandUsage {
             CurrentActorProvider actor,
             Clock clock,
             ObjectMapper json,
-            ProductionPurchasePort purchasing) {
+            ProductionPurchasePort purchasing,
+            io.github.acczff.mdop.common.manufacturing.ProductionMaterialPort materials) {
         this.db = db;
         this.catalog = catalog;
         this.boms = boms;
@@ -49,6 +51,7 @@ public class ProductionOrderService implements ProductionDemandUsage {
         this.clock = clock;
         this.json = json;
         this.purchasing = purchasing;
+        this.materials = materials;
     }
 
     public record Page(List<Map<String, Object>> items, long total, int page, int size) {}
@@ -277,6 +280,7 @@ public class ProductionOrderService implements ProductionDemandUsage {
             }
             default -> {
                 state(o, "DRAFT", "REJECTED", "SUBMITTED", "APPROVED");
+                if (materials.hasActive(orderId)) throw conflict("存在未取消领料或已发料事实，不能取消工单");
                 if (purchasing.hasActive(orderId))
                     throw conflict("请先安全取消关联采购订单和采购需求；有效供给未释放，不能取消工单");
                 next = "CANCELLED";

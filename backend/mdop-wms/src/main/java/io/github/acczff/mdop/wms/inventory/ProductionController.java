@@ -33,6 +33,20 @@ public class ProductionController {
         return service.records(id, returns, page, size);
     }
 
+    @PostMapping("/consumptions")
+    @PreAuthorize("hasAuthority('wms:production:report')")
+    public Map<String, Object> consume(
+            @Valid @RequestBody ProductionService.ManualConsumption input) {
+        return write(() -> service.reportConsumption(input));
+    }
+
+    @PostMapping("/returns")
+    @PreAuthorize("hasAuthority('wms:production:report')")
+    public Map<String, Object> requestReturn(
+            @Valid @RequestBody ProductionService.ReturnInput input) {
+        return write(() -> service.reportReturn(input));
+    }
+
     @PostMapping("/returns/{id}/confirm")
     @PreAuthorize("hasRole('ADMIN') or hasAuthority('wms:production:confirm')")
     public Map<String, Object> confirm(@PathVariable @Positive long id) {

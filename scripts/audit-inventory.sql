@@ -119,13 +119,22 @@ WHERE t.warehouse_id<>d.warehouse_id OR t.location_id<>p.target_location_id OR t
  OR NOT(s.production_date<=>t.production_date) OR NOT(s.expiry_date<=>t.expiry_date) OR s.owner_type<>t.owner_type OR s.owner_id<>t.owner_id
 UNION ALL
 SELECT 'issue_feedback',COUNT(*) FROM wms_material_issue d LEFT JOIN wms_outbox o ON o.aggregate_type='MaterialIssue' AND o.aggregate_id=d.id AND o.event_type='MaterialIssued' AND o.business_key=''
-WHERE (d.status='ISSUED' AND o.message_id IS NULL) OR (d.status<>'ISSUED' AND o.message_id IS NOT NULL)
+WHERE (d.production_order_id IS NULL AND ((d.status='ISSUED' AND o.message_id IS NULL) OR (d.status<>'ISSUED' AND o.message_id IS NOT NULL))) OR (d.production_order_id IS NOT NULL AND o.message_id IS NOT NULL)
+UNION ALL
+SELECT 'formal_issue_source',COUNT(*) FROM wms_material_issue d
+ JOIN mfg_order m ON m.id=d.production_order_id JOIN mfg_material_plan_line l ON l.id=d.production_plan_line_id JOIN mfg_material_plan p ON p.id=l.plan_id
+WHERE p.order_id<>m.id OR d.work_order_no<>m.order_no OR d.material_id<>l.material_id OR d.warehouse_id<>p.warehouse_id OR NOT(d.target_warehouse_id<=>m.material_target_warehouse_id) OR (m.status='CANCELLED' AND d.status<>'CANCELLED')
+UNION ALL
+SELECT 'production_report_source',COUNT(*) FROM (
+ SELECT issue_id,source_type FROM wms_production_consumption UNION ALL SELECT issue_id,source_type FROM wms_production_return
+) r JOIN wms_material_issue d ON d.id=r.issue_id
+WHERE (d.production_order_id IS NULL AND r.source_type<>'SIMULATED') OR (d.production_order_id IS NOT NULL AND r.source_type<>'MANUAL')
 UNION ALL
 SELECT 'consumption_feedback',COUNT(*) FROM wms_production_consumption c LEFT JOIN wms_outbox o ON o.aggregate_type='MaterialIssue' AND o.aggregate_id=c.issue_id AND o.event_type='ProductionConsumed' AND o.business_key=CAST(c.id AS CHAR)
-WHERE o.message_id IS NULL
+WHERE (c.source_type='SIMULATED' AND o.message_id IS NULL) OR (c.source_type='MANUAL' AND o.message_id IS NOT NULL)
 UNION ALL
 SELECT 'production_return_feedback',COUNT(*) FROM wms_production_return p LEFT JOIN wms_outbox o ON o.aggregate_type='MaterialIssue' AND o.aggregate_id=p.issue_id AND o.event_type='ProductionMaterialReturned' AND o.business_key=CAST(p.id AS CHAR)
-WHERE (p.status='RETURNED' AND o.message_id IS NULL) OR (p.status<>'RETURNED' AND o.message_id IS NOT NULL)
+WHERE (p.source_type='SIMULATED' AND ((p.status='RETURNED' AND o.message_id IS NULL) OR (p.status<>'RETURNED' AND o.message_id IS NOT NULL))) OR (p.source_type='MANUAL' AND o.message_id IS NOT NULL)
 UNION ALL
 SELECT 'production_reversal_ledger',COUNT(*) FROM wms_production_reversal r LEFT JOIN
  (SELECT production_reversal_id,COUNT(*) AS n,SUM(change_qty) AS qty FROM wms_inventory_transaction WHERE production_reversal_id IS NOT NULL GROUP BY production_reversal_id)t ON t.production_reversal_id=r.id
@@ -133,8 +142,8 @@ WHERE (r.status='APPROVED' AND (COALESCE(t.n,0)<>IF(r.consumption_id IS NULL,2,1
 UNION ALL
 SELECT 'production_reversal_links',COUNT(*) FROM wms_inventory_transaction t JOIN wms_inventory_transaction o ON o.id=t.reversed_transaction_id WHERE t.production_reversal_id IS NOT NULL AND (t.balance_id<>o.balance_id OR t.change_qty<>-o.change_qty)
 UNION ALL
-SELECT 'production_reversal_feedback',COUNT(*) FROM wms_production_reversal r LEFT JOIN wms_outbox o ON o.aggregate_type='MaterialIssue' AND o.aggregate_id=r.issue_id AND o.business_key=CAST(r.id AS CHAR) AND o.event_type=IF(r.consumption_id IS NULL,'ProductionReturnReversed','ProductionConsumptionReversed')
-WHERE (r.status='APPROVED' AND o.message_id IS NULL) OR (r.status<>'APPROVED' AND o.message_id IS NOT NULL)
+SELECT 'production_reversal_feedback',COUNT(*) FROM wms_production_reversal r JOIN wms_material_issue d ON d.id=r.issue_id LEFT JOIN wms_outbox o ON o.aggregate_type='MaterialIssue' AND o.aggregate_id=r.issue_id AND o.business_key=CAST(r.id AS CHAR) AND o.event_type=IF(r.consumption_id IS NULL,'ProductionReturnReversed','ProductionConsumptionReversed')
+WHERE (d.production_order_id IS NULL AND ((r.status='APPROVED' AND o.message_id IS NULL) OR (r.status<>'APPROVED' AND o.message_id IS NOT NULL))) OR (d.production_order_id IS NOT NULL AND o.message_id IS NOT NULL)
 UNION ALL
 SELECT 'finished_ledger',COUNT(*) FROM wms_finished_receipt d LEFT JOIN
  (SELECT finished_receipt_id,COUNT(*) n,SUM(change_qty) qty FROM wms_inventory_transaction WHERE finished_receipt_id IS NOT NULL GROUP BY finished_receipt_id)t ON t.finished_receipt_id=d.id

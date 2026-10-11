@@ -38,6 +38,13 @@ public class MaterialPlanController {
         return write(() -> service.confirm(id, in));
     }
 
+    @PostMapping("/issues")
+    @PreAuthorize("hasAuthority('manufacturing:write')")
+    public Map<String, Object> issue(
+            @PathVariable @Positive long id, @Valid @RequestBody MaterialPlanService.Issue in) {
+        return write(() -> service.issue(id, in));
+    }
+
     private Map<String, Object> write(Supplier<Map<String, Object>> op) {
         try {
             return op.get();
