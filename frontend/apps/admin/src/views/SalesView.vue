@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { quantity as displayQuantity, timestamp } from '../presentation'
 import { onMounted, ref } from 'vue'
 import { request, type Page, type Warehouse } from '../api'
 const props = defineProps<{ authorities: string[]; username: string }>()
@@ -342,7 +343,7 @@ onMounted(() =>
           <tbody>
             <tr v-for="r in result?.items" :key="r.id">
               <td>
-                SO-{{ r.id
+                销售出库 SO-{{ r.id
                 }}<small>{{ r.demand_no }} · {{ r.sales_order_no }}</small
                 ><small>{{ r.customer_reference }}</small>
                 <small>{{
@@ -354,8 +355,8 @@ onMounted(() =>
               <td>
                 {{ r.material_name
                 }}<small
-                  >{{ r.batch_no || '待分配批次' }} · {{ r.amount }}
-                  {{ r.unit }}</small
+                  >{{ r.batch_no || '待分配批次' }} ·
+                  {{ displayQuantity(r.amount) }} {{ r.unit }}</small
                 >
               </td>
               <td>
@@ -446,16 +447,17 @@ onMounted(() =>
       >
         <h2>{{ titles[modal] }}</h2>
         <p v-if="row">
-          SO-{{ row.id }} · {{ row.customer_reference }} ·
+          销售出库 SO-{{ row.id }} · {{ row.customer_reference }} ·
           {{ row.material_name }} · {{ row.batch_no || '待分配批次' }} ·
-          {{ row.amount }} {{ row.unit }}
+          {{ displayQuantity(row.amount) }} {{ row.unit }}
         </p>
         <template v-if="modal === 'history'"
           ><h3>预占记录</h3>
           <ul>
             <li v-for="(r, i) in reservations" :key="i">
-              {{ names[r.event_type] }} {{ r.quantity }} · 预占
-              {{ r.before_reserved }} → {{ r.after_reserved }} ·
+              {{ names[r.event_type] }} {{ displayQuantity(r.quantity) }} · 预占
+              {{ displayQuantity(r.before_reserved) }} →
+              {{ displayQuantity(r.after_reserved) }} ·
               {{ r.created_by }}
             </li>
           </ul>
@@ -463,7 +465,7 @@ onMounted(() =>
           <ul>
             <li v-for="h in history" :key="h.id">
               #{{ h.id }} {{ names[h.action_type] }} · {{ h.created_by }} ·
-              {{ h.reason }} · {{ h.created_at }}
+              {{ h.reason }} · {{ timestamp(h.created_at) }}
             </li>
           </ul>
           <h3>ERP 出库反馈</h3>
@@ -474,7 +476,11 @@ onMounted(() =>
           <ul>
             <li v-for="f in feedback" :key="f.message_id">
               {{ names[f.status] }} ·
-              {{ f.received_at ? 'ERP 已接收 ' + f.received_at : '尚未接收' }}
+              {{
+                f.received_at
+                  ? 'ERP 已接收 ' + timestamp(f.received_at)
+                  : '尚未接收'
+              }}
             </li>
           </ul>
           <button @click="modal = undefined">关闭</button></template
@@ -514,9 +520,10 @@ onMounted(() =>
               ><label
                 >合格成品库存<select v-model="balance" required>
                   <option v-for="s in stocks" :key="s.id" :value="s.id">
-                    #{{ s.id }} · {{ s.location_name }} · 批次
-                    {{ s.batch_no }} · 可用 {{ s.available_qty }} · 有效期
-                    {{ s.expiry_date || '无' }}
+                    {{ row?.material_name }} · {{ s.location_name }} · 批次
+                    {{ s.batch_no }} · 可用
+                    {{ displayQuantity(s.available_qty) }} {{ row?.unit }} ·
+                    有效期 {{ s.expiry_date || '无' }} · 记录 {{ s.id }}
                   </option>
                 </select></label
               >

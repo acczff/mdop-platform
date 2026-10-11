@@ -162,6 +162,13 @@ public class PurchaseService
         var d = header(id);
         requireWarehouse(n(d, "warehouse_id"));
         d.put("lines", lines(id));
+        // Display metadata is outside immutable fulfillment facts and closure hashes.
+        d.put(
+                "displayLocations",
+                db.sql("SELECT id,code,name FROM mdm_location WHERE warehouse_id=? ORDER BY id")
+                        .param(n(d, "warehouse_id"))
+                        .query()
+                        .listOfRows());
         if (d.get("request_id") != null) {
             var source = header(n(d, "request_id"));
             d.put("production_order_no", source.get("production_order_no"));

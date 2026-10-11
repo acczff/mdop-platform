@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import {
+  quantity as displayQuantity,
+  businessDate,
+  timestamp,
+} from '../presentation'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ApiError, request } from '../api'
 const props = defineProps<{
@@ -18,6 +23,8 @@ interface Report {
   status: string
   version: number
   created_by: string
+  created_at?: string
+  reviewed_at?: string | null
   reviewed_by: string | null
   review_reason: string | null
   receipt?: {
@@ -50,6 +57,10 @@ const error = ref(''),
   notice = ref(''),
   reason = ref(''),
   ack = ref(false)
+const decisions = ref<Record<number, { reason: string; ack: boolean }>>({})
+function decision(id: number) {
+  return (decisions.value[id] ??= { reason: '', ack: false })
+}
 const form = ref({
   reportNo: '',
   quantity: '',
@@ -108,9 +119,14 @@ async function load() {
     if (alive && token === generation) loading.value = false
   }
 }
-async function send(path: string, body: object) {
-  if (blocked.value || !ack.value) return
-  if (!reason.value.trim()) {
+async function send(
+  path: string,
+  body: object,
+  acknowledged = ack.value,
+  explanation = reason.value,
+) {
+  if (blocked.value || !acknowledged) return
+  if (!explanation.trim()) {
     error.value = '请填写登记或处理依据'
     return
   }
@@ -150,11 +166,16 @@ async function act(r: Report, action: string) {
     (action !== 'cancel' && (!review.value || r.created_by === props.username))
   )
     return
-  await send(`/${r.id}/${action}`, {
-    version: r.version,
-    reason: reason.value.trim(),
-    idempotencyKey: crypto.randomUUID(),
-  })
+  await send(
+    `/${r.id}/${action}`,
+    {
+      version: r.version,
+      reason: decision(r.id).reason.trim(),
+      idempotencyKey: crypto.randomUUID(),
+    },
+    decision(r.id).ack,
+    decision(r.id).reason,
+  )
 }
 async function retry() {
   if (!pending.value || busy.value || locked.value || !retryAllowed.value)
@@ -173,6 +194,7 @@ async function retry() {
     if (!alive) return
     remember()
     data.value = d
+    decisions.value = {}
     ack.value = false
     reason.value = ''
     if (!p.path)
@@ -252,8 +274,10 @@ onBeforeUnmount(() => {
     </button>
     <template v-if="data">
       <p>
-        授权 {{ data.authorized }} · 待复核 {{ data.pending }} · 已批准
-        {{ data.approved }} · 可登记 {{ data.remaining }} {{ data.unit }}
+        授权 {{ displayQuantity(data.authorized) }} · 待复核
+        {{ displayQuantity(data.pending) }} · 已批准
+        {{ displayQuantity(data.approved) }} · 可登记
+        {{ displayQuantity(data.remaining) }} {{ data.unit }}
       </p>
       <form
         v-if="report && data.orderStatus === 'APPROVED'"
@@ -288,7 +312,10 @@ onBeforeUnmount(() => {
           提交完工复核
         </button>
       </form>
-      <div v-if="report || review" class="completion-reason">
+      <div
+        v-if="report && data.orderStatus === 'APPROVED'"
+        class="completion-reason"
+      >
         <label
           >登记或处理依据<input
             v-model="reason"
@@ -326,19 +353,21 @@ onBeforeUnmount(() => {
                 </details>
               </td>
               <td>
-                {{ r.quantity }} {{ data.unit }}<br />{{ r.production_date }}
+                {{ displayQuantity(r.quantity) }} {{ data.unit }}<br />{{
+                  businessDate(r.production_date)
+                }}
               </td>
               <td>
                 {{ labels[r.status] }}<br />登记：{{ r.created_by
-                }}<template v-if="r.reviewed_by"
-                  ><br />处理：{{ r.reviewed_by }}<br />{{
-                    r.review_reason
-                  }}</template
+                }}<small>{{ timestamp(r.created_at) }}</small
+                ><template v-if="r.reviewed_by"
+                  ><br />处理：{{ r.reviewed_by }}<br />{{ r.review_reason
+                  }}<small>{{ timestamp(r.reviewed_at) }}</small></template
                 >
               </td>
               <td>
                 <template v-if="r.receipt"
-                  >FG-{{ r.receipt.id }} ·
+                  >成品入库 FG-{{ r.receipt.id }} ·
                   {{
                     r.receipt.status === 'REJECTED'
                       ? '不合格隔离'
@@ -349,23 +378,59 @@ onBeforeUnmount(() => {
               <td>
                 <div class="completion-actions">
                   <template v-if="r.status === 'SUBMITTED'">
+                    <div
+                      v-if="
+                        (review && r.created_by !== username) ||
+                        (report && r.created_by === username)
+                      "
+                      class="record-decision"
+                    >
+                      <label
+                        >本报告处理意见<input
+                          v-model="decision(r.id).reason"
+                          :aria-label="`处理意见 ${r.report_no}`"
+                          maxlength="500"
+                          :disabled="blocked"
+                      /></label>
+                      <label
+                        ><input
+                          v-model="decision(r.id).ack"
+                          type="checkbox"
+                          :aria-label="`核对报告 ${r.report_no}`"
+                          :disabled="blocked"
+                        />已核对 {{ r.report_no }} · {{ r.batch_no }} ·
+                        {{ displayQuantity(r.quantity) }} {{ data.unit }}</label
+                      >
+                    </div>
                     <button
                       v-if="review && r.created_by !== username"
-                      :disabled="blocked || !ack || !reason.trim()"
+                      :disabled="
+                        blocked ||
+                        !decision(r.id).ack ||
+                        !decision(r.id).reason.trim()
+                      "
                       @click="act(r, 'approve')"
                     >
                       批准完工
                     </button>
                     <button
                       v-if="review && r.created_by !== username"
-                      :disabled="blocked || !ack || !reason.trim()"
+                      :disabled="
+                        blocked ||
+                        !decision(r.id).ack ||
+                        !decision(r.id).reason.trim()
+                      "
                       @click="act(r, 'reject')"
                     >
                       驳回报告
                     </button>
                     <button
                       v-if="report && r.created_by === username"
-                      :disabled="blocked || !ack || !reason.trim()"
+                      :disabled="
+                        blocked ||
+                        !decision(r.id).ack ||
+                        !decision(r.id).reason.trim()
+                      "
                       @click="act(r, 'cancel')"
                     >
                       撤销登记
@@ -375,7 +440,7 @@ onBeforeUnmount(() => {
                     v-if="
                       r.receipt && authorities.includes('wms:finished:read')
                     "
-                    :to="`/finished-goods?warehouseId=${r.receipt.warehouse_id}`"
+                    :to="`/finished-goods?warehouseId=${r.receipt.warehouse_id}&receiptId=${r.receipt.id}`"
                     >办理成品入库</RouterLink
                   >
                 </div>

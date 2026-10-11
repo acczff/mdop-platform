@@ -51,10 +51,12 @@ beforeEach(() => {
   vi.mocked(request).mockResolvedValue(structuredClone(initial))
 })
 async function acknowledge(v: VueWrapper) {
-  await v
-    .find('input[placeholder="填写实际完工依据或复核意见"]')
-    .setValue('核对实际产量')
-  await v.find('input[type=checkbox]').setValue(true)
+  const registration = v.find('input[placeholder="填写实际完工依据或复核意见"]')
+  if (registration.exists()) await registration.setValue('核对实际产量')
+  for (const input of v.findAll('input[aria-label^="处理意见"]'))
+    await input.setValue('核对实际产量')
+  for (const input of v.findAll('input[type=checkbox]'))
+    await input.setValue(true)
 }
 it('records explicit report batch and date without inferring output from materials', async () => {
   const v = setup()
@@ -221,4 +223,35 @@ it('does not erase retry evidence when a response arrives after leaving the orde
   finish(initial)
   await flushPromises()
   expect(sessionStorage.getItem(storageKey)).toBe(newer)
+})
+
+it('keeps each report review acknowledgement and reason separate', async () => {
+  vi.mocked(request).mockResolvedValue({
+    ...initial,
+    reports: [
+      report,
+      { ...report, id: 9, report_no: 'DONE-4', batch_no: 'B2', quantity: '4' },
+    ],
+  })
+  const v = setup('checker', 'review')
+  await flushPromises()
+  await v.get('[aria-label="处理意见 DONE-6"]').setValue('仅核对 B1')
+  await v.get('[aria-label="核对报告 DONE-6"]').setValue(true)
+  const rows = v.findAll('tbody tr')
+  const secondApprove = rows[1]!
+    .findAll('button')
+    .find((b) => b.text() === '批准完工')!
+  expect(secondApprove.attributes('disabled')).toBeDefined()
+  await rows[0]!
+    .findAll('button')
+    .find((b) => b.text() === '批准完工')!
+    .trigger('click')
+  await flushPromises()
+  const writes = vi
+    .mocked(request)
+    .mock.calls.filter(([, o]) => o?.method === 'POST')
+  expect(writes).toHaveLength(1)
+  expect(writes[0]![0]).toBe(base + '/8/approve')
+  expect(JSON.parse(writes[0]![1]!.body as string).reason).toBe('仅核对 B1')
+  v.unmount()
 })

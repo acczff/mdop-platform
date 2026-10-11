@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { timestamp } from '../presentation'
 import { computed, onMounted, ref } from 'vue'
 import { ApiError, request } from '../api'
 const props = defineProps<{ authorities: string[]; username: string }>()
@@ -324,7 +325,7 @@ onMounted(() => {
             <p v-if="busy">正在读取…</p>
             <article v-for="a in audits" :key="a.id">
               <p>
-                {{ new Date(a.createdAt).toLocaleString('zh-CN') }} ·
+                {{ timestamp(a.createdAt) }} ·
                 {{ actionNames[a.action] || a.action }} · {{ a.actor }}
               </p>
               <p>{{ a.reason }}</p>

@@ -102,6 +102,12 @@ class ProductionTests extends InventoryScenarioSupport {
         consume(issue, "12.123456", event, 201);
         consume(issue, "13", event, 409);
         long r = requestReturn("10", "QUALIFIED", storageLocation);
+        var display =
+                read("/api/v1/wms/production/issues/" + issue + "/records?returns=true")
+                        .get("items")
+                        .get(0);
+        assertThat(display.get("target_location_name").asText()).isNotBlank();
+        assertThat(display.get("target_location_code").asText()).isNotBlank();
         returnConfirm(r, 200);
         returnConfirm(r, 200);
         returnCancel(r, 409);

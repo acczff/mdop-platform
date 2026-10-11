@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { quantity as displayQuantity, identity } from '../presentation'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { request, type Page } from '../api'
@@ -31,6 +32,8 @@ interface RecordRow {
   status?: string
   quality_status?: string
   target_location_id?: number
+  target_location_name?: string
+  target_location_code?: string
   reason?: string
   cancel_reason?: string
   reported_by?: string
@@ -255,7 +258,7 @@ onMounted(() =>
     </form>
     <template v-if="issue">
       <section class="panel panel-body">
-        <h2>MI-{{ issue.id }} · 工单 {{ issue.work_order_no }}</h2>
+        <h2>领料单 MI-{{ issue.id }} · 工单 {{ issue.work_order_no }}</h2>
         <p>
           {{ issue.material_name }} · 批次 {{ issue.batch_no || '无' }} ·
           {{ issue.target_warehouse_name }} / {{ issue.target_location }}
@@ -263,27 +266,27 @@ onMounted(() =>
         <dl class="metrics">
           <div>
             <dt>已领用</dt>
-            <dd>{{ issue.quantity }} {{ issue.unit }}</dd>
+            <dd>{{ displayQuantity(issue.quantity) }} {{ issue.unit }}</dd>
           </div>
           <div>
             <dt>已消耗</dt>
-            <dd>{{ issue.consumed_qty }}</dd>
+            <dd>{{ displayQuantity(issue.consumed_qty) }}</dd>
           </div>
           <div>
             <dt>已退回</dt>
-            <dd>{{ issue.returned_qty }}</dd>
+            <dd>{{ displayQuantity(issue.returned_qty) }}</dd>
           </div>
           <div>
             <dt>线边剩余</dt>
-            <dd>{{ issue.remaining_qty }}</dd>
+            <dd>{{ displayQuantity(issue.remaining_qty) }}</dd>
           </div>
           <div>
             <dt>待退占用</dt>
-            <dd>{{ issue.pending_return_qty }}</dd>
+            <dd>{{ displayQuantity(issue.pending_return_qty) }}</dd>
           </div>
           <div>
             <dt>可消耗 / 可申请退料</dt>
-            <dd>{{ issue.consumable_qty }}</dd>
+            <dd>{{ displayQuantity(issue.consumable_qty) }}</dd>
           </div>
         </dl>
         <p class="muted">
@@ -322,11 +325,11 @@ onMounted(() =>
             <tbody>
               <tr v-for="row in returns?.items" :key="row.id">
                 <td>
-                  PR-{{ row.id }}<small>{{ row.event_no }}</small
+                  生产退料 PR-{{ row.id }}<small>{{ row.event_no }}</small
                   ><small>{{ statuses[row.status!] }}</small>
                 </td>
                 <td>
-                  {{ row.quantity }} {{ issue.unit
+                  {{ displayQuantity(row.quantity) }} {{ issue.unit
                   }}<small>{{
                     row.quality_status === 'QUALIFIED'
                       ? '合格余料'
@@ -334,7 +337,12 @@ onMounted(() =>
                   }}</small>
                 </td>
                 <td>
-                  #{{ row.target_location_id }}<small>{{ row.reason }}</small
+                  {{
+                    identity(
+                      row.target_location_name,
+                      row.target_location_code,
+                    )
+                  }}<small>当前库位名称</small><small>{{ row.reason }}</small
                   ><small>{{ row.cancel_reason }}</small>
                 </td>
                 <td>
@@ -392,9 +400,9 @@ onMounted(() =>
             <tbody>
               <tr v-for="row in consumptions?.items" :key="row.id">
                 <td>
-                  PC-{{ row.id }}<small>{{ row.event_no }}</small>
+                  生产消耗 PC-{{ row.id }}<small>{{ row.event_no }}</small>
                 </td>
-                <td>{{ row.quantity }} {{ issue.unit }}</td>
+                <td>{{ displayQuantity(row.quantity) }} {{ issue.unit }}</td>
                 <td>
                   {{ row.reported_by }}<small>{{ row.reason }}</small>
                 </td>
@@ -477,7 +485,7 @@ onMounted(() =>
           }}
         </h2>
         <p>
-          MI-{{ issue.id }} · 工单 {{ issue.work_order_no }} ·
+          领料单 MI-{{ issue.id }} · 工单 {{ issue.work_order_no }} ·
           {{ issue.material_name }} · 批次 {{ issue.batch_no || '无' }}
         </p>
         <form @submit.prevent="submit">
@@ -497,7 +505,8 @@ onMounted(() =>
                   pattern="[0-9]{1,12}(\.[0-9]{1,6})?"
               /></label>
               <p>
-                当前可用业务额度：{{ issue.consumable_qty }} {{ issue.unit }}
+                当前可用业务额度：{{ displayQuantity(issue.consumable_qty) }}
+                {{ issue.unit }}
               </p></template
             >
             <template v-if="action === 'request'"
@@ -527,8 +536,8 @@ onMounted(() =>
             >
             <template v-if="action === 'confirm'"
               ><p>
-                退料 PR-{{ selected!.id }} · {{ selected!.quantity }}
-                {{ issue.unit }} ·
+                生产退料 PR-{{ selected!.id }} ·
+                {{ displayQuantity(selected!.quantity) }} {{ issue.unit }} ·
                 {{
                   selected!.quality_status === 'QUALIFIED'
                     ? '合格余料'

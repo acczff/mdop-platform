@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { quantity as displayQuantity } from '../presentation'
+import { timestamp } from '../presentation'
 import { onMounted, ref } from 'vue'
 import { request } from '../api'
 defineProps<{ authorities: string[] }>()
@@ -173,7 +175,7 @@ onMounted(load)
       class="error"
     >
       超过5分钟未完成 {{ counts.stalled }} 条 · 已隔离无效消息
-      {{ counts.rejected }} 次。请核对处理记录。
+      {{ displayQuantity(counts.rejected) }} 次。请核对处理记录。
     </p>
     <p class="hint">
       发布成功表示消息已到达队列；ERP/QMS
@@ -265,7 +267,8 @@ onMounted(load)
       <p v-if="!history.length" class="muted">暂无处理记录</p>
       <ul>
         <li v-for="(item, index) in history" :key="index">
-          {{ item.occurred_at }} · {{ item.action }} · {{ item.actor }} ·
+          {{ timestamp(item.occurred_at) }} · {{ item.action }} ·
+          {{ item.actor }} ·
           {{ item.detail || '—' }}
         </li>
       </ul>
@@ -324,8 +327,8 @@ onMounted(load)
       </p>
       <ul>
         <li v-for="item in rejections" :key="item.fingerprint">
-          {{ item.received_at }} · {{ item.reason }} · {{ item.occurrences }} 次
-          · 指纹 {{ item.fingerprint }}
+          {{ timestamp(item.received_at) }} · {{ item.reason }} ·
+          {{ item.occurrences }} 次 · 指纹 {{ item.fingerprint }}
         </li>
       </ul>
     </section>

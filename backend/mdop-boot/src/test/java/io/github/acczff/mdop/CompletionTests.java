@@ -108,6 +108,10 @@ class CompletionTests extends MaterialScenarioSupport {
             var d = postAs(approve, cmd, reviewer(), 200);
             postAs(approve, cmd, reviewer(), 200);
             long id = last(d).get("receipt").get("id").asLong();
+            var displayed = read("/api/v1/wms/finished-receipts/" + id);
+            assertThat(displayed.get("completion_report_no").asText())
+                    .isEqualTo(in.get("reportNo"));
+            assertThat(displayed.get("demand_no").asText()).isNotEqualTo(in.get("reportNo"));
             receipts[index++] = id;
             postAs(
                     "/api/v1/wms/finished-receipts/" + id + "/putaway",

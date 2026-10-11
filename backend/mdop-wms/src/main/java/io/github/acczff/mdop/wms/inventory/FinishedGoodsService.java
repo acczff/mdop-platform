@@ -58,7 +58,7 @@ public class FinishedGoodsService
     }
 
     private static final String SELECT =
-            "SELECT d.*,CAST(d.quantity AS CHAR) AS amount,rl.name AS received_location,sl.name AS stored_location FROM wms_finished_receipt d LEFT JOIN mdm_location rl ON rl.id=d.received_location_id LEFT JOIN mdm_location sl ON sl.id=d.stored_location_id";
+            "SELECT d.*,CAST(d.quantity AS CHAR) AS amount,c.report_no AS completion_report_no,rl.code AS received_location_code,rl.name AS received_location,sl.code AS stored_location_code,sl.name AS stored_location FROM wms_finished_receipt d LEFT JOIN mdm_location rl ON rl.id=d.received_location_id LEFT JOIN mdm_location sl ON sl.id=d.stored_location_id LEFT JOIN mfg_completion c ON c.id=d.completion_report_id";
 
     public InventoryService.Page list(long warehouse, int page, int size) {
         access.requireWarehouse(warehouse);
@@ -68,10 +68,14 @@ public class FinishedGoodsService
                         .query(Long.class)
                         .single();
         return new InventoryService.Page(
-                db.sql(SELECT + " WHERE d.warehouse_id=? ORDER BY d.id DESC LIMIT ? OFFSET ?")
+                db
+                        .sql(SELECT + " WHERE d.warehouse_id=? ORDER BY d.id DESC LIMIT ? OFFSET ?")
                         .params(warehouse, size, (long) page * size)
                         .query()
-                        .listOfRows(),
+                        .listOfRows()
+                        .stream()
+                        .map(this::displayDates)
+                        .toList(),
                 page,
                 size,
                 total,
@@ -81,6 +85,15 @@ public class FinishedGoodsService
     public Map<String, Object> detail(long id) {
         var d = find(SELECT + " WHERE d.id=?", id);
         access.requireWarehouse(n(d, "warehouse_id"));
+        return displayDates(d);
+    }
+
+    private Map<String, Object> displayDates(Map<String, Object> d) {
+        for (String key : List.of("production_date", "expiry_date")) {
+            if (d.get(key) instanceof java.sql.Date date) {
+                d.put(key, date.toLocalDate().toString());
+            }
+        }
         return d;
     }
 

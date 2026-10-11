@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import RecordHeading from '../components/RecordHeading.vue'
+import { identity } from '../presentation'
+import { quantity as displayQuantity, timestamp } from '../presentation'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 const route = useRoute()
@@ -59,6 +62,7 @@ const warehouseId = ref(0),
   batch = ref(''),
   quality = ref('')
 const includeZero = ref(false),
+  initializing = ref(true),
   busy = ref(false),
   error = ref('')
 const stocks = ref<Page<Stock>>(),
@@ -258,6 +262,8 @@ onMounted(async () => {
       await followBalance(Number(route.query.balanceId))
   } catch (e) {
     error.value = (e as Error).message
+  } finally {
+    initializing.value = false
   }
 })
 </script>
@@ -278,7 +284,7 @@ onMounted(async () => {
       <h2>确认仓内移库 · {{ moving.material_name }}</h2>
       <p>
         来源：{{ moving.location_name }} · 批次 {{ moving.batch_no || '无' }} ·
-        可用 {{ moving.available_qty }} {{ moving.unit }}
+        可用 {{ displayQuantity(moving.available_qty) }} {{ moving.unit }}
       </p>
       <p class="hint">
         仅同仓正式存储库位之间移动合格可用库存。请在实物移动完成后确认，原始流水不会覆盖。
@@ -400,12 +406,12 @@ onMounted(async () => {
                   >已冻结 · FR-{{ s.active_freeze_id }}</small
                 >
               </td>
-              <td>{{ s.on_hand_qty }}</td>
+              <td>{{ displayQuantity(s.on_hand_qty) }}</td>
               <td>
-                {{ s.available_qty
+                {{ displayQuantity(s.available_qty)
                 }}<small class="muted"
-                  >预占 {{ s.reserved_qty || '0' }} · 生产占用
-                  {{ s.production_qty || '0' }}</small
+                  >预占 {{ displayQuantity(s.reserved_qty) }} · 生产占用
+                  {{ displayQuantity(s.production_qty) }}</small
                 >
               </td>
               <td>
@@ -443,7 +449,13 @@ onMounted(async () => {
             </tr>
             <tr v-if="!stocks?.items.length">
               <td colspan="7">
-                {{ busy ? '正在加载…' : '没有符合条件的库存记录' }}
+                {{
+                  initializing || busy
+                    ? '正在加载…'
+                    : error
+                      ? '查询失败，请重试'
+                      : '没有符合条件的库存记录'
+                }}
               </td>
             </tr>
           </tbody>
@@ -469,7 +481,46 @@ onMounted(async () => {
       </div>
     </section>
     <section v-if="selected" class="panel" aria-label="库存流水">
-      <h2>{{ selected.material_name }} · 库存流水</h2>
+      <RecordHeading
+        :title="identity(selected.material_name, selected.material_code)"
+        subtitle="库存详情与流水"
+        :status="qualityNames[selected.quality_status]"
+        ><button :disabled="busy" @click="selected = undefined">
+          收起详情
+        </button></RecordHeading
+      >
+      <dl class="record-facts">
+        <div>
+          <dt>在手数量</dt>
+          <dd>
+            {{ displayQuantity(selected.on_hand_qty) }} {{ selected.unit }}
+          </dd>
+        </div>
+        <div>
+          <dt>可用数量</dt>
+          <dd>
+            {{ displayQuantity(selected.available_qty) }} {{ selected.unit }}
+          </dd>
+        </div>
+        <div>
+          <dt>已预占</dt>
+          <dd>
+            {{ displayQuantity(selected.reserved_qty) }} {{ selected.unit }}
+          </dd>
+        </div>
+        <div>
+          <dt>库存限制</dt>
+          <dd>
+            {{
+              selected.active_freeze_id
+                ? '库存已冻结，禁止出库'
+                : selected.quality_status !== 'QUALIFIED'
+                  ? '质量限制，不可用'
+                  : '可用量还受库位及预占限制'
+            }}
+          </dd>
+        </div>
+      </dl>
       <p>
         {{ selected.warehouse_name }} / {{ selected.location_name }} · 批次
         {{ selected.batch_no || '无' }} ·
@@ -489,9 +540,9 @@ onMounted(async () => {
             <tr>
               <th>流水 / 类型</th>
               <th>业务来源</th>
-              <th>变动前</th>
-              <th>变动数量</th>
-              <th>变动后</th>
+              <th>变动前（{{ selected.unit }}）</th>
+              <th>变动数量（{{ selected.unit }}）</th>
+              <th>变动后（{{ selected.unit }}）</th>
               <th>关联记录</th>
               <th>操作人 / 时间</th>
             </tr>
@@ -506,29 +557,47 @@ onMounted(async () => {
               </td>
               <td>
                 <template v-if="t.cross_transfer_id"
-                  >跨仓 WT-{{ t.cross_transfer_id
+                  >跨仓调拨 WT-{{ t.cross_transfer_id
                   }}<small v-if="t.cross_transfer_receipt_id"
-                    >收货 CR-{{ t.cross_transfer_receipt_id }}</small
+                    >调拨收货 CR-{{ t.cross_transfer_receipt_id }}</small
                   ></template
                 >
                 <template v-else-if="t.sales_order_id"
-                  >销售 SO-{{ t.sales_order_id }}</template
+                  ><RouterLink
+                    v-if="
+                      authorities.includes('ROLE_ADMIN') ||
+                      authorities.includes('wms:sales:read')
+                    "
+                    :to="`/sales?warehouseId=${selected.warehouse_id}&salesOrderId=${t.sales_order_id}`"
+                    >销售出库 SO-{{ t.sales_order_id }}</RouterLink
+                  ><span v-else
+                    >销售出库 SO-{{ t.sales_order_id }}</span
+                  ></template
                 ><template v-else-if="t.finished_receipt_id"
-                  >成品 FG-{{ t.finished_receipt_id }}</template
+                  ><RouterLink
+                    v-if="
+                      authorities.includes('ROLE_ADMIN') ||
+                      authorities.includes('wms:finished:read')
+                    "
+                    :to="`/finished-goods?warehouseId=${selected.warehouse_id}&receiptId=${t.finished_receipt_id}`"
+                    >成品入库 FG-{{ t.finished_receipt_id }}</RouterLink
+                  ><span v-else
+                    >成品入库 FG-{{ t.finished_receipt_id }}</span
+                  ></template
                 ><template v-else-if="t.issue_id"
-                  >领料 MI-{{ t.issue_id
+                  >领料单 MI-{{ t.issue_id
                   }}<small v-if="t.consumption_id"
-                    >消耗 PC-{{ t.consumption_id }}</small
+                    >消耗 生产消耗 PC-{{ t.consumption_id }}</small
                   ><small v-if="t.production_return_id"
-                    >退料 PR-{{ t.production_return_id }}</small
+                    >生产退料 PR-{{ t.production_return_id }}</small
                   ><small v-if="t.production_reversal_id"
                     >生产冲正 PCR-{{ t.production_reversal_id }}</small
                   ></template
                 >
                 <template v-else-if="t.count_id"
-                  >盘点 CT-{{ t.count_id }}</template
+                  >盘点单 CT-{{ t.count_id }}</template
                 ><template v-else-if="t.transfer_id"
-                  >移库 TR-{{ t.transfer_id
+                  >移库单 TR-{{ t.transfer_id
                   }}<small
                     >来源可能包含多次收货，沿库存维度追溯。</small
                   ></template
@@ -539,9 +608,9 @@ onMounted(async () => {
                   ><small>采购：{{ t.purchase_order_no }}</small></template
                 >
               </td>
-              <td>{{ t.before_qty }}</td>
-              <td>{{ t.change_qty }}</td>
-              <td>{{ t.after_qty }}</td>
+              <td>{{ displayQuantity(t.before_qty) }}</td>
+              <td>{{ displayQuantity(t.change_qty) }}</td>
+              <td>{{ displayQuantity(t.after_qty) }}</td>
               <td>
                 <span v-if="t.reversed_transaction_id"
                   >冲正原流水 #{{ t.reversed_transaction_id }}</span
@@ -552,21 +621,21 @@ onMounted(async () => {
                     :disabled="busy"
                     @click="followBalance(t.source_balance_id)"
                   >
-                    来源库存 #{{ t.source_balance_id }}</button
+                    查看来源库存</button
                   ><button
                     v-if="t.target_balance_id"
                     :disabled="busy"
                     @click="followBalance(t.target_balance_id)"
                   >
-                    目标库存 #{{ t.target_balance_id }}
+                    查看目标库存
                   </button></span
                 >
                 <span v-else-if="t.purchase_return_id"
-                  >退货 RT-{{ t.purchase_return_id }}</span
+                  >采购退货 RT-{{ t.purchase_return_id }}</span
                 ><span v-else>—</span>
               </td>
               <td>
-                {{ t.created_by }}<small>{{ t.created_at }}</small>
+                {{ t.created_by }}<small>{{ timestamp(t.created_at) }}</small>
               </td>
             </tr>
             <tr v-if="!ledger?.items.length">

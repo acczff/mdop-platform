@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { quantity as displayQuantity } from '../presentation'
 import { computed, onMounted, ref } from 'vue'
 import { request, type Warehouse, type Page } from '../api'
 const props = defineProps<{ authorities: string[] }>()
@@ -270,7 +271,8 @@ onMounted(async () => {
         <div v-for="line in lines" :key="line.id" class="quality-line">
           <strong>{{ line.material_code }} · {{ line.material_name }}</strong
           ><span
-            >收货 {{ line.quantity }} · 批次 {{ line.batch_no || '无' }}</span
+            >收货 {{ displayQuantity(line.quantity) }} · 批次
+            {{ line.batch_no || '无' }}</span
           >
           <label
             >合格数量<input
@@ -296,8 +298,18 @@ onMounted(async () => {
       <div v-else v-for="line in lines" :key="line.id" class="quality-line">
         <strong>{{ line.material_code }} · {{ line.material_name }}</strong>
         <span
-          >合格 {{ line.qualified_qty ?? '待检' }} / 不合格
-          {{ line.rejected_qty ?? '待检' }}</span
+          >合格
+          {{
+            line.qualified_qty == null
+              ? '待检'
+              : displayQuantity(line.qualified_qty)
+          }}
+          / 不合格
+          {{
+            line.rejected_qty == null
+              ? '待检'
+              : displayQuantity(line.rejected_qty)
+          }}</span
         >
         <span v-if="line.putaway_location_id"
           >已上架至

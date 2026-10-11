@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { quantity as displayQuantity, timestamp } from '../presentation'
 import { onMounted, ref } from 'vue'
 import { request, type Page, type Warehouse } from '../api'
 const props = defineProps<{ authorities: string[] }>()
@@ -93,7 +94,7 @@ onMounted(async () => {
           </thead>
           <tbody>
             <tr v-for="t in result?.items" :key="t.id">
-              <td>TR-{{ t.id }}<small>已完成</small></td>
+              <td>移库单 TR-{{ t.id }}<small>已完成</small></td>
               <td>
                 {{ t.material_name
                 }}<small
@@ -101,10 +102,11 @@ onMounted(async () => {
                 >
               </td>
               <td>{{ t.source_location }} → {{ t.target_location }}</td>
-              <td>{{ t.quantity }} {{ t.unit }}</td>
+              <td>{{ displayQuantity(t.quantity) }} {{ t.unit }}</td>
               <td>{{ t.reason }}</td>
               <td>
-                {{ t.confirmed_by }}<small>{{ t.confirmed_at }}</small>
+                {{ t.confirmed_by
+                }}<small>{{ timestamp(t.confirmed_at) }}</small>
               </td>
             </tr>
             <tr v-if="!result?.items.length">

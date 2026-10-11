@@ -30,6 +30,8 @@ MDOP（Manufacturing Digital Operations Platform）使用 Java 25、Spring Boot 
 
 公共流程及基本异常的逐项标准见 [WMS 验收清单](docs/project/WMS公共流程验收清单.md)。企业差异化规则按具体工作环境另行确认。
 
+列表与详情采用[数据展示与业务标识规范](docs/guides/data-presentation.md)：区分业务单号与内部引用、当前库存与累计执行、业务日期与操作时间；具体候选验收状态见版本记录。
+
 ## 工程特点
 
 - 草稿与库存记账分离，确认实际业务后才写余额、流水及消息；冲正保留原始记录。

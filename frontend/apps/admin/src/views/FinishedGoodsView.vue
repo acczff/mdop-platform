@@ -1,10 +1,34 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import ResultPager from '../components/ResultPager.vue'
+import {
+  quantity as displayQuantity,
+  identity,
+  businessDate,
+  timestamp,
+} from '../presentation'
+import RecordHeading from '../components/RecordHeading.vue'
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 import { request, type Page, type Warehouse } from '../api'
 const props = defineProps<{ authorities: string[] }>()
 interface Receipt {
+  warehouse_id: number
+  material_code: string
+  date_code: string | null
+  production_date: string | null
+  expiry_date: string | null
+  created_by: string
+  created_at: string
+  received_by: string | null
+  received_at: string | null
+  quality_by: string | null
+  quality_at: string | null
+  stored_by: string | null
+  stored_at: string | null
   production_order_id?: number | null
   completion_report_id?: number | null
+  completion_report_no?: string | null
+  received_location_code?: string | null
+  stored_location_code?: string | null
   id: number
   demand_no: string
   work_order_no: string
@@ -70,6 +94,35 @@ const names: Record<string, string> = {
   PUBLISHING: '发布中',
   DEAD: '死信',
 }
+const detail = ref<Receipt>()
+const detailError = ref('')
+const detailLoading = ref(false)
+let detailGeneration = 0
+async function showDetail(id: number) {
+  const token = ++detailGeneration
+  const selectedWarehouse = warehouse.value
+  detail.value = undefined
+  detailError.value = ''
+  detailLoading.value = true
+  try {
+    const value = await request<Receipt>(`/api/v1/wms/finished-receipts/${id}`)
+    if (token !== detailGeneration) return
+    if (value.warehouse_id !== selectedWarehouse)
+      throw Error('该入库单不属于当前仓库，请核对来源。')
+    detail.value = value
+  } catch (e) {
+    if (token === detailGeneration) detailError.value = (e as Error).message
+  } finally {
+    if (token === detailGeneration) detailLoading.value = false
+  }
+}
+function closeDetail() {
+  ++detailGeneration
+  detail.value = undefined
+  detailError.value = ''
+  detailLoading.value = false
+}
+onBeforeUnmount(closeDetail)
 const events: Record<string, string> = {
   FinishedGoodsReceived: '成品收货反馈',
   FinishedInspectionRequested: '成品检验请求',
@@ -101,6 +154,7 @@ async function perform(fn: () => Promise<void>) {
   }
 }
 async function load(page = 0) {
+  closeDetail()
   result.value = undefined
   modal.value = undefined
   row.value = undefined
@@ -216,6 +270,13 @@ onMounted(() =>
         materials.value = await request('/api/master-data/materials')
     }
     await load()
+    const receiptId = new URLSearchParams(window.location.search).get(
+      'receiptId',
+    )
+    if (receiptId) {
+      if (!/^[1-9][0-9]*$/.test(receiptId)) throw Error('成品入库编号无效')
+      await showDetail(Number(receiptId))
+    }
   }),
 )
 </script>
@@ -251,7 +312,9 @@ onMounted(() =>
         </select></label
       ><button :disabled="busy" @click="perform(() => load())">刷新</button>
     </section>
-    <p v-if="!warehouse">请先维护成品仓、待检位与正式库位，并配置仓库权限。</p>
+    <p v-if="!busy && !error && !warehouse">
+      请先维护成品仓、待检位与正式库位，并配置仓库权限。
+    </p>
     <section class="panel">
       <div class="table-wrap">
         <table>
@@ -266,17 +329,19 @@ onMounted(() =>
           <tbody>
             <tr v-for="r in result?.items" :key="r.id">
               <td>
-                FG-{{ r.id }}<small>{{ r.demand_no }}</small
-                ><small>{{ r.work_order_no }}</small>
+                成品入库 FG-{{ r.id }}<small>工单 {{ r.work_order_no }}</small>
                 <small>{{
                   r.completion_report_id
-                    ? `正式完工报告 #${r.completion_report_id}`
+                    ? `完工报告 ${r.completion_report_no || '编号未提供'}`
                     : '模拟 MES 来源'
                 }}</small>
               </td>
               <td>
-                {{ r.material_name
-                }}<small>{{ r.batch_no }} · {{ r.amount }} {{ r.unit }}</small>
+                {{ identity(r.material_name, r.material_code)
+                }}<small
+                  >{{ r.batch_no }} · {{ displayQuantity(r.amount) }}
+                  {{ r.unit }}</small
+                >
               </td>
               <td>
                 {{ names[r.status]
@@ -285,6 +350,12 @@ onMounted(() =>
               </td>
               <td>
                 <div class="row-actions">
+                  <button
+                    :disabled="busy || detailLoading"
+                    @click="showDetail(r.id)"
+                  >
+                    查看详情
+                  </button>
                   <button
                     v-if="r.status === 'OPEN' && allowed('receive')"
                     :disabled="busy"
@@ -316,25 +387,157 @@ onMounted(() =>
               </td>
             </tr>
             <tr v-if="!result?.items.length">
-              <td colspan="4">暂无成品入库需求</td>
+              <td colspan="4">
+                {{
+                  busy
+                    ? '正在读取成品入库…'
+                    : error
+                      ? '查询失败，请重试'
+                      : '暂无成品入库需求'
+                }}
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
-      <div v-if="result" class="pager">
-        <span>共 {{ result.totalElements }} 单</span
-        ><button
-          :disabled="busy || result.page === 0"
-          @click="perform(() => load(result!.page - 1))"
+      <ResultPager
+        v-if="result"
+        :total="result.totalElements"
+        :page="result.page"
+        :pages="result.totalPages"
+        :disabled="busy"
+        @change="(p) => perform(() => load(p))"
+      />
+    </section>
+    <p v-if="detailLoading" role="status">正在读取成品入库详情…</p>
+    <p v-if="detailError" class="error" role="alert">
+      详情读取失败：{{ detailError }}
+    </p>
+    <section
+      v-if="detail"
+      class="panel"
+      style="padding: 20px"
+      aria-label="成品入库详情"
+    >
+      <RecordHeading
+        :title="`成品入库 FG-${detail.id}`"
+        :subtitle="identity(detail.material_name, detail.material_code)"
+        :status="names[detail.status] || detail.status"
+      >
+        <button @click="closeDetail">收起详情</button>
+      </RecordHeading>
+      <dl class="record-facts">
+        <div>
+          <dt>来源工单</dt>
+          <dd>{{ detail.work_order_no }}</dd>
+        </div>
+        <div>
+          <dt>
+            {{ detail.completion_report_id ? '完工报告' : '模拟 MES 需求' }}
+          </dt>
+          <dd>
+            {{
+              detail.completion_report_id
+                ? detail.completion_report_no || '编号未提供'
+                : detail.demand_no
+            }}
+          </dd>
+        </div>
+        <div>
+          <dt>目标仓库</dt>
+          <dd>
+            {{
+              warehouses.find((w) => w.id === detail?.warehouse_id)?.name ||
+              '名称未提供'
+            }}
+          </dd>
+        </div>
+        <div>
+          <dt>本单数量</dt>
+          <dd>{{ displayQuantity(detail.amount) }} {{ detail.unit }}</dd>
+        </div>
+        <div>
+          <dt>批次</dt>
+          <dd>{{ detail.batch_no }}</dd>
+        </div>
+        <div>
+          <dt>生产日期</dt>
+          <dd>{{ businessDate(detail.production_date) }}</dd>
+        </div>
+        <div>
+          <dt>有效期</dt>
+          <dd>{{ businessDate(detail.expiry_date) }}</dd>
+        </div>
+        <div>
+          <dt>Date Code</dt>
+          <dd>{{ detail.date_code || '未填写' }}</dd>
+        </div>
+      </dl>
+      <section class="record-section" aria-label="成品入库执行进度">
+        <h3>执行进度</h3>
+        <dl class="record-facts">
+          <div>
+            <dt>入库需求登记</dt>
+            <dd>
+              {{ detail.created_by }} · {{ timestamp(detail.created_at) }}
+            </dd>
+          </div>
+          <div>
+            <dt>实物收货</dt>
+            <dd>
+              {{
+                detail.received_by
+                  ? `${identity(detail.received_location, detail.received_location_code)} · ${detail.received_by}`
+                  : '未收货'
+              }}<br />{{ timestamp(detail.received_at) }}
+            </dd>
+          </div>
+          <div>
+            <dt>质检判定</dt>
+            <dd>
+              {{
+                detail.quality_at
+                  ? detail.status === 'REJECTED'
+                    ? '不合格'
+                    : '合格'
+                  : '未判定'
+              }}
+              · {{ detail.quality_by || '—' }}<br />{{
+                timestamp(detail.quality_at)
+              }}<br />{{ detail.quality_reason || '—' }}
+            </dd>
+          </div>
+          <div>
+            <dt>上架</dt>
+            <dd>
+              {{
+                detail.stored_by
+                  ? `${identity(detail.stored_location, detail.stored_location_code)} · ${detail.stored_by}`
+                  : '未上架'
+              }}<br />{{ timestamp(detail.stored_at) }}
+            </dd>
+          </div>
+        </dl>
+        <p class="hint">
+          本单记录的是入库过程。已上架数量不等于当前库存，后续领用和出库请查看库存流水。库位名称为当前主数据名称。
+        </p>
+        <details class="record-section">
+          <summary>来源标识</summary>
+          <p>接入需求号：{{ detail.demand_no }}</p>
+          <p v-if="detail.completion_report_id">
+            完工报告内部引用：{{ detail.completion_report_id }}
+          </p>
+        </details>
+        <RouterLink
+          v-if="
+            detail.stored_balance_id &&
+            (authorities.includes('ROLE_ADMIN') ||
+              authorities.includes('wms:inventory:read'))
+          "
+          :to="`/inventory?warehouseId=${detail.warehouse_id}&balanceId=${detail.stored_balance_id}`"
+          >查看对应库存与流水</RouterLink
         >
-          上一页</button
-        ><button
-          :disabled="busy || result.page + 1 >= result.totalPages"
-          @click="perform(() => load(result!.page + 1))"
-        >
-          下一页
-        </button>
-      </div>
+      </section>
     </section>
     <div v-if="modal" class="overlay">
       <section
@@ -357,8 +560,9 @@ onMounted(() =>
           }}
         </h2>
         <p v-if="row">
-          FG-{{ row.id }} · 工单 {{ row.work_order_no }} ·
-          {{ row.material_name }} · {{ row.batch_no }} · {{ row.amount }}
+          成品入库 FG-{{ row.id }} · 工单 {{ row.work_order_no }} ·
+          {{ row.material_name }} · {{ row.batch_no }} ·
+          {{ displayQuantity(row.amount) }}
           {{ row.unit }}
         </p>
         <template v-if="modal === 'feedback'"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { quantity as displayQuantity } from '../presentation'
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { request, type Page, type Warehouse } from '../api'
@@ -177,7 +178,7 @@ onMounted(() =>
       <h2>创建盘点快照</h2>
       <p>
         {{ source.material_name }} · {{ source.location_name }} · 当前账面
-        {{ source.on_hand_qty }}
+        {{ displayQuantity(source.on_hand_qty) }}
       </p>
       <p>首版仅支持已有的合格、未过期、无预占的正式库位库存维度。</p>
       <button :disabled="busy" @click="create">保存账面快照</button>
@@ -194,7 +195,7 @@ onMounted(() =>
       </select></label
     ><button :disabled="busy" @click="perform(() => load())">刷新记录</button>
     <section v-if="editing" class="panel" aria-label="录入实盘">
-      <h2>录入 CT-{{ editing.id }}</h2>
+      <h2>录入 盘点单 CT-{{ editing.id }}</h2>
       <form @submit.prevent="submit">
         <fieldset :disabled="busy || !!submittedBody">
           <label
@@ -215,10 +216,11 @@ onMounted(() =>
       </form>
     </section>
     <section v-if="decision" class="panel" aria-label="确认盘点处理">
-      <h2>确认处理 CT-{{ decision.row.id }}</h2>
+      <h2>确认处理 盘点单 CT-{{ decision.row.id }}</h2>
       <p>
-        账面 {{ decision.row.snapshot_qty }} → 实盘
-        {{ decision.row.counted_qty }}，差异 {{ decision.row.difference }}
+        账面 {{ displayQuantity(decision.row.snapshot_qty) }} → 实盘
+        {{ displayQuantity(decision.row.counted_qty) }}，差异
+        {{ decision.row.difference }}
       </p>
       <p>
         {{
@@ -262,7 +264,7 @@ onMounted(() =>
         <tbody>
           <tr v-for="c in result?.items" :key="c.id">
             <td>
-              CT-{{ c.id }}<small>{{ names[c.status] }}</small>
+              盘点单 CT-{{ c.id }}<small>{{ names[c.status] }}</small>
             </td>
             <td>
               {{ c.material_name
@@ -271,8 +273,19 @@ onMounted(() =>
               >
             </td>
             <td>
-              {{ c.snapshot_qty }} → {{ c.counted_qty ?? '待录入' }} {{ c.unit
-              }}<small>差异 {{ c.difference ?? '—' }}</small>
+              {{ displayQuantity(c.snapshot_qty) }} →
+              {{
+                c.counted_qty == null
+                  ? '待录入'
+                  : displayQuantity(c.counted_qty)
+              }}
+              {{ c.unit
+              }}<small
+                >差异
+                {{
+                  c.difference == null ? '—' : displayQuantity(c.difference)
+                }}</small
+              >
             </td>
             <td>
               {{ c.reason || '—' }}<small>{{ c.decision_reason }}</small>

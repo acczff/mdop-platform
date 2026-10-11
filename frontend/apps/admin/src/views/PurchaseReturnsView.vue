@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { quantity as displayQuantity, timestamp } from '../presentation'
 import { computed, onMounted, ref } from 'vue'
 import { request, type Warehouse, type Page } from '../api'
 const props = defineProps<{ authorities: string[]; username: string }>()
@@ -251,7 +252,8 @@ onMounted(async () => {
                 :value="c.receipt_item_id"
               >
                 {{ c.receipt_no }} / {{ c.material_code }} ·
-                {{ c.material_name }} / 可申请 {{ c.remaining_qty }}
+                {{ c.material_name }} / 可申请
+                {{ displayQuantity(c.remaining_qty) }}
               </option>
             </select></label
           >
@@ -260,9 +262,9 @@ onMounted(async () => {
               candidate.location_name
             }}
             · 批次：{{ candidate.batch_no || '无' }}<br />不合格
-            {{ candidate.rejected_qty }}，已占额度（含已退）{{
-              candidate.committed_qty
-            }}，可申请 {{ candidate.remaining_qty }}
+            {{ displayQuantity(candidate.rejected_qty) }}，已占额度（含已退）{{
+              displayQuantity(candidate.committed_qty)
+            }}，可申请 {{ displayQuantity(candidate.remaining_qty) }}
           </p>
           <label
             >本次退货数量<input
@@ -307,7 +309,7 @@ onMounted(async () => {
           </thead>
           <tbody>
             <tr v-for="r in records" :key="r.id">
-              <td>RT-{{ r.id }}</td>
+              <td>采购退货 RT-{{ r.id }}</td>
               <td>
                 {{
                   candidates.find((c) => c.receipt_item_id === r.receiptItemId)
@@ -319,7 +321,7 @@ onMounted(async () => {
                     ?.material_name || r.receiptItemId
                 }}
               </td>
-              <td>{{ r.quantity }}</td>
+              <td>{{ displayQuantity(r.quantity) }}</td>
               <td>{{ names[r.status] }}</td>
               <td>{{ r.requestedBy }}</td>
               <td>
@@ -335,9 +337,10 @@ onMounted(async () => {
     </section>
     <section v-if="selected" class="panel">
       <div class="panel-body">
-        <h2>RT-{{ selected.id }} · {{ names[selected.status] }}</h2>
+        <h2>采购退货 RT-{{ selected.id }} · {{ names[selected.status] }}</h2>
         <p>
-          本次数量 {{ selected.quantity }} · 申请人 {{ selected.requestedBy }}
+          本次数量 {{ displayQuantity(selected.quantity) }} · 申请人
+          {{ selected.requestedBy }}
         </p>
         <p>原因：{{ selected.reason }}</p>
         <p v-if="selected.decisionReason">
@@ -408,7 +411,7 @@ onMounted(async () => {
         <h3>操作记录</h3>
         <ul>
           <li v-for="(event, index) in history" :key="index">
-            {{ event.occurred_at }} · {{ event.actor }} ·
+            {{ timestamp(event.occurred_at) }} · {{ event.actor }} ·
             {{ names[event.action] || '已申请' }} · {{ event.detail }}
           </li>
         </ul>

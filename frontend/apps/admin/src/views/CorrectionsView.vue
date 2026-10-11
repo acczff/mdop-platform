@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { timestamp, quantity as displayQuantity } from '../presentation'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { request, type Warehouse, type Page } from '../api'
 import type { Arrival, ArrivalDetail, Receipt } from '../receiving'
@@ -357,7 +358,13 @@ onMounted(initialize)
                     : types[item.differenceType || '']
                 }}
               </td>
-              <td>{{ item.quantity || '整单' }}</td>
+              <td>
+                {{
+                  item.quantity == null
+                    ? '整单'
+                    : displayQuantity(item.quantity)
+                }}
+              </td>
               <td>{{ item.reason }}</td>
               <td>{{ item.requestedBy }}</td>
               <td>{{ statuses[item.status] }}</td>
@@ -413,7 +420,8 @@ onMounted(initialize)
       </p>
       <ul>
         <li v-for="(log, index) in history" :key="index">
-          {{ log.occurred_at }} · {{ log.actor }} · {{ log.action }} ·
+          {{ timestamp(log.occurred_at) }} · {{ log.actor }} ·
+          {{ log.action }} ·
           {{ log.detail }}
         </li>
       </ul>

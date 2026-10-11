@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { quantity as displayQuantity } from '../presentation'
 import { computed, onMounted, ref } from 'vue'
 import { request, type Page } from '../api'
 const props = defineProps<{
@@ -151,7 +152,7 @@ onMounted(() => perform(() => load()))
         <tbody>
           <tr v-for="r in result?.items" :key="r.id">
             <td>
-              PCR-{{ r.id
+              生产冲正 PCR-{{ r.id
               }}<small>{{
                 r.consumption_id
                   ? '消耗 PC-' + r.consumption_id
@@ -159,7 +160,8 @@ onMounted(() => perform(() => load()))
               }}</small>
             </td>
             <td>
-              {{ r.amount }}<small>{{ names[r.status] }}</small>
+              {{ displayQuantity(r.amount)
+              }}<small>{{ names[r.status] }}</small>
             </td>
             <td>
               {{ r.external_reference }}<small>{{ r.reason }}</small
@@ -233,8 +235,11 @@ onMounted(() => perform(() => load()))
           }}
         </h2>
         <p>
-          领料 MI-{{ issueId
-          }}<span v-if="row"> · PCR-{{ row.id }} · {{ row.amount }}</span>
+          领料单 MI-{{ issueId
+          }}<span v-if="row">
+            · 生产冲正 PCR-{{ row.id }} ·
+            {{ displayQuantity(row.amount) }}</span
+          >
         </p>
         <form @submit.prevent="submit">
           <fieldset :disabled="busy || !!body">
@@ -251,7 +256,7 @@ onMounted(() => perform(() => load()))
                 >原记录<select v-model="source" required>
                   <option v-for="o in options" :key="o.id" :value="o.id">
                     {{ kind === 'CONSUMPTION' ? 'PC-' : 'PR-' }}{{ o.id }} ·
-                    {{ o.quantity }}
+                    {{ displayQuantity(o.quantity) }}
                   </option>
                 </select></label
               >

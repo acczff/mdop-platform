@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { timestamp } from '../presentation'
 import { computed, onMounted, onBeforeUnmount, reactive, ref } from 'vue'
 import { ApiError, request, statuses, type Warehouse, type Page } from '../api'
 import { areaNames } from '../receiving'
@@ -665,7 +666,7 @@ onBeforeUnmount(() => {
               <tr v-for="a in historyRows" :key="a.id">
                 <td>
                   {{ a.action_type === 'CREATE' ? '创建' : '维护'
-                  }}<small>{{ a.created_at }}</small>
+                  }}<small>{{ timestamp(a.created_at) }}</small>
                 </td>
                 <td>
                   {{ a.created_by }}<small>{{ a.reason }}</small>

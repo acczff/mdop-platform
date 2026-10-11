@@ -68,8 +68,8 @@ it('distinguishes net receipt, putaway and pending return and blocks premature c
       authorities: [],
     },
   })
-  expect(view.text()).toContain('净收货 100.000000')
-  expect(view.text()).toContain('冲正 20.000000')
+  expect(view.text()).toContain('净收货 100')
+  expect(view.text()).toContain('冲正 20')
   expect(view.text()).toContain('M01不合格待实际退供')
   expect(view.findAll('button')[1]!.attributes('disabled')).toBeDefined()
   expect(view.findAll('a')).toHaveLength(0)
@@ -99,7 +99,7 @@ it('preserves closure snapshot when current source facts change', () => {
   })
   expect(view.get('[role="alert"]').text()).toContain('结案后事实发生变化')
   expect(view.text()).toContain('含退供结案')
-  expect(view.text()).toContain('实际退供 20.000000')
+  expect(view.text()).toContain('实际退供 20')
   expect(view.findAll('button')).toHaveLength(1)
 })
 it('offers closure only after all blockers clear and respects unknown pending writes', async () => {

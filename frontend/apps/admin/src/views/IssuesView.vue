@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { quantity as displayQuantity } from '../presentation'
 import { computed, onMounted, ref } from 'vue'
 import { request, type Page, type Warehouse } from '../api'
 const props = defineProps<{ authorities: string[] }>()
@@ -319,12 +320,14 @@ onMounted(() =>
           <tbody>
             <tr v-for="row in result?.items" :key="row.id">
               <td>
-                MI-{{ row.id }}<small>{{ row.demand_no }}</small
+                领料单 MI-{{ row.id }}<small>{{ row.demand_no }}</small
                 ><small>{{ row.work_order_no }}</small>
               </td>
               <td>
                 {{ row.material_name
-                }}<small>{{ row.quantity }} {{ row.unit }}</small>
+                }}<small
+                  >{{ displayQuantity(row.quantity) }} {{ row.unit }}</small
+                >
               </td>
               <td>
                 {{ row.batch_no || '待选择批次'
@@ -464,8 +467,9 @@ onMounted(() =>
           }}
         </h2>
         <p>
-          MI-{{ action.row.id }} · 工单 {{ action.row.work_order_no }} ·
-          {{ action.row.material_name }} · {{ action.row.quantity }}
+          领料单 MI-{{ action.row.id }} · 工单 {{ action.row.work_order_no }} ·
+          {{ action.row.material_name }} ·
+          {{ displayQuantity(action.row.quantity) }}
           {{ action.row.unit }}
         </p>
         <form @submit.prevent="decide">
@@ -475,7 +479,7 @@ onMounted(() =>
                 >来源库存<select v-model="selectedBalance" required>
                   <option v-for="b in stocks" :key="b.id" :value="b.id">
                     {{ b.location_name }} · 批次 {{ b.batch_no }} · 可用
-                    {{ b.available_qty }}
+                    {{ displayQuantity(b.available_qty) }}
                   </option>
                 </select></label
               >
@@ -549,12 +553,13 @@ onMounted(() =>
         aria-modal="true"
         aria-label="预占记录"
       >
-        <h2>MI-{{ history.row.id }} 预占记录</h2>
+        <h2>领料单 MI-{{ history.row.id }} 预占记录</h2>
         <p v-if="!history.events.length">尚无预占记录</p>
         <ol>
           <li v-for="e in history.events" :key="e.id">
-            {{ eventNames[e.event_type] }} {{ e.quantity }} · 库存预占量
-            {{ e.before_reserved }} → {{ e.after_reserved }} ·
+            {{ eventNames[e.event_type] }} {{ displayQuantity(e.quantity) }} ·
+            库存预占量 {{ displayQuantity(e.before_reserved) }} →
+            {{ displayQuantity(e.after_reserved) }} ·
             {{ e.created_by }}
           </li>
         </ol>

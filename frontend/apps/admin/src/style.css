@@ -5,6 +5,60 @@
   font-synthesis: none;
   line-height: 1.5;
 }
+.record-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.record-heading h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.record-subtitle {
+  margin: 6px 0 0;
+  color: #625d73;
+}
+.record-status {
+  padding: 4px 10px;
+  border-radius: 5px;
+  background: #f0eafb;
+}
+.record-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+.record-facts dt {
+  color: #625d73;
+  font-size: 13px;
+}
+.record-facts dd {
+  margin: 4px 0 0;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.record-section {
+  margin-top: 20px;
+  border-top: 1px solid #e6e2ed;
+  padding-top: 16px;
+}
+.record-section > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.record-section > summary:focus-visible {
+  outline-offset: 4px;
+}
+.record-section[open] > summary {
+  margin-bottom: 16px;
+}
+td {
+  font-variant-numeric: tabular-nums;
+}
 * {
   box-sizing: border-box;
 }
