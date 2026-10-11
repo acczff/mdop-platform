@@ -1,12 +1,10 @@
 <script setup lang="ts">
+import OperationRecord from '../components/OperationRecord.vue'
+import OperationTimeNote from '../components/OperationTimeNote.vue'
 import ResultPager from '../components/ResultPager.vue'
 import RecordHeading from '../components/RecordHeading.vue'
 import { identity } from '../presentation'
-import {
-  quantity as displayQuantity,
-  businessDate,
-  timestamp,
-} from '../presentation'
+import { quantity as displayQuantity, businessDate } from '../presentation'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ApiError, request, type Page, type Warehouse } from '../api'
 import MaterialPlanPanel from '../components/MaterialPlanPanel.vue'
@@ -583,9 +581,14 @@ onBeforeUnmount(() => {
           {{ o.site_code }} · {{ o.site_name }} → {{ o.warehouse_name }} · 计划
           {{ businessDate(o.planned_date) }}
         </p>
-        <p v-if="o.approved_by">
-          批准：{{ o.approved_by }} · {{ timestamp(o.approved_at) }}
-        </p>
+        <OperationRecord
+          v-if="o.approved_by"
+          title="工单批准"
+          result="已批准"
+          :account="o.approved_by"
+          :at="o.approved_at"
+        />
+        <OperationTimeNote v-if="o.approved_by" />
         <div class="toolbar">
           <template v-if="write && ['DRAFT', 'REJECTED'].includes(o.status)"
             ><button :disabled="blocked" @click="open('edit', o)">
@@ -667,10 +670,16 @@ onBeforeUnmount(() => {
         <summary>
           操作历史（已加载 {{ detail.history.length }} 条，上限 1000 条）
         </summary>
-        <p v-for="h in detail.history" :key="h.id">
-          {{ label(h.action) }} · {{ h.created_by }} ·
-          {{ timestamp(h.created_at) }}<br />{{ h.reason }}
-        </p>
+        <OperationRecord
+          v-for="h in detail.history"
+          :key="h.id"
+          :title="label(h.action)"
+          :account="h.created_by"
+          :at="h.created_at"
+          :note="h.reason"
+          note-label="操作依据"
+        />
+        <OperationTimeNote v-if="detail.history.length" />
       </details>
     </section>
     <div v-if="mode" class="modal-backdrop">

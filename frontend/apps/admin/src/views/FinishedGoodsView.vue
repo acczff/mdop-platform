@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import ResultPager from '../components/ResultPager.vue'
+import OperationRecord from '../components/OperationRecord.vue'
+import OperationTimeNote from '../components/OperationTimeNote.vue'
 import {
   quantity as displayQuantity,
   identity,
   businessDate,
-  timestamp,
 } from '../presentation'
 import RecordHeading from '../components/RecordHeading.vue'
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
@@ -475,49 +476,55 @@ onMounted(() =>
       </dl>
       <section class="record-section" aria-label="成品入库执行进度">
         <h3>执行进度</h3>
-        <dl class="record-facts">
-          <div>
-            <dt>入库需求登记</dt>
-            <dd>
-              {{ detail.created_by }} · {{ timestamp(detail.created_at) }}
-            </dd>
-          </div>
-          <div>
-            <dt>实物收货</dt>
-            <dd>
-              {{
-                detail.received_by
-                  ? `${identity(detail.received_location, detail.received_location_code)} · ${detail.received_by}`
-                  : '未收货'
-              }}<br />{{ timestamp(detail.received_at) }}
-            </dd>
-          </div>
-          <div>
-            <dt>质检判定</dt>
-            <dd>
-              {{
-                detail.quality_at
-                  ? detail.status === 'REJECTED'
-                    ? '不合格'
-                    : '合格'
-                  : '未判定'
-              }}
-              · {{ detail.quality_by || '—' }}<br />{{
-                timestamp(detail.quality_at)
-              }}<br />{{ detail.quality_reason || '—' }}
-            </dd>
-          </div>
-          <div>
-            <dt>上架</dt>
-            <dd>
-              {{
-                detail.stored_by
-                  ? `${identity(detail.stored_location, detail.stored_location_code)} · ${detail.stored_by}`
+        <div class="execution-grid">
+          <OperationRecord
+            title="入库需求登记"
+            result="已登记"
+            :account="detail.created_by"
+            :at="detail.created_at"
+          />
+          <OperationRecord
+            title="实物收货"
+            :result="detail.received_at ? '已收货' : '未收货'"
+            :account="detail.received_by"
+            :at="detail.received_at"
+            :location="detail.received_location"
+            :location-code="detail.received_location_code"
+            location-label="接收库位"
+          />
+          <OperationRecord
+            title="质检判定"
+            :result="
+              !detail.quality_at
+                ? '未判定'
+                : detail.status === 'REJECTED'
+                  ? '不合格'
+                  : ['QUALIFIED', 'STORED'].includes(detail.status)
+                    ? '合格'
+                    : '结果待核对'
+            "
+            :account="detail.quality_by"
+            :at="detail.quality_at"
+            :note="detail.quality_reason"
+            note-label="判定备注"
+          />
+          <OperationRecord
+            title="上架"
+            :result="
+              detail.stored_at
+                ? '已上架'
+                : detail.status === 'REJECTED'
+                  ? '不合格，禁止上架'
                   : '未上架'
-              }}<br />{{ timestamp(detail.stored_at) }}
-            </dd>
-          </div>
-        </dl>
+            "
+            :account="detail.stored_by"
+            :at="detail.stored_at"
+            :location="detail.stored_location"
+            :location-code="detail.stored_location_code"
+            location-label="上架库位"
+          />
+        </div>
+        <OperationTimeNote />
         <p class="hint">
           本单记录的是入库过程。已上架数量不等于当前库存，后续领用和出库请查看库存流水。库位名称为当前主数据名称。
         </p>
@@ -677,6 +684,16 @@ onMounted(() =>
   </main>
 </template>
 <style scoped>
+.execution-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 900px) {
+  .execution-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .panel {
   margin-bottom: 20px;
 }

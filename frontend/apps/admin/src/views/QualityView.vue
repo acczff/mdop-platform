@@ -242,6 +242,7 @@ onMounted(async () => {
     </table>
     <section v-if="selected" class="panel">
       <h2>{{ selected.receipt_no }}</h2>
+      <p>检验单号：{{ selected.reference_no || '尚未登记检验结果' }}</p>
       <p class="hint">
         不合格品保留原位置并保持不可用；每条明细的合格数量整行上架。
       </p>
@@ -312,12 +313,17 @@ onMounted(async () => {
           }}</span
         >
         <span v-if="line.putaway_location_id"
-          >已上架至
+          >上架库位：
           {{
             locations.find((l) => l.id === line.putaway_location_id)?.name ||
-            line.putaway_location_id
+            '名称未提供'
           }}</span
         >
+        <small v-if="line.putaway_location_id">{{
+          locations.find((l) => l.id === line.putaway_location_id)?.code
+            ? `库位编码：${locations.find((l) => l.id === line.putaway_location_id)?.code}`
+            : `库位引用：${line.putaway_location_id}`
+        }}</small>
         <template v-else-if="canPutaway && Number(line.qualified_qty) > 0">
           <label
             >目标库位<select
@@ -326,7 +332,7 @@ onMounted(async () => {
             >
               <option :value="0">请选择正式存储库位</option>
               <option v-for="l in targets" :key="l.id" :value="l.id">
-                {{ l.code }} · {{ l.name }}
+                {{ l.name }}（{{ l.code }}）
               </option>
             </select></label
           >

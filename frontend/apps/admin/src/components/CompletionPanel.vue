@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import {
-  quantity as displayQuantity,
-  businessDate,
-  timestamp,
-} from '../presentation'
+import OperationRecord from './OperationRecord.vue'
+import OperationTimeNote from './OperationTimeNote.vue'
+import { quantity as displayQuantity, businessDate } from '../presentation'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ApiError, request } from '../api'
 const props = defineProps<{
@@ -358,12 +356,21 @@ onBeforeUnmount(() => {
                 }}
               </td>
               <td>
-                {{ labels[r.status] }}<br />登记：{{ r.created_by
-                }}<small>{{ timestamp(r.created_at) }}</small
-                ><template v-if="r.reviewed_by"
-                  ><br />处理：{{ r.reviewed_by }}<br />{{ r.review_reason
-                  }}<small>{{ timestamp(r.reviewed_at) }}</small></template
-                >
+                <div class="report-operations">
+                  <OperationRecord
+                    title="完工登记"
+                    :account="r.created_by"
+                    :at="r.created_at"
+                  />
+                  <OperationRecord
+                    :title="r.status === 'CANCELLED' ? '撤销登记' : '完工复核'"
+                    :result="labels[r.status] || r.status"
+                    :account="r.reviewed_by"
+                    :at="r.reviewed_at"
+                    :note="r.review_reason"
+                    note-label="处理意见"
+                  />
+                </div>
               </td>
               <td>
                 <template v-if="r.receipt"
@@ -452,6 +459,7 @@ onBeforeUnmount(() => {
           </tbody>
         </table>
       </div>
+      <OperationTimeNote v-if="data.reports.length" />
       <p class="muted">
         不合格品保持隔离待处理；本页不办理返工、报废或工单结案。
       </p>
@@ -459,6 +467,11 @@ onBeforeUnmount(() => {
   </section>
 </template>
 <style scoped>
+.report-operations {
+  display: grid;
+  gap: 8px;
+  min-width: 280px;
+}
 .completion-panel {
   border-top: 1px solid var(--border, #ddd);
   padding-top: 1rem;

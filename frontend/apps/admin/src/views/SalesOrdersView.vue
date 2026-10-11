@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import ResultPager from '../components/ResultPager.vue'
 import RecordHeading from '../components/RecordHeading.vue'
+import OperationRecord from '../components/OperationRecord.vue'
+import OperationTimeNote from '../components/OperationTimeNote.vue'
 import { identity } from '../presentation'
-import {
-  businessDate,
-  quantity as displayQuantity,
-  timestamp,
-} from '../presentation'
+import { businessDate, quantity as displayQuantity } from '../presentation'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ApiError, request, type Page, type Warehouse } from '../api'
 import { remaining, scaled } from '../quantity'
@@ -685,11 +683,15 @@ onBeforeUnmount(() => {
           </button>
         </div>
         <template v-if="detail.closure"
-          ><p class="success">
-            已保存数量结案快照 · {{ detail.closure.closed_by }} ·
-            {{ timestamp(detail.closure.closed_at) }}
-          </p>
-          <p>{{ detail.closure.reason }}</p>
+          ><OperationRecord
+            title="数量履约结案"
+            result="已保存数量结案快照"
+            :account="detail.closure.closed_by"
+            :at="detail.closure.closed_at"
+            :note="detail.closure.reason"
+            note-label="结案原因"
+          />
+          <OperationTimeNote />
           <p v-if="!detail.closureMatches" class="error" role="alert">
             当前事实与结案快照不一致，请联系管理员核对。
           </p>
@@ -738,9 +740,13 @@ onBeforeUnmount(() => {
       <details class="history">
         <summary>操作历史（{{ detail.history.length }}）</summary>
         <div v-for="h in detail.history" :key="h.id" class="history-item">
-          <strong>{{ auditNames[h.action] || h.action }}</strong> ·
-          {{ h.created_by }} · {{ timestamp(h.created_at) }}
-          <p>{{ h.reason }}</p>
+          <OperationRecord
+            :title="auditNames[h.action] || h.action"
+            :account="h.created_by"
+            :at="h.created_at"
+            :note="h.reason"
+            note-label="操作依据"
+          />
           <details>
             <summary>变更快照</summary>
             <p class="hint">变更前</p>
@@ -749,6 +755,7 @@ onBeforeUnmount(() => {
             <pre>{{ describeSnapshot(h.after_state) }}</pre>
           </details>
         </div>
+        <OperationTimeNote v-if="detail.history.length" />
       </details>
     </section>
     <div v-if="mode" class="overlay">

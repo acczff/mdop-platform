@@ -15,14 +15,17 @@ export function businessDate(value: string | null | undefined): string {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '日期待核对'
 }
 
-export function timestamp(value: string | null | undefined): string {
+export function timestamp(
+  value: string | null | undefined,
+  inlineTimezone = true,
+): string {
   if (!value) return '—'
   // An offset-free value has no reliable timezone; do not guess one.
   if (!/(Z|[+-]\d{2}:?\d{2})$/i.test(value)) {
     const local = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(?:\.\d+)?$/.exec(
       value,
     )
-    return `${local ? `${local[1]} ${local[2]}` : value}（时区未提供）`
+    return `${local ? `${local[1]} ${local[2]}` : value}${inlineTimezone ? '（时区未提供）' : ''}`
   }
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '时间待核对'

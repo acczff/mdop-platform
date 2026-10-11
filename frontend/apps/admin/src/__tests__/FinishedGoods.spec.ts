@@ -125,6 +125,48 @@ it('requires an explicit production date instead of silently defaulting to a UTC
   v.unmount()
 })
 
+it.each(['OPEN', 'REJECTED'])(
+  'shows distinct pending and rejected execution stages for %s',
+  async (status) => {
+    const v = setup(status, ['wms:finished:read', 'wms:warehouse:1'])
+    await flushPromises()
+    vi.mocked(request).mockResolvedValueOnce({
+      ...receiptDetail,
+      status,
+      created_by: 'completionreviewer',
+      created_at: '2026-10-11T18:30:24',
+      received_by: status === 'REJECTED' ? 'warehouse01' : null,
+      received_at: status === 'REJECTED' ? '2026-10-11T18:31:15' : null,
+      quality_by: status === 'REJECTED' ? 'qms01' : null,
+      quality_at: status === 'REJECTED' ? '2026-10-11T18:31:37' : null,
+      quality_reason: status === 'REJECTED' ? '抽检不合格\n保持隔离' : null,
+      stored_by: null,
+      stored_at: null,
+      stored_location: null,
+      stored_balance_id: null,
+    })
+    await v
+      .findAll('button')
+      .find((b) => b.text() === '查看详情')!
+      .trigger('click')
+    await flushPromises()
+    const progress = v.get('[aria-label="成品入库执行进度"]')
+    expect(progress.findAll('article')).toHaveLength(4)
+    expect(progress.findAll('.operation-time-note')).toHaveLength(1)
+    expect(progress.get('[aria-label="入库需求登记"]').text()).toContain(
+      '操作账号completionreviewer',
+    )
+    expect(progress.get('[aria-label="上架"]').text()).toContain(
+      status === 'REJECTED' ? '不合格，禁止上架' : '未上架',
+    )
+    expect(progress.get('[aria-label="质检判定"]').text()).toContain(
+      status === 'REJECTED' ? '判定备注抽检不合格' : '未判定',
+    )
+    expect(v.text()).not.toContain('确认上架')
+    v.unmount()
+  },
+)
+
 const receiptDetail = {
   id: 77,
   warehouse_id: 1,

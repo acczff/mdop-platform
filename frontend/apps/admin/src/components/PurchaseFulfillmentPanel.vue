@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { timestamp, quantity as displayQuantity } from '../presentation'
+import { quantity as displayQuantity } from '../presentation'
+import OperationRecord from './OperationRecord.vue'
+import OperationTimeNote from './OperationTimeNote.vue'
 import { computed } from 'vue'
 import { identity } from '../presentation'
 import type { Closure, Fulfillment } from '../purchasing'
@@ -61,13 +63,19 @@ const state: Record<string, string> = {
         </button>
       </div>
     </header>
-    <p v-if="closure" class="hint">
-      {{
-        closure.outcome === 'WITH_RETURNS' ? '含退供结案' : '全部合格上架结案'
-      }}
-      · {{ closure.closed_by }} · {{ timestamp(closure.closed_at) }}
-      <br />结案原因：{{ closure.reason }}
-    </p>
+    <template v-if="closure">
+      <OperationRecord
+        title="数量履约结案"
+        :result="
+          closure.outcome === 'WITH_RETURNS' ? '含退供结案' : '全部合格上架结案'
+        "
+        :account="closure.closed_by"
+        :at="closure.closed_at"
+        :note="closure.reason"
+        note-label="结案原因"
+      />
+      <OperationTimeNote />
+    </template>
     <p v-if="!matches" class="error" role="alert">
       结案后事实发生变化，待核对。原结案快照已保留，不自动重开或覆盖；请核对下方来源单据。
     </p>
