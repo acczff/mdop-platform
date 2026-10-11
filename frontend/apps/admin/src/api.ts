@@ -32,7 +32,9 @@ export async function request<T>(
   } catch {
     throw new ApiError(
       0,
-      '连接失败或请求超时。写入结果可能已生效，请刷新确认后再操作。',
+      ['GET', 'HEAD'].includes(options.method || 'GET')
+        ? '读取失败或请求超时，请重新查询。'
+        : '连接失败或请求超时。写入结果可能已生效，请刷新确认后再操作。',
     )
   }
   if (!response.ok) {

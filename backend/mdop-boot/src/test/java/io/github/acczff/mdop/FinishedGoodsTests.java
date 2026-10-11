@@ -64,6 +64,10 @@ class FinishedGoodsTests extends InventoryScenarioSupport {
                     });
         }
         var receipt = read("/api/v1/wms/finished-receipts/" + id);
+        assertThat(receipt.get("production_date").asText()).isEqualTo(body.get("productionDate"));
+        assertThat(receipt.get("expiry_date").asText()).isEqualTo("2099-01-01");
+        var displayed = read("/api/v1/wms/finished-receipts?warehouseId=" + fg).get("items");
+        assertThat(displayed.toString()).contains("2099-01-01").doesNotContain("2099-01-01T");
         assertThat(receipt.get("status").asText()).isEqualTo("STORED");
         assertThat(qty(receipt.get("received_balance_id").asLong())).isZero();
         assertThat(qty(receipt.get("quality_balance_id").asLong())).isZero();

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { timestamp } from '../presentation'
 import { computed, onMounted, reactive, ref } from 'vue'
 import {
   ApiError,
@@ -252,7 +253,7 @@ onMounted(load)
               </td>
               <td>
                 {{ item.updatedBy
-                }}<small>{{ new Date(item.updatedAt).toLocaleString() }}</small>
+                }}<small>{{ timestamp(item.updatedAt) }}</small>
               </td>
               <td class="actions">
                 <button @click="open(item)">

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ResultPager from '../components/ResultPager.vue'
+import { quantity as displayQuantity, timestamp } from '../presentation'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ApiError, request } from '../api'
 
@@ -361,7 +363,7 @@ onBeforeUnmount(() => {
               {{ b.product_code }}<small>{{ b.product_name }}</small>
             </td>
             <td>{{ b.version_label }}</td>
-            <td>{{ b.base_quantity }} {{ b.product_unit }}</td>
+            <td>{{ displayQuantity(b.base_quantity) }} {{ b.product_unit }}</td>
             <td>{{ label(b.status) }}</td>
             <td>
               <button :disabled="blocked || loading" @click="openDetail(b.id)">
@@ -383,22 +385,13 @@ onBeforeUnmount(() => {
         </tbody>
       </table>
     </div>
-    <div class="toolbar">
-      <span>共 {{ result?.total ?? 0 }} 条 · 第 {{ page + 1 }} 页</span
-      ><button
-        :disabled="blocked || loading || !result || page === 0"
-        @click="load(page - 1)"
-      >
-        上一页</button
-      ><button
-        :disabled="
-          blocked || loading || !result || (page + 1) * 20 >= result.total
-        "
-        @click="load(page + 1)"
-      >
-        下一页
-      </button>
-    </div>
+    <ResultPager
+      v-if="result"
+      :total="result.total"
+      :page="page"
+      :disabled="blocked || loading"
+      @change="load"
+    />
     <p v-if="detailError" role="alert" class="error">
       详情读取失败：{{ detailError }}
     </p>
@@ -408,7 +401,8 @@ onBeforeUnmount(() => {
         <span>{{ label(detail.status) }}</span>
       </div>
       <p>
-        {{ detail.product_name }} · 基准产量 {{ detail.base_quantity }}
+        {{ detail.product_name }} · 基准产量
+        {{ displayQuantity(detail.base_quantity) }}
         {{ detail.product_unit }}
       </p>
       <p>{{ detail.description }}</p>
@@ -438,15 +432,15 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <p v-if="detail.published_at">
-        发布：{{ detail.published_by }} · {{ detail.published_at }}
+        发布：{{ detail.published_by }} · {{ timestamp(detail.published_at) }}
       </p>
       <p v-if="detail.disabled_at">
-        停用：{{ detail.disabled_by }} · {{ detail.disabled_at }}
+        停用：{{ detail.disabled_by }} · {{ timestamp(detail.disabled_at) }}
       </p>
       <p v-if="detail.copied_from_id">
         复制自
         <button :disabled="blocked" @click="openDetail(detail.copied_from_id)">
-          BOM #{{ detail.copied_from_id }}
+          查看来源 BOM 版本
         </button>
       </p>
       <div
@@ -468,7 +462,7 @@ onBeforeUnmount(() => {
               <td>
                 {{ c.material_code }}<small>{{ c.material_name }}</small>
               </td>
-              <td>{{ c.quantity }}</td>
+              <td>{{ displayQuantity(c.quantity) }}</td>
               <td>{{ c.unit }}</td>
             </tr>
           </tbody>
@@ -494,7 +488,7 @@ onBeforeUnmount(() => {
         <summary>操作历史（{{ detail.history.length }}，最多 1000 条）</summary>
         <article v-for="h in detail.history" :key="h.id">
           <strong>{{ label(h.action) }} · {{ h.created_by }}</strong>
-          <p>{{ h.created_at }} · {{ h.reason }}</p>
+          <p>{{ timestamp(h.created_at) }} · {{ h.reason }}</p>
           <details>
             <summary>变更前后</summary>
             <pre>{{ snapshot(h.before_state) }}</pre>

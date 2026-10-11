@@ -23,6 +23,7 @@ export interface Fulfillment {
     delivery: { arrivalId: number }
     facts: {
       receipts: {
+        arrangementLineId?: number
         receiptId: number
         receiptNumber: string
         receiptItemId: number

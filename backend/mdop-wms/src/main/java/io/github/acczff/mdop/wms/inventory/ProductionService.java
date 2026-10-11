@@ -106,7 +106,7 @@ public class ProductionService {
                         .single();
         String columns =
                 returns
-                        ? "source_type,id,event_no,issue_id,CAST(quantity AS CHAR) AS quantity,quality_status,status,target_location_id,target_balance_id,reason,requested_by,requested_at,closed_by,closed_at,cancel_reason"
+                        ? "source_type,id,event_no,issue_id,CAST(quantity AS CHAR) AS quantity,quality_status,status,target_location_id,(SELECT name FROM mdm_location WHERE id=wms_production_return.target_location_id) AS target_location_name,(SELECT code FROM mdm_location WHERE id=wms_production_return.target_location_id) AS target_location_code,target_balance_id,reason,requested_by,requested_at,closed_by,closed_at,cancel_reason"
                         : "source_type,reason,id,event_no,issue_id,CAST(quantity AS CHAR) AS quantity,reported_by,reported_at";
         return new InventoryService.Page(
                 db.sql(

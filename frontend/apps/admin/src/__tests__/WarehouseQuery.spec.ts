@@ -57,7 +57,7 @@ it('production reversal ledger must display its original transaction reference',
   await flushPromises()
   expect(v.text()).toContain('冲正原流水 #17')
   expect(v.text()).toContain('生产冲正 PCR-1')
-  expect(v.text()).toContain('领料 MI-1')
+  expect(v.text()).toContain('领料单 MI-1')
   v.unmount()
 })
 it.each([

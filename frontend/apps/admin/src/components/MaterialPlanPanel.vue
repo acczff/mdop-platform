@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { timestamp } from '../presentation'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ApiError, request, type Page, type Warehouse } from '../api'
 
@@ -384,7 +385,9 @@ onBeforeUnmount(() => {
         <template v-else>
           <p class="muted">
             计算版本 {{ data.planVersion }} · {{ data.plan.created_by }} ·
-            {{ data.plan.created_at }}。以下为计算时快照，确认时会再次校验。
+            {{
+              timestamp(data.plan.created_at)
+            }}。以下为计算时快照，确认时会再次校验。
           </p>
           <div class="table-scroll">
             <table>
@@ -555,7 +558,7 @@ onBeforeUnmount(() => {
               <tbody>
                 <tr v-for="i in data.issues" :key="i.id">
                   <td>
-                    MI-{{ i.id
+                    领料单 MI-{{ i.id
                     }}<small>{{
                       lines.find((l) => l.materialId === i.material_id)?.code
                     }}</small>
@@ -600,7 +603,8 @@ onBeforeUnmount(() => {
         <details v-if="data.history.length">
           <summary>计算记录（{{ data.history.length }}，最多 1000 条）</summary>
           <p v-for="h in data.history" :key="h.id">
-            版本 {{ h.version }} · {{ h.created_by }} · {{ h.created_at }}
+            版本 {{ h.version }} · {{ h.created_by }} ·
+            {{ timestamp(h.created_at) }}
           </p>
         </details>
       </template>

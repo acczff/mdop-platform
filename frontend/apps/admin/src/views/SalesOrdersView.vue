@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import ResultPager from '../components/ResultPager.vue'
+import RecordHeading from '../components/RecordHeading.vue'
+import OperationRecord from '../components/OperationRecord.vue'
+import OperationTimeNote from '../components/OperationTimeNote.vue'
+import { identity } from '../presentation'
+import { businessDate, quantity as displayQuantity } from '../presentation'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ApiError, request, type Page, type Warehouse } from '../api'
 import { remaining, scaled } from '../quantity'
@@ -489,7 +495,7 @@ onBeforeUnmount(() => {
                 {{ d.document_no }}<small>{{ d.purpose }}</small>
               </td>
               <td>{{ d.customer_name }}</td>
-              <td>{{ d.needed_date }}</td>
+              <td>{{ businessDate(d.needed_date) }}</td>
               <td>{{ stateText(d.status) }}</td>
               <td>
                 <button :disabled="blocked" @click="openDetail(d.id)">
@@ -511,37 +517,29 @@ onBeforeUnmount(() => {
           </tbody>
         </table>
       </div>
-      <div v-if="result" class="pagination">
-        <span>共 {{ result.total }} 条 · 第 {{ page + 1 }} 页</span
-        ><button
-          :disabled="blocked || loading || page === 0"
-          @click="load(page - 1)"
-        >
-          上一页</button
-        ><button
-          :disabled="blocked || loading || (page + 1) * 20 >= result.total"
-          @click="load(page + 1)"
-        >
-          下一页
-        </button>
-      </div>
+      <ResultPager
+        v-if="result"
+        :total="result.total"
+        :page="page"
+        :disabled="blocked || loading"
+        @change="load"
+      />
     </section>
     <p v-if="detailError" class="error" role="alert">
       详情读取失败：{{ detailError }}，请重新选择单据。
     </p>
     <section v-if="detail" class="panel detail">
-      <div class="detail-heading">
-        <div>
-          <h2>{{ detail.document_no }} · {{ stateText(detail.status) }}</h2>
-          <p class="hint">
-            {{ detail.customer_name }} · {{ detail.warehouse_name }} ·
-            {{ detail.needed_date }}
-          </p>
-        </div>
-        <button :disabled="blocked" @click="detail = undefined">
+      <RecordHeading
+        :title="'销售订单 ' + detail.document_no"
+        :subtitle="
+          identity(detail.customer_name) + ' · ' + detail.warehouse_name
+        "
+        :status="stateText(detail.status)"
+        ><button :disabled="blocked" @click="detail = undefined">
           收起详情
-        </button>
-      </div>
+        </button></RecordHeading
+      >
+      <p class="hint">约定日期：{{ businessDate(detail.needed_date) }}</p>
       <p>{{ detail.purpose }}</p>
       <p v-if="detail.customer_reference" class="hint">
         客户单号：{{ detail.customer_reference }}
@@ -600,10 +598,10 @@ onBeforeUnmount(() => {
                     ?.material_name
                 }}</small>
               </td>
-              <td>{{ l.ordered }} {{ l.unit }}</td>
-              <td>{{ l.allocated }}</td>
-              <td>{{ l.shipped }}</td>
-              <td>{{ l.remaining }}</td>
+              <td>{{ displayQuantity(l.ordered) }} {{ l.unit }}</td>
+              <td>{{ displayQuantity(l.allocated) }}</td>
+              <td>{{ displayQuantity(l.shipped) }}</td>
+              <td>{{ displayQuantity(l.remaining) }}</td>
             </tr>
           </tbody>
         </table>
@@ -632,21 +630,25 @@ onBeforeUnmount(() => {
           class="arrangement-record"
         >
           <strong
-            >发货 #{{ a.id }} · {{ stateText(a.status)
-            }}{{ a.wms ? ' · ' + stateText(a.wms.status) : '' }}</strong
+            >发货安排 {{ a.id }} · 送达状态：{{ stateText(a.status)
+            }}{{
+              a.wms ? ' · 仓库执行：' + stateText(a.wms.status) : ''
+            }}</strong
           >
           <p>
             {{
               detail.lines.find((l) => l.id === a.order_line_id)?.material_code
             }}
-            · {{ a.quantity }} · 预计发货 {{ a.expected_date }}
+            · {{ displayQuantity(a.quantity) }}
+            {{ detail.lines.find((l) => l.id === a.order_line_id)?.unit }} ·
+            预计发货 {{ businessDate(a.expected_date) }}
           </p>
           <p v-if="a.last_error" class="error">
             送达失败：{{ a.last_error }}。核对后可重试，额度仍保留。
           </p>
           <p v-if="a.wms" class="hint">
-            WMS #{{ a.wms.id }} · 批次 {{ a.wms.batchNo || '待选择' }} ·
-            实际已发 {{ a.wms.shippedQuantity }}
+            销售出库 SO-{{ a.wms.id }} · 批次 {{ a.wms.batchNo || '待选择' }} ·
+            实际已发 {{ displayQuantity(a.wms.shippedQuantity) }}
           </p>
           <div class="detail-actions">
             <button
@@ -681,11 +683,15 @@ onBeforeUnmount(() => {
           </button>
         </div>
         <template v-if="detail.closure"
-          ><p class="success">
-            已保存数量结案快照 · {{ detail.closure.closed_by }} ·
-            {{ detail.closure.closed_at }}
-          </p>
-          <p>{{ detail.closure.reason }}</p>
+          ><OperationRecord
+            title="数量履约结案"
+            result="已保存数量结案快照"
+            :account="detail.closure.closed_by"
+            :at="detail.closure.closed_at"
+            :note="detail.closure.reason"
+            note-label="结案原因"
+          />
+          <OperationTimeNote />
           <p v-if="!detail.closureMatches" class="error" role="alert">
             当前事实与结案快照不一致，请联系管理员核对。
           </p>
@@ -704,9 +710,9 @@ onBeforeUnmount(() => {
                 <tbody>
                   <tr v-for="l in closureLines" :key="l.orderLineId">
                     <td>{{ l.code }}</td>
-                    <td>{{ l.ordered }} {{ l.unit }}</td>
-                    <td>{{ l.shipped }}</td>
-                    <td>{{ l.remaining }}</td>
+                    <td>{{ displayQuantity(l.ordered) }} {{ l.unit }}</td>
+                    <td>{{ displayQuantity(l.shipped) }}</td>
+                    <td>{{ displayQuantity(l.remaining) }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -734,9 +740,13 @@ onBeforeUnmount(() => {
       <details class="history">
         <summary>操作历史（{{ detail.history.length }}）</summary>
         <div v-for="h in detail.history" :key="h.id" class="history-item">
-          <strong>{{ auditNames[h.action] || h.action }}</strong> ·
-          {{ h.created_by }} · {{ h.created_at }}
-          <p>{{ h.reason }}</p>
+          <OperationRecord
+            :title="auditNames[h.action] || h.action"
+            :account="h.created_by"
+            :at="h.created_at"
+            :note="h.reason"
+            note-label="操作依据"
+          />
           <details>
             <summary>变更快照</summary>
             <p class="hint">变更前</p>
@@ -745,6 +755,7 @@ onBeforeUnmount(() => {
             <pre>{{ describeSnapshot(h.after_state) }}</pre>
           </details>
         </div>
+        <OperationTimeNote v-if="detail.history.length" />
       </details>
     </section>
     <div v-if="mode" class="overlay">

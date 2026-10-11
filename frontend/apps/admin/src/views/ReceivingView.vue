@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { quantity as displayQuantity } from '../presentation'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ApiError, request, type Warehouse, type Page } from '../api'
 import { remaining, scaled } from '../quantity'
@@ -479,8 +480,8 @@ onMounted(loadFoundation)
               <td>
                 {{ i.materialName }}<small>{{ i.materialCode }}</small>
               </td>
-              <td>{{ i.noticeQty }} {{ i.unit }}</td>
-              <td>{{ i.receivedQty }}</td>
+              <td>{{ displayQuantity(i.noticeQty) }} {{ i.unit }}</td>
+              <td>{{ displayQuantity(i.receivedQty) }}</td>
               <td>{{ remaining(i.noticeQty, i.receivedQty) }}</td>
             </tr>
           </tbody>

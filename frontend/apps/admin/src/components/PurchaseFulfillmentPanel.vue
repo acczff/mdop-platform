@@ -1,5 +1,9 @@
 <script setup lang="ts">
+import { quantity as displayQuantity } from '../presentation'
+import OperationRecord from './OperationRecord.vue'
+import OperationTimeNote from './OperationTimeNote.vue'
 import { computed } from 'vue'
+import { identity } from '../presentation'
 import type { Closure, Fulfillment } from '../purchasing'
 const props = defineProps<{
   value: Fulfillment
@@ -8,8 +12,21 @@ const props = defineProps<{
   canWrite: boolean
   blocked: boolean
   authorities: string[]
+  warehouseId?: number
+  locations?: { id: number; code: string; name: string }[]
+  materials?: { material_code: string; material_name: string; unit?: string }[]
+  arrangements?: {
+    id: number
+    lines: { id: number; material_code: string }[]
+  }[]
 }>()
 defineEmits<{ refresh: []; close: [] }>()
+function receiptMaterial(arrangement: number, line?: number) {
+  const code = props.arrangements
+    ?.find((a) => a.id === arrangement)
+    ?.lines.find((l) => l.id === line)?.material_code
+  return props.materials?.find((m) => m.material_code === code)
+}
 const saved = computed(() => {
   try {
     return props.closure
@@ -46,45 +63,61 @@ const state: Record<string, string> = {
         </button>
       </div>
     </header>
-    <p v-if="closure" class="hint">
-      {{
-        closure.outcome === 'WITH_RETURNS' ? '含退供结案' : '全部合格上架结案'
-      }}
-      · {{ closure.closed_by }} · {{ closure.closed_at }} <br />结案原因：{{
-        closure.reason
-      }}
-    </p>
+    <template v-if="closure">
+      <OperationRecord
+        title="数量履约结案"
+        :result="
+          closure.outcome === 'WITH_RETURNS' ? '含退供结案' : '全部合格上架结案'
+        "
+        :account="closure.closed_by"
+        :at="closure.closed_at"
+        :note="closure.reason"
+        note-label="结案原因"
+      />
+      <OperationTimeNote />
+    </template>
     <p v-if="!matches" class="error" role="alert">
       结案后事实发生变化，待核对。原结案快照已保留，不自动重开或覆盖；请核对下方来源单据。
     </p>
     <div v-for="line in value.lines" :key="line.orderLineId" class="line">
-      <strong>{{ line.code }} · 订单 {{ line.ordered }} {{ line.unit }}</strong>
+      <strong
+        >{{
+          identity(
+            materials?.find((m) => m.material_code === line.code)
+              ?.material_name,
+            line.code,
+          )
+        }}
+        · 订单 {{ displayQuantity(line.ordered) }} {{ line.unit }}</strong
+      >
       <p>
-        净收货 {{ line.netReceived }} / 尚欠 {{ line.remaining
+        净收货 {{ displayQuantity(line.netReceived) }} / 尚欠
+        {{ displayQuantity(line.remaining)
         }}<span class="hint"
-          >（已收 {{ line.received }} − 冲正 {{ line.reversed }}）</span
+          >（已收 {{ displayQuantity(line.received) }} − 冲正
+          {{ displayQuantity(line.reversed) }}）</span
         >
       </p>
       <dl>
         <div>
           <dt>待检</dt>
-          <dd>{{ line.pendingInspection }}</dd>
+          <dd>{{ displayQuantity(line.pendingInspection) }}</dd>
         </div>
         <div>
           <dt>合格待上架</dt>
-          <dd>{{ line.pendingPutaway }}</dd>
+          <dd>{{ displayQuantity(line.pendingPutaway) }}</dd>
         </div>
         <div>
           <dt>已合格上架</dt>
-          <dd>{{ line.putaway }}</dd>
+          <dd>{{ displayQuantity(line.putaway) }}</dd>
         </div>
         <div>
           <dt>不合格待退</dt>
-          <dd>{{ line.rejectedPendingReturn }}</dd>
+          <dd>{{ displayQuantity(line.rejectedPendingReturn) }}</dd>
         </div>
         <div>
           <dt>已实际退供</dt>
-          <dd>{{ line.returned }}</dd>
+          <dd>{{ displayQuantity(line.returned) }}</dd>
         </div>
       </dl>
     </div>
@@ -121,22 +154,45 @@ const state: Record<string, string> = {
       </nav>
       <article v-for="notice in value.notices" :key="notice.arrangementId">
         <strong
-          >到货安排 #{{ notice.arrangementId }} · WMS 通知 #{{
-            notice.delivery.arrivalId
+          >到货安排 PA-{{
+            String(notice.arrangementId).padStart(8, '0')
           }}</strong
         >
+        <a
+          v-if="warehouseId && authorities.includes('wms:arrival:read')"
+          :href="`/receiving?warehouseId=${warehouseId}&arrivalId=${notice.delivery.arrivalId}`"
+          >查看对应到货通知及收货明细</a
+        >
         <p v-for="r in notice.facts.receipts" :key="r.receiptItemId">
-          {{ r.receiptNumber }} / 行 #{{ r.receiptItemId }} · {{ r.quantity }} ·
+          {{ r.receiptNumber }} ·
+          {{
+            identity(
+              receiptMaterial(notice.arrangementId, r.arrangementLineId)
+                ?.material_name,
+              receiptMaterial(notice.arrangementId, r.arrangementLineId)
+                ?.material_code,
+            )
+          }}
+          · {{ displayQuantity(r.quantity) }}
+          {{ receiptMaterial(notice.arrangementId, r.arrangementLineId)?.unit }}
+          ·
           {{
             r.correctionStatus === 'REVERSED'
               ? '已冲正'
               : state[r.status] || r.status
           }}
           <span v-if="r.qualityReference">
-            · 质检 {{ r.qualityReference }}：合格 {{ r.qualified }} / 不合格
-            {{ r.rejected
+            · 质检 {{ r.qualityReference }}：合格
+            {{ displayQuantity(r.qualified) }} / 不合格
+            {{ displayQuantity(r.rejected)
             }}<span v-if="r.putawayLocation">
-              · 已上架至库位 #{{ r.putawayLocation }}</span
+              · 已上架至
+              {{
+                identity(
+                  locations?.find((l) => l.id === r.putawayLocation)?.name,
+                  locations?.find((l) => l.id === r.putawayLocation)?.code,
+                )
+              }}（当前库位名称）</span
             ></span
           >
         </p>
@@ -145,8 +201,8 @@ const state: Record<string, string> = {
           {{ state[c.status] || c.status }} · {{ c.reason }}
         </p>
         <p v-for="r in notice.facts.returns" :key="`return-${r.id}`">
-          退供 #{{ r.id }} / 收货行 #{{ r.receiptItemId }} · {{ r.quantity }} ·
-          {{ state[r.status] || r.status
+          退供 #{{ r.id }} / 收货行 #{{ r.receiptItemId }} ·
+          {{ displayQuantity(r.quantity) }} · {{ state[r.status] || r.status
           }}<span v-if="r.handover"> · 交接 {{ r.handover }}</span>
         </p>
       </article>
@@ -155,8 +211,9 @@ const state: Record<string, string> = {
       <summary>原结案快照</summary>
       <p v-if="!saved" class="error">快照暂时无法展示，请联系管理员核对。</p>
       <p v-for="line in saved?.lines || []" :key="line.orderLineId">
-        {{ line.code }} · 净收货 {{ line.netReceived }} · 合格上架
-        {{ line.putaway }} · 实际退供 {{ line.returned }}
+        {{ line.code }} · 净收货 {{ displayQuantity(line.netReceived) }} ·
+        合格上架 {{ displayQuantity(line.putaway) }} · 实际退供
+        {{ displayQuantity(line.returned) }}
       </p>
     </details>
   </section>

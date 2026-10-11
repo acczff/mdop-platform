@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import OperationRecord from '../components/OperationRecord.vue'
+import OperationTimeNote from '../components/OperationTimeNote.vue'
+import ResultPager from '../components/ResultPager.vue'
+import RecordHeading from '../components/RecordHeading.vue'
+import { identity } from '../presentation'
+import { quantity as displayQuantity, businessDate } from '../presentation'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ApiError, request, type Page, type Warehouse } from '../api'
 import MaterialPlanPanel from '../components/MaterialPlanPanel.vue'
@@ -507,8 +513,8 @@ onBeforeUnmount(() => {
               {{ d.source_reference
               }}<small>{{ d.product_code }} · {{ d.product_name }}</small>
             </td>
-            <td>{{ d.quantity }} {{ d.unit }}</td>
-            <td>{{ d.needed_date }}</td>
+            <td>{{ displayQuantity(d.quantity) }} {{ d.unit }}</td>
+            <td>{{ businessDate(d.needed_date) }}</td>
             <td>
               {{ d.order_no || '无有效工单'
               }}<small>{{ label(d.order_status || d.status) }}</small>
@@ -533,31 +539,33 @@ onBeforeUnmount(() => {
         </tbody>
       </table>
     </div>
-    <div v-if="result" class="toolbar">
-      <span>共 {{ result.total }} 条 · 第 {{ page + 1 }} 页</span
-      ><button
-        :disabled="blocked || loading || page === 0"
-        @click="load(page - 1)"
-      >
-        上一页</button
-      ><button
-        :disabled="blocked || loading || (page + 1) * 20 >= result.total"
-        @click="load(page + 1)"
-      >
-        下一页
-      </button>
-    </div>
+    <ResultPager
+      v-if="result"
+      :total="result.total"
+      :page="page"
+      :disabled="blocked || loading"
+      @change="load"
+    />
     <section v-if="detail" aria-label="生产需求详情" class="detail">
-      <h2>
-        {{ detail.product_code }} · {{ detail.quantity }} {{ detail.unit }}
-      </h2>
+      <RecordHeading
+        :title="identity(detail.product_name, detail.product_code)"
+        :subtitle="
+          '需求量：' + displayQuantity(detail.quantity) + ' ' + detail.unit
+        "
+        :status="label(detail.status)"
+        ><button :disabled="blocked" @click="detail = undefined">
+          收起详情
+        </button></RecordHeading
+      >
       <p>
         {{ detail.source_type === 'SALES' ? '销售来源' : '手工依据' }}：{{
           detail.source_reference
         }}
         · {{ label(detail.status) }}
       </p>
-      <p>{{ detail.purpose }} · 需求日期 {{ detail.needed_date }}</p>
+      <p>
+        {{ detail.purpose }} · 需求日期 {{ businessDate(detail.needed_date) }}
+      </p>
       <div v-if="write && detail.status === 'OPEN' && !active" class="toolbar">
         <button :disabled="blocked" @click="open('order')">转生产订单</button
         ><button :disabled="blocked" @click="open('cancel-demand')">
@@ -566,16 +574,21 @@ onBeforeUnmount(() => {
       </div>
       <article v-for="o in detail.orders" :key="o.id" class="order">
         <div class="heading">
-          <h3>{{ o.order_no }}</h3>
+          <h3>生产订单 {{ o.order_no }}</h3>
           <span>{{ label(o.status) }}</span>
         </div>
         <p>
           {{ o.site_code }} · {{ o.site_name }} → {{ o.warehouse_name }} · 计划
-          {{ o.planned_date }}
+          {{ businessDate(o.planned_date) }}
         </p>
-        <p v-if="o.approved_by">
-          批准：{{ o.approved_by }} · {{ o.approved_at }}
-        </p>
+        <OperationRecord
+          v-if="o.approved_by"
+          title="工单批准"
+          result="已批准"
+          :account="o.approved_by"
+          :at="o.approved_at"
+        />
+        <OperationTimeNote v-if="o.approved_by" />
         <div class="toolbar">
           <template v-if="write && ['DRAFT', 'REJECTED'].includes(o.status)"
             ><button :disabled="blocked" @click="open('edit', o)">
@@ -604,8 +617,9 @@ onBeforeUnmount(() => {
             固定 BOM · {{ snapshot(o)?.version_label || '待核对' }}
           </summary>
           <p v-if="snapshot(o)">
-            基准产量 {{ snapshot(o)!.base_quantity }}
-            {{ snapshot(o)!.product_unit }}；工单生产量 {{ detail.quantity }}
+            基准产量 {{ displayQuantity(snapshot(o)!.base_quantity) }}
+            {{ snapshot(o)!.product_unit }}；工单生产量
+            {{ displayQuantity(detail.quantity) }}
             {{ detail.unit }}
           </p>
           <p v-else class="error">快照无法读取，请核对原记录。</p>
@@ -620,34 +634,52 @@ onBeforeUnmount(() => {
               <tbody>
                 <tr v-for="c in snapshot(o)?.components" :key="c.material_code">
                   <td>{{ c.material_code }} · {{ c.material_name }}</td>
-                  <td>{{ c.quantity }} {{ c.unit }}</td>
+                  <td>{{ displayQuantity(c.quantity) }} {{ c.unit }}</td>
                 </tr>
               </tbody>
             </table>
           </div>
           <p class="muted">工单批准时固定的 BOM 用量依据。</p>
         </details>
-        <CompletionPanel
+        <details
           v-if="['APPROVED', 'CANCELLED'].includes(o.status)"
-          :key="`completion:${o.id}:${o.version}`"
-          :order-id="o.id"
-          :authorities="authorities"
-          :username="username"
-        />
-        <MaterialPlanPanel
-          v-if="['APPROVED', 'CANCELLED'].includes(o.status)"
-          :key="`${o.id}:${o.version}`"
-          :order-id="o.id"
-          :authorities="authorities"
-          :username="username"
-        />
+          class="record-section"
+          open
+        >
+          <summary>完工登记与成品入库</summary>
+          <CompletionPanel
+            v-if="['APPROVED', 'CANCELLED'].includes(o.status)"
+            :key="`completion:${o.id}:${o.version}`"
+            :order-id="o.id"
+            :authorities="authorities"
+            :username="username"
+          />
+        </details>
+        <details class="record-section" open>
+          <summary>材料计划与领料执行</summary>
+          <MaterialPlanPanel
+            v-if="['APPROVED', 'CANCELLED'].includes(o.status)"
+            :key="`${o.id}:${o.version}`"
+            :order-id="o.id"
+            :authorities="authorities"
+            :username="username"
+          />
+        </details>
       </article>
       <details>
-        <summary>操作历史（{{ detail.history.length }}，最多 1000 条）</summary>
-        <p v-for="h in detail.history" :key="h.id">
-          {{ label(h.action) }} · {{ h.created_by }} · {{ h.created_at
-          }}<br />{{ h.reason }}
-        </p>
+        <summary>
+          操作历史（已加载 {{ detail.history.length }} 条，上限 1000 条）
+        </summary>
+        <OperationRecord
+          v-for="h in detail.history"
+          :key="h.id"
+          :title="label(h.action)"
+          :account="h.created_by"
+          :at="h.created_at"
+          :note="h.reason"
+          note-label="操作依据"
+        />
+        <OperationTimeNote v-if="detail.history.length" />
       </details>
     </section>
     <div v-if="mode" class="modal-backdrop">
@@ -703,7 +735,7 @@ onBeforeUnmount(() => {
                   <option :value="0" disabled>选择销售行</option>
                   <option v-for="s in sources" :key="s.id" :value="s.id">
                     {{ s.document_no }} / {{ s.id }} · {{ s.material_code }} ·
-                    {{ s.quantity }} {{ s.unit }}
+                    {{ displayQuantity(s.quantity) }} {{ s.unit }}
                   </option>
                 </select></label
               >
@@ -721,7 +753,8 @@ onBeforeUnmount(() => {
             </template>
             <template v-else-if="mode === 'order' || mode === 'edit'"
               ><p>
-                {{ detail?.product_code }} · {{ detail?.quantity }}
+                {{ detail?.product_code }} ·
+                {{ displayQuantity(detail?.quantity) }}
                 {{ detail?.unit }}
               </p>
               <label
@@ -739,7 +772,8 @@ onBeforeUnmount(() => {
                 >BOM 版本<select v-model.number="order.bomId" required>
                   <option :value="0" disabled>明确选择已发布版本</option>
                   <option v-for="b in boms" :key="b.id" :value="b.id">
-                    {{ b.version_label }} · 基准 {{ b.base_quantity }}
+                    {{ b.version_label }} · 基准
+                    {{ displayQuantity(b.base_quantity) }}
                     {{ b.product_unit }}
                   </option>
                 </select></label
@@ -756,7 +790,7 @@ onBeforeUnmount(() => {
             >
             <p v-else>
               {{ selected?.order_no || detail?.source_reference }} ·
-              {{ detail?.quantity }} {{ detail?.unit }}<br />{{
+              {{ displayQuantity(detail?.quantity) }} {{ detail?.unit }}<br />{{
                 mode === 'cancel'
                   ? '有有效采购、领料、待复核或已批准完工记录时不能取消；历史记录保留。'
                   : mode === 'approve'

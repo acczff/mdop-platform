@@ -9,6 +9,7 @@
 | 了解项目、能力与边界 | [项目首页](../README.md) |
 | 从空环境启动、创建账号 | [快速开始](guides/quickstart.md) |
 | 跑通收货并检查基本异常 | [WMS 业务演练](guides/wms-walkthrough.md) |
+| 理解列表、详情和业务编号 | [数据展示与业务标识](guides/data-presentation.md) |
 | 找代码、理解事务与模块依赖 | [架构与代码阅读](reference/architecture.md)、[自动生成的源码导航](reference/source-index.md) |
 | 调接口、处理错误与重试 | [HTTP 接口约定](reference/api.md) |
 | 查配置、启动和排障 | [快速开始](guides/quickstart.md)、[脚本说明](../scripts/README.md)、[部署说明](../deploy/README.md) |

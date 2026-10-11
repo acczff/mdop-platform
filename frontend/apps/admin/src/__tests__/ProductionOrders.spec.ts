@@ -177,7 +177,7 @@ it('separates creator review, read-only and immutable approved orders', async ()
   expect(btn(v, '编辑工单')).toBeUndefined()
   expect(btn(v, '取消工单')).toBeDefined()
   expect(v.text()).toContain('V1')
-  expect(v.text()).toContain('2.000000')
+  expect(v.text()).toContain('2 件')
   v.unmount()
 })
 it('creates a sales-backed demand without trusting editable quantity or product', async () => {

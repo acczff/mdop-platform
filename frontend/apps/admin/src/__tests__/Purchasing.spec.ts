@@ -389,7 +389,7 @@ it('retains failed arrangement quota and posts stable order line ids with decima
   vi.mocked(request).mockResolvedValueOnce(order)
   await button(view, '查看').trigger('click')
   await flushPromises()
-  expect(view.text()).toContain('10.000000 / 2.123456')
+  expect(view.text()).toContain('10 / 2.123456')
   expect(button(view, '取消订单').attributes('disabled')).toBeDefined()
   expect(button(view, '重试送达')).toBeDefined()
   await button(view, '安排到货').trigger('click')

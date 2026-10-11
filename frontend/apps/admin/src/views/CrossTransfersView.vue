@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { quantity as displayQuantity, timestamp } from '../presentation'
 import { computed, onMounted, ref } from 'vue'
 import { request, type Page, type Warehouse } from '../api'
 const props = defineProps<{ authorities: string[]; username: string }>()
@@ -29,6 +30,7 @@ interface Stock {
   expiry_date: string | null
   material_name: string
   batch_no: string
+  unit: string
   available_qty: string
   production_qty: string
   owner_type: string
@@ -351,7 +353,7 @@ onMounted(() => void perform(() => load()))
           <tbody>
             <tr v-for="r in result?.items" :key="r.id">
               <td>
-                WT-{{ r.id }}<small>{{ statusName(r) }}</small>
+                跨仓调拨 WT-{{ r.id }}<small>{{ statusName(r) }}</small>
               </td>
               <td>
                 {{ r.material_name
@@ -362,9 +364,9 @@ onMounted(() => void perform(() => load()))
                 }}<small>目标库位：{{ r.target_location }}</small>
               </td>
               <td>
-                {{ r.quantity }} {{ r.unit
-                }}<small>已收 {{ r.received_qty }}</small
-                ><small>在途 {{ r.in_transit_qty }}</small>
+                {{ displayQuantity(r.quantity) }} {{ r.unit
+                }}<small>已收 {{ displayQuantity(r.received_qty) }}</small
+                ><small>在途 {{ displayQuantity(r.in_transit_qty) }}</small>
               </td>
               <td>
                 {{ r.created_by }}<small>{{ r.reason }}</small>
@@ -431,32 +433,40 @@ onMounted(() => void perform(() => load()))
         class="modal cross-dialog"
       >
         <h2 id="cross-title">
-          {{ titles[modal] }} <template v-if="row">· WT-{{ row.id }}</template>
+          {{ titles[modal] }}
+          <template v-if="row">· 跨仓调拨 WT-{{ row.id }}</template>
         </h2>
         <p v-if="row">
-          {{ row.material_name }} / {{ row.batch_no }} · {{ row.quantity }}
-          {{ row.unit }}<br />{{ row.source_warehouse }} →
-          {{ row.target_warehouse }} / {{ row.target_location }} <br />累计已收
-          {{ row.received_qty }} · 剩余在途 {{ row.in_transit_qty }}
+          {{ row.material_name }} / {{ row.batch_no }} ·
+          {{ displayQuantity(row.quantity) }} {{ row.unit }}<br />{{
+            row.source_warehouse
+          }}
+          → {{ row.target_warehouse }} / {{ row.target_location }}
+          <br />累计已收 {{ displayQuantity(row.received_qty) }} · 剩余在途
+          {{ displayQuantity(row.in_transit_qty) }}
         </p>
         <template v-if="modal === 'history'"
           ><ol>
             <li v-for="e in history" :key="e.id">
               {{ names[e.action_type] }} · {{ e.created_by }} ·
-              {{ e.created_at }}
+              {{ timestamp(e.created_at) }}
               <p>{{ e.reason }}</p>
               <p v-if="e.receipt_id">
-                收货 CR-{{ e.receipt_id }} · 本次 {{ e.quantity }} · 累计
-                {{ e.cumulative_qty }} · 剩余在途 {{ e.remaining_qty }}
+                调拨收货 CR-{{ e.receipt_id }} · 本次
+                {{ displayQuantity(e.quantity) }} · 累计
+                {{ displayQuantity(e.cumulative_qty) }} · 剩余在途
+                {{ displayQuantity(e.remaining_qty) }}
               </p>
             </li>
           </ol>
           <p v-if="row">
-            源库存 #{{ row.source_balance_id
+            源仓 {{ row.source_warehouse }} / {{ row.material_name }} /
+            {{ row.batch_no }} · 库存记录 {{ row.source_balance_id
             }}<template v-if="row.target_balance_id">
-              → 目标库存 #{{ row.target_balance_id }}</template
+              → {{ row.target_warehouse }} / {{ row.target_location }} ·
+              库存记录 {{ row.target_balance_id }}</template
             >
-            · 在途 {{ row.in_transit_qty }}
+            · 在途 {{ displayQuantity(row.in_transit_qty) }}
           </p>
           <button @click="modal = undefined">关闭</button></template
         >
@@ -467,10 +477,11 @@ onMounted(() => void perform(() => load()))
                 >源库存<select v-model="balance" required>
                   <option :value="0">请选择库存</option>
                   <option v-for="s in stocks" :key="s.id" :value="s.id">
-                    #{{ s.id }} {{ s.material_name }} /
-                    {{ s.batch_no || '无批次' }} / {{ s.location_name }} · 可用
-                    {{ s.available_qty }}
-                    {{ s.expiry_date ? `· 到期 ${s.expiry_date}` : '' }}
+                    {{ s.material_name }} / {{ s.batch_no || '无批次' }} /
+                    {{ s.location_name }} · 可用
+                    {{ displayQuantity(s.available_qty) }} {{ s.unit }}
+                    {{ s.expiry_date ? `· 到期 ${s.expiry_date}` : '' }} · 记录
+                    {{ s.id }}
                   </option>
                 </select></label
               >

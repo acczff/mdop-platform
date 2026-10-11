@@ -142,7 +142,7 @@ it('shows each receipt snapshot and refuses a stale completed receipt action', a
   const history = v.get('[role="dialog"]').text()
   expect(history).toContain('收货 CR-12')
   expect(history).toContain('本次 0.123456')
-  expect(history).toContain('剩余在途 1.000000')
+  expect(history).toContain('剩余在途 1')
 })
 const row = {
   id: 7,

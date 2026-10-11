@@ -18,6 +18,21 @@ import tools.jackson.databind.JsonNode;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class PurchaseFulfillmentTests extends PurchaseScenarioSupport {
+    @Test
+    void displayNamesDoNotChangeFulfillmentFacts() throws Exception {
+        var d = delivered();
+        long id = d.get("id").asLong();
+        var before = getOrder(id);
+        var location = before.get("displayLocations").get(0);
+        assertThat(location.get("code").asText()).isNotBlank();
+        db.update(
+                "UPDATE mdm_location SET name=? WHERE id=?", "改名后的库位", location.get("id").asLong());
+        var after = getOrder(id);
+        assertThat(after.get("displayLocations").toString()).contains("改名后的库位");
+        assertThat(after.get("fulfillment").get("factHash").asText())
+                .isEqualTo(before.get("fulfillment").get("factHash").asText());
+    }
+
     JsonNode delivered() throws Exception {
         var d = arrange(order(), "100", 200);
         return perform(d, d.get("arrangements").get(0).get("id").asLong(), "deliver", 200);

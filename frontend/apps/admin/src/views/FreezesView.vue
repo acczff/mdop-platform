@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import {
+  quantity as displayQuantity,
+  timestamp,
+  identity,
+} from '../presentation'
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { request, type Page, type Warehouse } from '../api'
@@ -247,29 +252,33 @@ onMounted(() => void perform(() => load()))
           {{ row.batch_no || '无' }} · {{ qualityNames[row.quality_status] }}
         </p>
         <p>
-          当前在手 {{ row.on_hand_qty }} / 可用 {{ row.available_qty }} / 预占
-          {{ row.reserved_qty }} {{ row.unit }}
+          当前在手 {{ displayQuantity(row.on_hand_qty) }} / 可用
+          {{ displayQuantity(row.available_qty) }} / 预占
+          {{ displayQuantity(row.reserved_qty) }} {{ row.unit }}
         </p>
         <p>
-          冻结前：在手 {{ row.frozen_on_hand }} / 可用
-          {{ row.frozen_available }} / 预占 {{ row.frozen_reserved }}
+          冻结前：在手 {{ displayQuantity(row.frozen_on_hand) }} / 可用
+          {{ displayQuantity(row.frozen_available) }} / 预占
+          {{ displayQuantity(row.frozen_reserved) }}
         </p>
         <p>
-          冻结：{{ row.created_by }} · {{ row.created_at }} · {{ row.reason }}
+          冻结：{{ row.created_by }} · {{ timestamp(row.created_at) }} ·
+          {{ row.reason }}
         </p>
         <template v-if="row.status === 'RELEASED'"
           ><p>
-            解冻后：在手 {{ row.released_on_hand }} / 可用
-            {{ row.released_available }} / 预占 {{ row.released_reserved }}
+            解冻后：在手 {{ displayQuantity(row.released_on_hand) }} / 可用
+            {{ displayQuantity(row.released_available) }} / 预占
+            {{ displayQuantity(row.released_reserved) }}
           </p>
           <p>
-            审批解冻：{{ row.released_by }} · {{ row.released_at }} ·
+            审批解冻：{{ row.released_by }} · {{ timestamp(row.released_at) }} ·
             {{ row.release_reason }}
           </p></template
         >
         <RouterLink
           :to="`/inventory?warehouseId=${row.warehouse_id}&balanceId=${row.balance_id}`"
-          >查看库存流水 #{{ row.balance_id }}</RouterLink
+          >查看对应库存流水</RouterLink
         >
       </template>
       <form v-if="modal !== 'detail'" @submit.prevent="submit">
@@ -278,10 +287,12 @@ onMounted(() => void perform(() => load()))
             >库存记录<select v-model="balance" required>
               <option :value="0" disabled>请选择整条库存</option>
               <option v-for="s in stocks" :key="s.id" :value="s.id">
-                #{{ s.id }} · {{ s.material_name }} · {{ s.location_name }} ·
-                {{ s.batch_no || '无批次' }} ·
+                {{ identity(s.material_name, s.material_code) }} ·
+                {{ s.location_name }} · {{ s.batch_no || '无批次' }} ·
                 {{ qualityNames[s.quality_status] }} · 在手
-                {{ s.on_hand_qty }} · 预占 {{ s.reserved_qty }}
+                {{ displayQuantity(s.on_hand_qty) }} {{ s.unit }} · 预占
+                {{ displayQuantity(s.reserved_qty) }} {{ s.unit }} · 记录
+                {{ s.id }}
               </option>
             </select></label
           >
@@ -350,18 +361,24 @@ onMounted(() => void perform(() => load()))
                 >
               </td>
               <td>
-                在手 {{ r.frozen_on_hand
-                }}<small>冻结前可用 {{ r.frozen_available }}</small
-                ><small>预占 {{ r.frozen_reserved }} {{ r.unit }}</small>
+                在手 {{ displayQuantity(r.frozen_on_hand)
+                }}<small
+                  >冻结前可用 {{ displayQuantity(r.frozen_available) }}</small
+                ><small
+                  >预占 {{ displayQuantity(r.frozen_reserved) }}
+                  {{ r.unit }}</small
+                >
               </td>
               <td>
                 {{ r.reason
-                }}<small>{{ r.created_by }} · {{ r.created_at }}</small>
+                }}<small
+                  >{{ r.created_by }} · {{ timestamp(r.created_at) }}</small
+                >
               </td>
               <td>
                 {{ r.release_reason || '—'
                 }}<small v-if="r.released_by"
-                  >{{ r.released_by }} · {{ r.released_at }}</small
+                  >{{ r.released_by }} · {{ timestamp(r.released_at) }}</small
                 >
               </td>
               <td>

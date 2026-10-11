@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { quantity as displayQuantity } from '../presentation'
 import { computed, onMounted, ref } from 'vue'
 import { request, type Warehouse, type Page } from '../api'
 const props = defineProps<{ authorities: string[] }>()
@@ -241,6 +242,7 @@ onMounted(async () => {
     </table>
     <section v-if="selected" class="panel">
       <h2>{{ selected.receipt_no }}</h2>
+      <p>检验单号：{{ selected.reference_no || '尚未登记检验结果' }}</p>
       <p class="hint">
         不合格品保留原位置并保持不可用；每条明细的合格数量整行上架。
       </p>
@@ -270,7 +272,8 @@ onMounted(async () => {
         <div v-for="line in lines" :key="line.id" class="quality-line">
           <strong>{{ line.material_code }} · {{ line.material_name }}</strong
           ><span
-            >收货 {{ line.quantity }} · 批次 {{ line.batch_no || '无' }}</span
+            >收货 {{ displayQuantity(line.quantity) }} · 批次
+            {{ line.batch_no || '无' }}</span
           >
           <label
             >合格数量<input
@@ -296,16 +299,31 @@ onMounted(async () => {
       <div v-else v-for="line in lines" :key="line.id" class="quality-line">
         <strong>{{ line.material_code }} · {{ line.material_name }}</strong>
         <span
-          >合格 {{ line.qualified_qty ?? '待检' }} / 不合格
-          {{ line.rejected_qty ?? '待检' }}</span
-        >
-        <span v-if="line.putaway_location_id"
-          >已上架至
+          >合格
           {{
-            locations.find((l) => l.id === line.putaway_location_id)?.name ||
-            line.putaway_location_id
+            line.qualified_qty == null
+              ? '待检'
+              : displayQuantity(line.qualified_qty)
+          }}
+          / 不合格
+          {{
+            line.rejected_qty == null
+              ? '待检'
+              : displayQuantity(line.rejected_qty)
           }}</span
         >
+        <span v-if="line.putaway_location_id"
+          >上架库位：
+          {{
+            locations.find((l) => l.id === line.putaway_location_id)?.name ||
+            '名称未提供'
+          }}</span
+        >
+        <small v-if="line.putaway_location_id">{{
+          locations.find((l) => l.id === line.putaway_location_id)?.code
+            ? `库位编码：${locations.find((l) => l.id === line.putaway_location_id)?.code}`
+            : `库位引用：${line.putaway_location_id}`
+        }}</small>
         <template v-else-if="canPutaway && Number(line.qualified_qty) > 0">
           <label
             >目标库位<select
@@ -314,7 +332,7 @@ onMounted(async () => {
             >
               <option :value="0">请选择正式存储库位</option>
               <option v-for="l in targets" :key="l.id" :value="l.id">
-                {{ l.code }} · {{ l.name }}
+                {{ l.name }}（{{ l.code }}）
               </option>
             </select></label
           >
