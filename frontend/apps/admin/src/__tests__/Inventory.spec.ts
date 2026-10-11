@@ -136,3 +136,64 @@ it('shows material issue provenance with source and target links instead of empt
   expect(view.text()).not.toContain('到货：')
   expect(view.text()).not.toContain('采购：')
 })
+
+it('clears the previous stock and ledger when following a related stock fails', async () => {
+  mock()
+  const view = mount(InventoryView, { props: { authorities: ['ROLE_ADMIN'] } })
+  await flushPromises()
+  vi.mocked(request).mockResolvedValueOnce({
+    items: [
+      {
+        id: 10,
+        transaction_type: 'ISSUE_IN',
+        issue_id: 4,
+        source_balance_id: 7,
+        before_qty: '0',
+        change_qty: '5',
+        after_qty: '5',
+      },
+    ],
+    page: 0,
+    totalPages: 1,
+    totalElements: 1,
+  })
+  await view
+    .findAll('button')
+    .find((b) => b.text() === '查看流水')!
+    .trigger('click')
+  await flushPromises()
+  expect(view.find('[aria-label="库存流水"]').exists()).toBe(true)
+  vi.mocked(request).mockRejectedValueOnce(new Error('关联库存无权访问'))
+  await view
+    .findAll('button')
+    .find((b) => b.text() === '查看来源库存')!
+    .trigger('click')
+  await flushPromises()
+  expect(view.get('[role="alert"]').text()).toContain('关联库存无权访问')
+  expect(view.find('[aria-label="库存流水"]').exists()).toBe(false)
+  view.unmount()
+})
+
+it('distinguishes failed ledger reads from empty results and can recover on retry', async () => {
+  mock()
+  const view = mount(InventoryView, { props: { authorities: ['ROLE_ADMIN'] } })
+  await flushPromises()
+  vi.mocked(request).mockRejectedValueOnce(new Error('流水服务不可达'))
+  await view
+    .findAll('button')
+    .find((b) => b.text() === '查看流水')!
+    .trigger('click')
+  await flushPromises()
+  const detail = view.get('[aria-label="库存流水"]')
+  expect(detail.text()).not.toContain('暂无流水')
+  expect(detail.text()).toContain('流水读取失败')
+  await detail
+    .findAll('button')
+    .find((b) => b.text() === '重试读取流水')!
+    .trigger('click')
+  await flushPromises()
+  expect(detail.text()).toContain('PO-1')
+  expect(detail.text()).not.toContain('流水读取失败')
+  expect(view.find('[role="alert"]').exists()).toBe(false)
+  view.unmount()
+})

@@ -68,6 +68,8 @@ const includeZero = ref(false),
 const stocks = ref<Page<Stock>>(),
   ledger = ref<Page<Ledger>>(),
   selected = ref<Stock>()
+const ledgerError = ref(''),
+  ledgerPage = ref(0)
 const qualityNames: Record<string, string> = {
   PENDING_INSPECTION: '待检',
   QUALIFIED: '合格',
@@ -186,6 +188,9 @@ async function confirmMove() {
 async function followBalance(id: number) {
   busy.value = true
   error.value = ''
+  selected.value = undefined
+  ledger.value = undefined
+  ledgerError.value = ''
   try {
     await trace(await request<Stock>(`/api/v1/wms/stock/${id}`))
   } catch (e) {
@@ -201,6 +206,7 @@ async function search(page = 0, apply = false) {
   error.value = ''
   selected.value = undefined
   ledger.value = undefined
+  ledgerError.value = ''
   if (apply) {
     applied = new URLSearchParams({
       warehouseId: String(warehouseId.value),
@@ -224,6 +230,8 @@ async function search(page = 0, apply = false) {
 async function trace(stock: Stock, page = 0) {
   busy.value = true
   error.value = ''
+  ledgerError.value = ''
+  ledgerPage.value = page
   ledger.value = undefined
   selected.value = stock
   try {
@@ -231,7 +239,8 @@ async function trace(stock: Stock, page = 0) {
       `/api/v1/wms/stock/${stock.id}/transactions?page=${page}&size=20`,
     )
   } catch (e) {
-    error.value = (e as Error).message
+    ledgerError.value = (e as Error).message
+    error.value = ledgerError.value
   } finally {
     busy.value = false
   }
@@ -587,7 +596,7 @@ onMounted(async () => {
                 ><template v-else-if="t.issue_id"
                   >领料单 MI-{{ t.issue_id
                   }}<small v-if="t.consumption_id"
-                    >消耗 生产消耗 PC-{{ t.consumption_id }}</small
+                    >生产消耗 PC-{{ t.consumption_id }}</small
                   ><small v-if="t.production_return_id"
                     >生产退料 PR-{{ t.production_return_id }}</small
                   ><small v-if="t.production_reversal_id"
@@ -639,7 +648,16 @@ onMounted(async () => {
               </td>
             </tr>
             <tr v-if="!ledger?.items.length">
-              <td colspan="7">{{ busy ? '正在加载…' : '暂无流水' }}</td>
+              <td colspan="7">
+                <template v-if="busy">正在加载…</template>
+                <template v-else-if="ledgerError">
+                  流水读取失败：{{ ledgerError }}
+                  <button @click="trace(selected, ledgerPage)">
+                    重试读取流水
+                  </button>
+                </template>
+                <template v-else>暂无流水</template>
+              </td>
             </tr>
           </tbody>
         </table>
