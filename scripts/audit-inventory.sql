@@ -159,7 +159,14 @@ WHERE b.origin_type<>'PRODUCTION' OR b.supplier_id IS NOT NULL OR b.warehouse_id
  OR (t.transaction_type='FG_PUT_IN' AND (t.balance_id<>d.stored_balance_id OR b.quality_status<>'QUALIFIED'))
 UNION ALL
 SELECT 'finished_feedback',COUNT(*) FROM wms_finished_receipt d WHERE
- (SELECT COUNT(*) FROM wms_outbox o WHERE o.aggregate_type='FinishedReceipt' AND o.aggregate_id=d.id)<>CASE WHEN d.status='OPEN' THEN 0 WHEN d.status='STORED' THEN 3 ELSE 2 END
+ (SELECT COUNT(*) FROM wms_outbox o WHERE o.aggregate_type='FinishedReceipt' AND o.aggregate_id=d.id)<>CASE WHEN d.status='OPEN' THEN 0 WHEN d.production_order_id IS NOT NULL THEN 1 WHEN d.status='STORED' THEN 3 ELSE 2 END
+UNION ALL
+SELECT 'completion_source',COUNT(*) FROM mfg_completion c JOIN mfg_order o ON o.id=c.order_id JOIN mfg_demand m ON m.id=o.demand_id LEFT JOIN wms_finished_receipt f ON f.completion_report_id=c.id
+WHERE (c.status='APPROVED' AND (f.id IS NULL OR f.production_order_id<>c.order_id OR f.quantity<>c.quantity OR f.material_id<>m.product_id OR f.warehouse_id<>m.warehouse_id OR f.unit<>m.unit OR f.work_order_no<>o.order_no OR f.batch_no<>c.batch_no OR f.date_code<>c.date_code OR f.production_date<>c.production_date OR NOT(f.expiry_date<=>c.expiry_date))) OR (c.status<>'APPROVED' AND f.id IS NOT NULL)
+UNION ALL
+SELECT 'completion_authorization',COUNT(*) FROM mfg_order o JOIN mfg_demand d ON d.id=o.demand_id JOIN (SELECT order_id,SUM(quantity) quantity FROM mfg_completion WHERE status IN('SUBMITTED','APPROVED') GROUP BY order_id)c ON c.order_id=o.id WHERE o.status<>'APPROVED' OR c.quantity>d.quantity
+UNION ALL
+SELECT 'completion_feedback',COUNT(*) FROM wms_finished_receipt f JOIN wms_outbox o ON o.aggregate_type='FinishedReceipt' AND o.aggregate_id=f.id WHERE f.production_order_id IS NOT NULL AND o.event_type<>'FinishedInspectionRequested'
 UNION ALL
 SELECT 'sales_ledger',COUNT(*) FROM wms_sales_order d LEFT JOIN wms_inventory_transaction t ON t.sales_order_id=d.id
 WHERE (d.status='SHIPPED' AND (t.id IS NULL OR t.balance_id<>d.source_balance_id OR t.change_qty<>-d.quantity OR t.transaction_type<>'SALES_OUT')) OR (d.status<>'SHIPPED' AND t.id IS NOT NULL)

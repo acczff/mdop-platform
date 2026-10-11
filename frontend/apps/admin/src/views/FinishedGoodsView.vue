@@ -3,6 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { request, type Page, type Warehouse } from '../api'
 const props = defineProps<{ authorities: string[] }>()
 interface Receipt {
+  production_order_id?: number | null
+  completion_report_id?: number | null
   id: number
   demand_no: string
   work_order_no: string
@@ -195,7 +197,12 @@ onMounted(() =>
       )
       if (page >= data.totalPages) break
     }
-    warehouse.value = warehouses.value[0]?.id || 0
+    const requested = Number(
+      new URLSearchParams(window.location.search).get('warehouseId'),
+    )
+    if (requested && !warehouses.value.some((w) => w.id === requested))
+      throw new Error('没有所选成品仓权限')
+    warehouse.value = requested || warehouses.value[0]?.id || 0
     if (
       props.authorities.includes('ROLE_ADMIN') ||
       props.authorities.includes('integration:simulate')
@@ -261,6 +268,11 @@ onMounted(() =>
               <td>
                 FG-{{ r.id }}<small>{{ r.demand_no }}</small
                 ><small>{{ r.work_order_no }}</small>
+                <small>{{
+                  r.completion_report_id
+                    ? `正式完工报告 #${r.completion_report_id}`
+                    : '模拟 MES 来源'
+                }}</small>
               </td>
               <td>
                 {{ r.material_name
@@ -292,7 +304,9 @@ onMounted(() =>
                   >
                     确认上架</button
                   ><button :disabled="busy" @click="open('feedback', r)">
-                    反馈记录</button
+                    {{
+                      r.completion_report_id ? '模拟 QMS 检验请求' : '反馈记录'
+                    }}</button
                   ><RouterLink
                     v-if="r.stored_balance_id"
                     :to="`/inventory?warehouseId=${warehouse}&balanceId=${r.stored_balance_id}`"

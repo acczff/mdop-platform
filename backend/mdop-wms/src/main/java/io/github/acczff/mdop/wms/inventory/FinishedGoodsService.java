@@ -16,7 +16,8 @@ import tools.jackson.databind.ObjectMapper;
 
 @Service
 @Transactional(isolation = Isolation.READ_COMMITTED)
-public class FinishedGoodsService {
+public class FinishedGoodsService
+        implements io.github.acczff.mdop.common.manufacturing.ProductionCompletionPort {
     public record Demand(
             @NotBlank @Pattern(regexp = "[A-Za-z0-9_-]{1,64}") String demandNo,
             @NotBlank @Size(max = 64) String workOrderNo,
@@ -86,6 +87,39 @@ public class FinishedGoodsService {
     public Map<String, Object> create(Demand in) {
         io.github.acczff.mdop.common.manufacturing.ProductionNumbers.requireLegacy(
                 in.workOrderNo());
+        return createDemand(in, null);
+    }
+
+    @Override
+    public long create(
+            io.github.acczff.mdop.common.manufacturing.ProductionCompletionPort.Input in) {
+        return n(
+                createDemand(
+                        new Demand(
+                                in.reportNo(),
+                                in.orderNo(),
+                                in.warehouseId(),
+                                in.materialId(),
+                                in.quantity(),
+                                in.batchNo(),
+                                in.dateCode(),
+                                in.productionDate(),
+                                in.expiryDate()),
+                        in),
+                "id");
+    }
+
+    @Override
+    public List<Map<String, Object>> references(long orderId) {
+        return db.sql(SELECT + " WHERE d.production_order_id=? ORDER BY d.id")
+                .param(orderId)
+                .query()
+                .listOfRows();
+    }
+
+    private Map<String, Object> createDemand(
+            Demand in,
+            io.github.acczff.mdop.common.manufacturing.ProductionCompletionPort.Input formal) {
         lockWarehouse(in.warehouseId());
         String code = in.dateCode() == null ? "" : in.dateCode().trim();
         String hash =
@@ -99,13 +133,14 @@ public class FinishedGoodsService {
                                 code,
                                 in.productionDate(),
                                 in.expiryDate()));
+        if (formal != null) hash = hash(List.of(hash, formal));
         var old =
                 db.sql("SELECT id,request_hash FROM wms_finished_receipt WHERE demand_no=?")
                         .param(in.demandNo())
                         .query()
                         .listOfRows();
         if (!old.isEmpty()) {
-            if (!hash.equals(old.getFirst().get("request_hash"))) throw conflict("MES 完工需求号内容不一致");
+            if (!hash.equals(old.getFirst().get("request_hash"))) throw conflict("完工需求号内容不一致");
             return detail(n(old.getFirst(), "id"));
         }
         eligible(in.warehouseId());
@@ -116,7 +151,7 @@ public class FinishedGoodsService {
                 || (in.expiryDate() != null && in.expiryDate().isBefore(in.productionDate())))
             throw conflict("生产日期或有效期不合法");
         db.sql(
-                        "INSERT INTO wms_finished_receipt(demand_no,request_hash,work_order_no,warehouse_id,material_id,quantity,batch_no,date_code,production_date,expiry_date,created_by,created_at,material_code,material_name,unit) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                        "INSERT INTO wms_finished_receipt(demand_no,request_hash,work_order_no,warehouse_id,material_id,quantity,batch_no,date_code,production_date,expiry_date,created_by,created_at,material_code,material_name,unit,production_order_id,completion_report_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
                 .params(
                         in.demandNo(),
                         hash,
@@ -130,9 +165,11 @@ public class FinishedGoodsService {
                         in.expiryDate(),
                         actor.currentActor(),
                         now(),
-                        m.code(),
-                        m.name(),
-                        m.unit())
+                        formal == null ? m.code() : formal.materialCode(),
+                        formal == null ? m.name() : formal.materialName(),
+                        formal == null ? m.unit() : formal.unit(),
+                        formal == null ? null : formal.orderId(),
+                        formal == null ? null : formal.reportId())
                 .update();
         return detail(
                 db.sql("SELECT id FROM wms_finished_receipt WHERE demand_no=?")
@@ -307,6 +344,8 @@ public class FinishedGoodsService {
     }
 
     private void event(Map<String, Object> d, String type, String quality) {
+        if (d.get("production_order_id") != null && !type.equals("FinishedInspectionRequested"))
+            return;
         var payload =
                 Map.of(
                         "receiptId",

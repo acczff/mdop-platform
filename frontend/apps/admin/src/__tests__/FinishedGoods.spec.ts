@@ -92,7 +92,10 @@ it('keeps rejected goods isolated and hides simulator for readers', async () => 
   await flushPromises()
   expect(v.text()).toContain('不合格隔离')
   expect(v.text()).not.toContain('确认上架')
-  expect(v.text()).not.toContain('模拟 MES')
+  expect(v.text()).toContain('模拟 MES 来源')
+  expect(
+    v.findAll('button').some((b) => b.text() === '模拟 MES 完工需求'),
+  ).toBe(false)
 })
 it('does not label broker publication as downstream receipt', async () => {
   const v = setup()
