@@ -170,8 +170,8 @@ async function retry() {
       method: 'POST',
       body: p.body,
     })
-    remember()
     if (!alive) return
+    remember()
     data.value = d
     ack.value = false
     reason.value = ''

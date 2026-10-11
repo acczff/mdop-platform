@@ -195,3 +195,30 @@ it('invalidates late reads when the original write is retried', async () => {
   expect(v.text()).toContain('已批准 6')
   v.unmount()
 })
+
+it('does not erase retry evidence when a response arrives after leaving the order', async () => {
+  const saved = JSON.stringify({
+    path: '',
+    body: '{"idempotencyKey":"old-report"}',
+  })
+  sessionStorage.setItem(storageKey, saved)
+  const v = setup()
+  await flushPromises()
+  let finish!: (value: typeof initial) => void
+  vi.mocked(request).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+  )
+  await btn(v, '原样重试完工请求')!.trigger('click')
+  v.unmount()
+  const newer = JSON.stringify({
+    path: '',
+    body: '{"idempotencyKey":"new-report"}',
+  })
+  sessionStorage.setItem(storageKey, newer)
+  finish(initial)
+  await flushPromises()
+  expect(sessionStorage.getItem(storageKey)).toBe(newer)
+})
