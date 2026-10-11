@@ -79,6 +79,16 @@ const demand = {
 }
 let current = structuredClone(demand)
 const response = async (path: string): Promise<unknown> => {
+  if (path.endsWith('/completions'))
+    return {
+      orderStatus: 'APPROVED',
+      authorized: '10',
+      pending: '0',
+      approved: '0',
+      remaining: '10',
+      unit: '件',
+      reports: [],
+    }
   if (path.startsWith('/api/master-data/warehouses?page=0'))
     throw new ApiError(400, '仓库分页从1开始')
   if (path.startsWith('/api/master-data/warehouses'))

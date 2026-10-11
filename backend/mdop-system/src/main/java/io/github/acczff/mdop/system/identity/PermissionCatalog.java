@@ -84,7 +84,9 @@ public final class PermissionCatalog {
                                 "warehouse:read",
                                 "wms:issue:read",
                                 "wms:production:read",
-                                "wms:production:report")),
+                                "wms:production:report",
+                                "manufacturing:read",
+                                "manufacturing:completion:report")),
                 new Role(
                         "PRODUCTION_PLANNER",
                         "生产计划员",
@@ -100,7 +102,8 @@ public final class PermissionCatalog {
                                 "warehouse:read",
                                 "bom:read",
                                 "manufacturing:read",
-                                "manufacturing:review")),
+                                "manufacturing:review",
+                                "manufacturing:completion:review")),
                 new Role(
                         "BOM_MAINTAINER",
                         "BOM 资料员",
@@ -145,6 +148,8 @@ public final class PermissionCatalog {
             throw invalid("销售审批与作业职责必须使用不同账号");
         if (codes.contains("PRODUCTION_REVIEWER") && codes.contains("PRODUCTION_PLANNER"))
             throw invalid("生产审批与计划职责必须使用不同账号");
+        if (codes.contains("PRODUCTION_REVIEWER") && codes.contains("PRODUCTION_RECORDER"))
+            throw invalid("生产完工复核与登记职责必须使用不同账号");
         var result = new TreeSet<String>();
         for (var code : codes)
             result.addAll(

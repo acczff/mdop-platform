@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ApiError, request, type Page, type Warehouse } from '../api'
 import MaterialPlanPanel from '../components/MaterialPlanPanel.vue'
+import CompletionPanel from '../components/CompletionPanel.vue'
 
 const props = defineProps<{ authorities: string[]; username: string }>()
 interface Directory {
@@ -431,10 +432,14 @@ onBeforeUnmount(() => {
   <main class="page production-orders">
     <div class="heading">
       <h1>生产需求与订单</h1>
-      <span v-if="!write && !review" class="muted">只读</span>
+      <span v-if="!write && !review" class="muted">{{
+        authorities.includes('manufacturing:completion:report')
+          ? '完工登记'
+          : '只读'
+      }}</span>
     </div>
     <p class="muted">
-      按需求整量建单，审核后固定生产依据，并按材料需求办理领料。完工另行接入。
+      按需求整量建单，批准后办理领料与完工登记，复核后衔接成品入库。
     </p>
     <p v-if="notice" role="status">{{ notice }}</p>
     <p v-if="error" role="alert" class="error">{{ error }}</p>
@@ -622,6 +627,13 @@ onBeforeUnmount(() => {
           </div>
           <p class="muted">工单批准时固定的 BOM 用量依据。</p>
         </details>
+        <CompletionPanel
+          v-if="['APPROVED', 'CANCELLED'].includes(o.status)"
+          :key="`completion:${o.id}:${o.version}`"
+          :order-id="o.id"
+          :authorities="authorities"
+          :username="username"
+        />
         <MaterialPlanPanel
           v-if="['APPROVED', 'CANCELLED'].includes(o.status)"
           :key="`${o.id}:${o.version}`"
@@ -746,7 +758,7 @@ onBeforeUnmount(() => {
               {{ selected?.order_no || detail?.source_reference }} ·
               {{ detail?.quantity }} {{ detail?.unit }}<br />{{
                 mode === 'cancel'
-                  ? '本轮工单尚未连接领料与完工；取消后释放需求，历史保留。'
+                  ? '有有效采购、领料、待复核或已批准完工记录时不能取消；历史记录保留。'
                   : mode === 'approve'
                     ? '批准后固定 BOM、地点和生产数量；不自动发料或报工。'
                     : '请核对当前依据并填写原因。'

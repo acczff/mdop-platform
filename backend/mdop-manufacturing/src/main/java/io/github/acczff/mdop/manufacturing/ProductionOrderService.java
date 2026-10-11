@@ -280,6 +280,12 @@ public class ProductionOrderService implements ProductionDemandUsage {
             }
             default -> {
                 state(o, "DRAFT", "REJECTED", "SUBMITTED", "APPROVED");
+                if (db.sql(
+                                        "SELECT COUNT(*) FROM mfg_completion WHERE order_id=? AND status IN('SUBMITTED','APPROVED')")
+                                .param(orderId)
+                                .query(Long.class)
+                                .single()
+                        > 0) throw conflict("存在待复核或已批准完工报告，不能取消工单");
                 if (materials.hasActive(orderId)) throw conflict("存在未取消领料或已发料事实，不能取消工单");
                 if (purchasing.hasActive(orderId))
                     throw conflict("请先安全取消关联采购订单和采购需求；有效供给未释放，不能取消工单");
