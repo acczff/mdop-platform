@@ -210,6 +210,73 @@ public class IssueService implements ProductionMaterialPort {
                 > 0;
     }
 
+    @Override
+    public List<Map<String, Object>> closureReferences(long orderId) {
+        var rows = references(orderId);
+        for (var r : rows) {
+            long id = n(r, "id");
+            r.put(
+                    "ledger",
+                    db.sql(
+                                    """
+                SELECT t.id,t.transaction_type,CAST(t.change_qty AS CHAR) quantity,t.balance_id,t.issue_id,t.consumption_id,t.production_return_id,t.production_reversal_id
+                FROM wms_inventory_transaction t
+                LEFT JOIN wms_production_consumption c ON c.id=t.consumption_id
+                LEFT JOIN wms_production_return p ON p.id=t.production_return_id
+                LEFT JOIN wms_production_reversal v ON v.id=t.production_reversal_id
+                WHERE t.issue_id=? OR c.issue_id=? OR p.issue_id=? OR v.issue_id=? ORDER BY t.id
+                """)
+                            .params(id, id, id, id)
+                            .query()
+                            .listOfRows());
+            var dimensions =
+                    db.sql(
+                                    "SELECT source_balance_id,target_balance_id FROM wms_material_issue WHERE id=?")
+                            .param(id)
+                            .query()
+                            .singleRow();
+            r.putAll(dimensions);
+            r.put(
+                    "allocationMatches",
+                    db.sql(
+                                            """
+                SELECT COUNT(*) FROM wms_material_issue d JOIN wms_inventory_balance b ON b.id=d.target_balance_id
+                WHERE d.id=? AND b.production_qty<>(SELECT COALESCE(SUM(x.quantity-x.consumed_qty-x.returned_qty),0) FROM wms_material_issue x WHERE x.target_balance_id=b.id AND x.status='ISSUED')
+                """)
+                                    .param(id)
+                                    .query(Long.class)
+                                    .single()
+                            == 0);
+            r.put(
+                    "consumptions",
+                    db.sql(
+                                    "SELECT id,event_no,CAST(quantity AS CHAR) quantity,reported_by FROM wms_production_consumption WHERE issue_id=? ORDER BY id")
+                            .param(id)
+                            .query()
+                            .listOfRows());
+            r.put(
+                    "returns",
+                    db.sql(
+                                    "SELECT id,event_no,status,target_balance_id,CAST(quantity AS CHAR) quantity,requested_by FROM wms_production_return WHERE issue_id=? ORDER BY id")
+                            .param(id)
+                            .query()
+                            .listOfRows());
+            r.put(
+                    "reversals",
+                    db.sql(
+                                    "SELECT id,consumption_id,production_return_id,status,CAST(quantity AS CHAR) quantity,created_by FROM wms_production_reversal WHERE issue_id=? ORDER BY id")
+                            .param(id)
+                            .query()
+                            .listOfRows());
+        }
+        return rows;
+    }
+
+    void requireOpen(Map<String, Object> issue) {
+        if (issue.get("production_order_id") != null)
+            manufacturing.requireOpen(n(issue, "production_order_id"));
+    }
+
     public Map<String, Object> reserve(long id, Reserve input) {
         var d = locked(id);
         if (Set.of("RESERVED", "ISSUED").contains(d.get("status"))) {

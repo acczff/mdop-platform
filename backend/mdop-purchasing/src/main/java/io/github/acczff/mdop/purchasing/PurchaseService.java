@@ -114,6 +114,12 @@ public class PurchaseService
                     returned = returned.add(new BigDecimal(l.returned()));
                 }
                 o.put("factHash", f.factHash());
+                var closedFact = closure(n(o, "id"));
+                o.put(
+                        "closureMatches",
+                        closedFact != null
+                                && f.canClose()
+                                && f.factHash().equals(closedFact.get("fact_hash")));
                 if ("CLOSED".equals(o.get("status"))) closed = true;
                 downstream.add(o);
             }

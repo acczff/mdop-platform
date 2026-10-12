@@ -65,7 +65,7 @@ public class ProductionReversalService {
         boolean consumption = in.kind().equals("CONSUMPTION");
         String table = consumption ? "wms_production_consumption" : "wms_production_return";
         var source = find("SELECT * FROM " + table + " WHERE id=?", in.sourceId());
-        issues.locked(n(source, "issue_id"));
+        var issue = issues.locked(n(source, "issue_id"));
         var old =
                 db.sql("SELECT * FROM wms_production_reversal WHERE request_key=?")
                         .param(in.requestKey())
@@ -82,6 +82,7 @@ public class ProductionReversalService {
                 throw conflict("冲正请求号内容不一致");
             return detail(n(o, "id"));
         }
+        issues.requireOpen(issue);
         if (!consumption && !"RETURNED".equals(source.get("status"))) throw conflict("仅已确认退料可申请冲正");
         if (db.sql(
                                 "SELECT COUNT(*) FROM wms_production_reversal WHERE "
@@ -125,6 +126,7 @@ public class ProductionReversalService {
             if (!reason.trim().equals(r.get("decision_reason"))) throw conflict("原审批原因不可修改");
             return detail(id);
         }
+        issues.requireOpen(d);
         if (!"PENDING".equals(r.get("status"))) throw conflict("只有待审冲正可处理");
         if (decision.equals("APPROVED")) {
             issues.eligibleWarehouses(n(d, "warehouse_id"), n(d, "target_warehouse_id"));

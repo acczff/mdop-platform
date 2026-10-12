@@ -64,6 +64,7 @@
 | [BomController.java](../../backend/mdop-manufacturing/src/main/java/io/github/acczff/mdop/manufacturing/BomController.java) | `/api/v1/manufacturing/boms` | 6 | — |
 | [CompletionController.java](../../backend/mdop-manufacturing/src/main/java/io/github/acczff/mdop/manufacturing/CompletionController.java) | `/api/v1/manufacturing/orders/{id}/completions` | 5 | — |
 | [MaterialPlanController.java](../../backend/mdop-manufacturing/src/main/java/io/github/acczff/mdop/manufacturing/MaterialPlanController.java) | `/api/v1/manufacturing/orders/{id}/materials` | 4 | — |
+| [ProductionClosureController.java](../../backend/mdop-manufacturing/src/main/java/io/github/acczff/mdop/manufacturing/ProductionClosureController.java) | `/api/v1/manufacturing/orders/{id}/closure` | 2 | — |
 | [ProductionOrderController.java](../../backend/mdop-manufacturing/src/main/java/io/github/acczff/mdop/manufacturing/ProductionOrderController.java) | `/api/v1/manufacturing` | 8 | — |
 | [CatalogController.java](../../backend/mdop-master-data/src/main/java/io/github/acczff/mdop/masterdata/catalog/CatalogController.java) | `/api/master-data` | 10 | — |
 | [WarehouseController.java](../../backend/mdop-master-data/src/main/java/io/github/acczff/mdop/masterdata/warehouse/api/WarehouseController.java) | `/api/master-data/warehouses` | 5 | — |
@@ -135,3 +136,4 @@
 | [V202610090011__material_planning.sql](../../backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610090011__material_planning.sql) | mdop-manufacturing |
 | [V202610110001__production_material_execution.sql](../../backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610110001__production_material_execution.sql) | mdop-manufacturing |
 | [V202610110002__production_completion.sql](../../backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610110002__production_completion.sql) | mdop-manufacturing |
+| [V202610120001__production_closure.sql](../../backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610120001__production_closure.sql) | mdop-manufacturing |

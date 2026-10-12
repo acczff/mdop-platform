@@ -11,6 +11,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ApiError, request, type Page, type Warehouse } from '../api'
 import MaterialPlanPanel from '../components/MaterialPlanPanel.vue'
 import CompletionPanel from '../components/CompletionPanel.vue'
+import ProductionClosurePanel from '../components/ProductionClosurePanel.vue'
 
 const props = defineProps<{ authorities: string[]; username: string }>()
 interface Directory {
@@ -150,6 +151,8 @@ const labels: Record<string, string> = {
   SUBMITTED: '待审核',
   REJECTED: '已驳回',
   APPROVED: '已批准',
+  COMPLETED: '已完成',
+  CLOSE: '确认结束',
   create: '新建需求',
   order: '转生产订单',
   edit: '编辑工单',
@@ -243,6 +246,23 @@ async function load(next = 0) {
   } finally {
     if (token === generation) loading.value = false
   }
+}
+function closureSaved(orderId: number) {
+  notice.value = '工单结束已保存'
+  if (result.value && detail.value) {
+    const demandId = detail.value.id
+    result.value.items = result.value.items.map((item) =>
+      item.id === demandId
+        ? {
+            ...item,
+            order_no: detail.value?.orders.find((o) => o.id === orderId)
+              ?.order_no,
+            order_status: 'COMPLETED',
+          }
+        : item,
+    )
+  }
+  if (detail.value) void openDetail(detail.value.id)
 }
 async function openDetail(id: number) {
   if (blocked.value || loading.value) return
@@ -675,13 +695,13 @@ onBeforeUnmount(() => {
           <p class="muted">工单批准时固定的 BOM 用量依据。</p>
         </details>
         <details
-          v-if="['APPROVED', 'CANCELLED'].includes(o.status)"
+          v-if="['APPROVED', 'CANCELLED', 'COMPLETED'].includes(o.status)"
           class="record-section"
           open
         >
           <summary>完工登记与成品入库</summary>
           <CompletionPanel
-            v-if="['APPROVED', 'CANCELLED'].includes(o.status)"
+            v-if="['APPROVED', 'CANCELLED', 'COMPLETED'].includes(o.status)"
             :key="`completion:${o.id}:${o.version}`"
             :order-id="o.id"
             :authorities="authorities"
@@ -691,13 +711,21 @@ onBeforeUnmount(() => {
         <details class="record-section" open>
           <summary>材料计划与领料执行</summary>
           <MaterialPlanPanel
-            v-if="['APPROVED', 'CANCELLED'].includes(o.status)"
+            v-if="['APPROVED', 'CANCELLED', 'COMPLETED'].includes(o.status)"
             :key="`${o.id}:${o.version}`"
             :order-id="o.id"
             :authorities="authorities"
             :username="username"
           />
         </details>
+        <ProductionClosurePanel
+          v-if="['APPROVED', 'COMPLETED'].includes(o.status)"
+          :key="`closure:${o.id}:${o.version}`"
+          :order-id="o.id"
+          :username="username"
+          :authorities="authorities"
+          @closed="closureSaved(o.id)"
+        />
       </article>
       <details>
         <summary>

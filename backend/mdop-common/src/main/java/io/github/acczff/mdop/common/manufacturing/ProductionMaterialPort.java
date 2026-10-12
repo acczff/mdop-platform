@@ -21,4 +21,6 @@ public interface ProductionMaterialPort {
     List<Map<String, Object>> references(long orderId);
 
     boolean hasActive(long orderId);
+
+    List<Map<String, Object>> closureReferences(long orderId);
 }

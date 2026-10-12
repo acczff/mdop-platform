@@ -1,6 +1,7 @@
 import { mount, flushPromises, type VueWrapper } from '@vue/test-utils'
 import { beforeEach, expect, it, vi } from 'vitest'
 import View from '../views/ProductionOrdersView.vue'
+import ClosurePanel from '../components/ProductionClosurePanel.vue'
 import { ApiError, request } from '../api'
 
 vi.mock('../api', async (original) => ({
@@ -8,6 +9,33 @@ vi.mock('../api', async (original) => ({
   request: vi.fn(),
 }))
 const base = '/api/v1/manufacturing'
+it('updates the preserved list row after closing an order from detail', async () => {
+  current.orders[0]!.status = 'APPROVED'
+  const view = setup('checker', 'review')
+  vi.mocked(request).mockImplementation(async (path) =>
+    path.startsWith(base + '/demands?')
+      ? {
+          items: [
+            { ...current, order_no: 'MFG-00000002', order_status: 'APPROVED' },
+          ],
+          total: 40,
+        }
+      : response(path),
+  )
+  await open(view)
+  current = {
+    ...current,
+    orders: [{ ...current.orders[0]!, status: 'COMPLETED', version: 2 }],
+  }
+  view.getComponent(ClosurePanel).vm.$emit('closed')
+  await flushPromises()
+  await view.get('.back-to-list').trigger('click')
+  await flushPromises()
+  expect(view.get('.business-list').text()).toContain('已完成')
+  expect(view.get('.business-list').text()).not.toContain('已批准')
+  expect(view.get('.result-pager').text()).toContain('第 1 / 2 页')
+  view.unmount()
+})
 it('returns from production detail without losing the list page or refetching', async () => {
   const view = setup()
   vi.mocked(request).mockImplementation(async (path) =>
@@ -105,6 +133,22 @@ const demand = {
 }
 let current = structuredClone(demand)
 const response = async (path: string): Promise<unknown> => {
+  if (path.endsWith('/closure'))
+    return {
+      orderStatus: 'APPROVED',
+      canClose: false,
+      selfReview: false,
+      closure: null,
+      facts: {
+        authorized: '10',
+        approved: '0',
+        stored: '0',
+        unit: '件',
+        hasVariance: false,
+        blockers: ['尚未完成生产'],
+        materials: [],
+      },
+    }
   if (path.endsWith('/completions'))
     return {
       orderStatus: 'APPROVED',

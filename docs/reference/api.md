@@ -94,6 +94,10 @@
 
 接口服务端校验和异人审核不因前端隐藏按钮而省略。`SYSTEM_ADMIN` 只有 `iam:manage`，不具备旧版 `ROLE_ADMIN` 的业务全权限；代码中的兼容权限分支不表示可以在账号页面分配该旧角色。
 
+## 工单结束核对
+
+`GET /api/v1/manufacturing/orders/{id}/closure` 重算材料、采购、完工及库存流水，返回阻断原因、事实摘要及历史快照一致性。读取需要 `manufacturing:read` 及工单全部相关仓库范围。`POST` 同一路径要求 `manufacturing:review`，禁止工单经办人及有效完工登记人自审；提交 `idempotencyKey`、`version`、`factHash`、`reason`、`varianceReason`，材料有差异时最后一项必填。结束不写库存或成本，未知结果保留原请求查证，详见[工单核对与结束](../erp/工单核对与结束实现与验收.md)。
+
 ## BOM 版本接口
 
 生产需求及工单接口位于同一根路径下的 `/api/v1/manufacturing/demands`、`/orders` 和 `/sales-sources`，使用独立 `manufacturing:read/write/review` 及成品仓权限；生产地点复用 `/api/master-data/production-sites`。请求和生命周期详见[生产订单接口](../erp/生产订单实现与验收.md#3-页面接口和迁移)。
