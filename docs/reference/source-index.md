@@ -8,8 +8,9 @@
 
 | 模块 | 直接依赖的内部模块（含测试依赖） | 定义 |
 |---|---|---|
-| mdop-boot | mdop-manufacturing、mdop-sales、mdop-purchasing、mdop-security、mdop-system、mdop-master-data、mdop-wms、mdop-integration、mdop-test-support (test) | [pom.xml](../../backend/mdop-boot/pom.xml) |
+| mdop-boot | mdop-finance、mdop-manufacturing、mdop-sales、mdop-purchasing、mdop-security、mdop-system、mdop-master-data、mdop-wms、mdop-integration、mdop-test-support (test) | [pom.xml](../../backend/mdop-boot/pom.xml) |
 | mdop-common | 无 | [pom.xml](../../backend/mdop-common/pom.xml) |
+| mdop-finance | mdop-security、mdop-common | [pom.xml](../../backend/mdop-finance/pom.xml) |
 | mdop-integration | mdop-common、mdop-wms | [pom.xml](../../backend/mdop-integration/pom.xml) |
 | mdop-manufacturing | mdop-master-data、mdop-security、mdop-common | [pom.xml](../../backend/mdop-manufacturing/pom.xml) |
 | mdop-master-data | mdop-common、mdop-security | [pom.xml](../../backend/mdop-master-data/pom.xml) |
@@ -24,6 +25,7 @@
 
 | 路径 | 源码 |
 |---|---|
+| `/finance` | [FinanceView.vue](../../frontend/apps/admin/src/views/FinanceView.vue) |
 | `/production-orders` | [ProductionOrdersView.vue](../../frontend/apps/admin/src/views/ProductionOrdersView.vue) |
 | `/boms` | [BomsView.vue](../../frontend/apps/admin/src/views/BomsView.vue) |
 | `/sales-orders` | [SalesOrdersView.vue](../../frontend/apps/admin/src/views/SalesOrdersView.vue) |
@@ -55,6 +57,7 @@
 
 | 控制器 | 路径前缀 / 方法路径 | 映射方法数 | Profile 限制 |
 |---|---|---:|---|
+| [FinanceController.java](../../backend/mdop-finance/src/main/java/io/github/acczff/mdop/finance/FinanceController.java) | `/api/v1/finance` | 8 | — |
 | [ErpMessageController.java](../../backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/local/ErpMessageController.java) | `/api/local/erp-messages` | 2 | local,test |
 | [ErpSimulatorController.java](../../backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/local/ErpSimulatorController.java) | `/api/local/erp-arrivals` | 2 | local,test |
 | [DeliveryController.java](../../backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/DeliveryController.java) | `/api/integration/messages` | 6 | — |
@@ -137,3 +140,4 @@
 | [V202610110001__production_material_execution.sql](../../backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610110001__production_material_execution.sql) | mdop-manufacturing |
 | [V202610110002__production_completion.sql](../../backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610110002__production_completion.sql) | mdop-manufacturing |
 | [V202610120001__production_closure.sql](../../backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610120001__production_closure.sql) | mdop-manufacturing |
+| [V202610120002__finance_basis.sql](../../backend/mdop-finance/src/main/resources/db/migration/finance/V202610120002__finance_basis.sql) | mdop-finance |

@@ -2,6 +2,10 @@
 
 当前没有 OpenAPI/Swagger 发布页。本文统一跨接口约定；全部控制器入口见[源码导航](source-index.md)，具体请求字段、默认分页与状态以控制器、请求 record/DTO、服务校验及对应集成测试为准。模拟端点不能作为生产系统集成契约。
 
+## 金额依据与往来
+
+新增财务入口 `/api/v1/finance`，详细路由、字段口径、状态与重试见[金额依据与往来确认](../erp/金额依据与往来确认实现与验收.md)。金额和单价输入使用十进制值，输出为字符串；CNY 金额两位、单价六位，按行 `HALF_UP`。`FINANCE_OPERATOR` 录入、`FINANCE_REVIEWER` 异人复核，来源和依据均校验仓库范围；未确认往来的 `open_amount` 为 `null`，不是零。确认往来不代表收付款、核销或凭证过账。
+
 ## 登录与会话
 
 1. `GET /api/auth/csrf`，保存响应中的 `headerName` 与 `token`，保留服务端 Cookie。

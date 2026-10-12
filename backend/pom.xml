@@ -27,6 +27,7 @@
     <module>mdop-master-data</module>
     <module>mdop-purchasing</module>
     <module>mdop-sales</module>
+    <module>mdop-finance</module>
     <module>mdop-manufacturing</module>
     <module>mdop-wms</module>
     <module>mdop-integration</module>
@@ -43,6 +44,7 @@
 
   <dependencyManagement>
     <dependencies>
+      <dependency><groupId>${project.groupId}</groupId><artifactId>mdop-finance</artifactId><version>${project.version}</version></dependency>
       <dependency>
         <groupId>${project.groupId}</groupId>
         <artifactId>mdop-manufacturing</artifactId>

@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    { path: '/finance', component: () => import('../views/FinanceView.vue') },
     {
       path: '/production-orders',
       component: () => import('../views/ProductionOrdersView.vue'),

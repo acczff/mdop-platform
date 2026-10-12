@@ -759,4 +759,100 @@ class ErpSalesTests extends InventoryScenarioSupport {
                         .get("stored_balance_id")
                         .asLong();
     }
+
+    @Test
+    void financeReceivableUsesOnlyActualShipmentAndDoesNotChangeStock() throws Exception {
+        for (String table : List.of("fin_command", "fin_audit", "fin_open_item", "fin_basis"))
+            db.update("DELETE FROM " + table);
+        db.update("UPDATE fin_baseline SET status='UNINITIALIZED',version=0 WHERE id=1");
+        var maker =
+                user("fin-maker")
+                        .authorities(
+                                new SimpleGrantedAuthority("finance:read"),
+                                new SimpleGrantedAuthority("finance:write"),
+                                new SimpleGrantedAuthority("wms:warehouse:" + fg));
+        var checker =
+                user("fin-checker")
+                        .authorities(
+                                new SimpleGrantedAuthority("finance:read"),
+                                new SimpleGrantedAuthority("finance:review"),
+                                new SimpleGrantedAuthority("wms:warehouse:" + fg));
+        String fin = "/api/v1/finance";
+        postAs(
+                fin + "/baseline",
+                Map.of(
+                        "idempotencyKey",
+                        key(),
+                        "version",
+                        0,
+                        "organization",
+                        "销售演示组织",
+                        "startDate",
+                        "2026-01-01",
+                        "endDate",
+                        "2026-12-31",
+                        "reason",
+                        "演示初始化"),
+                maker,
+                200);
+        postAs(
+                fin + "/baseline/approve",
+                Map.of("idempotencyKey", key(), "version", 1, "reason", "独立复核"),
+                checker,
+                200);
+        long id = approved("100"), a = arrange(id, "60"), execution = deliver(id, a);
+        String number = order(id).get("document_no").asText();
+        String path =
+                fin + "/sources?warehouseId=" + fg + "&direction=RECEIVABLE&orderNumber=" + number;
+        assertThat(
+                        json.readTree(
+                                        mvc.perform(get(path).with(maker))
+                                                .andExpect(status().isOk())
+                                                .andReturn()
+                                                .getResponse()
+                                                .getContentAsString())
+                                .isEmpty())
+                .isTrue();
+        execute(execution, "60");
+        var facts =
+                json.readTree(
+                        mvc.perform(get(path).with(maker))
+                                .andExpect(status().isOk())
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString());
+        assertThat(facts.size()).isEqualTo(1);
+        assertThat(facts.get(0).get("quantity").asText()).isEqualTo("60.000000");
+        var in = new HashMap<String, Object>();
+        in.put("idempotencyKey", key());
+        in.put("direction", "RECEIVABLE");
+        in.put("warehouseId", fg);
+        in.put("orderNumber", number);
+        in.put("factId", execution);
+        in.put("unitPrice", "20");
+        in.put("amount", "1200.00");
+        in.put("reference", "销售结算-" + key());
+        in.put("businessDate", "2026-10-12");
+        in.put("reason", "实际发货单独确认");
+        var d = postAs(fin + "/bases", in, maker, 200);
+        String bp = fin + "/bases/" + d.get("id").asLong();
+        assertThat(d.get("sourceMatches").asBoolean()).isTrue();
+        assertThat(d.get("business_date").asText()).isEqualTo("2026-10-12");
+        postAs(
+                bp + "/submit",
+                Map.of("idempotencyKey", key(), "version", 0, "reason", "提交"),
+                maker,
+                200);
+        d =
+                postAs(
+                        bp + "/approve",
+                        Map.of("idempotencyKey", key(), "version", 1, "reason", "复核"),
+                        checker,
+                        200);
+        assertThat(d.get("open_amount").asText()).isEqualTo("1200.00");
+        assertThat(d.get("balanceMatches").asBoolean()).isTrue();
+        assertThat(qty(stockId)).isEqualByComparingTo("40");
+        assertThat(order(id).get("fulfillment").get("lines").get(0).get("remaining").asText())
+                .isEqualTo("40.000000");
+    }
 }

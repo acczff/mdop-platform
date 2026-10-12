@@ -111,6 +111,7 @@ onBeforeUnmount(() => {
       'nav-closed': !navOpen,
       'nav-open': navOpen,
       'business-workspace': [
+        '/finance',
         '/purchasing',
         '/sales-orders',
         '/sales',
