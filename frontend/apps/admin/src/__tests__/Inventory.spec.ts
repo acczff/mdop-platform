@@ -5,6 +5,79 @@ import { request } from '../api'
 vi.mock('../api', () => ({ request: vi.fn() }))
 afterEach(() => vi.resetAllMocks())
 
+it.each([false, true])(
+  'focuses the inventory detail after a delayed read settles (failed=%s)',
+  async (failed) => {
+    mock()
+    const view = mount(InventoryView, {
+      attachTo: document.body,
+      props: { authorities: ['wms:inventory:read', 'wms:warehouse:1'] },
+    })
+    try {
+      await flushPromises()
+      let resolve!: (value: unknown) => void
+      let reject!: (error: Error) => void
+      vi.mocked(request).mockImplementationOnce(
+        () =>
+          new Promise((done, fail) => {
+            resolve = done
+            reject = fail
+          }),
+      )
+      const trigger = view
+        .findAll('button')
+        .find((b) => b.text() === '查看流水')!
+      ;(trigger.element as HTMLButtonElement).focus()
+      await trigger.trigger('click')
+      await flushPromises()
+      expect(view.get('.back-to-list').attributes('disabled')).toBeDefined()
+      if (failed) reject(new Error('流水不可达'))
+      else resolve({ items: [], page: 0, totalElements: 0, totalPages: 1 })
+      await flushPromises()
+      expect(document.activeElement).toBe(view.get('.back-to-list').element)
+      await view.get('.back-to-list').trigger('click')
+      await flushPromises()
+      expect(document.activeElement).toBe(trigger.element)
+    } finally {
+      view.unmount()
+    }
+  },
+)
+
+it('returns from inventory ledger to the same applied list without refetching', async () => {
+  mock()
+  const view = mount(InventoryView, {
+    props: { authorities: ['wms:inventory:read', 'wms:warehouse:1'] },
+  })
+  await flushPromises()
+  await view.findAll('input')[0]!.setValue('物料')
+  await view.get('form').trigger('submit')
+  await flushPromises()
+  await view
+    .findAll('button')
+    .find((b) => b.text() === '下一页')!
+    .trigger('click')
+  await flushPromises()
+  await view
+    .findAll('button')
+    .find((b) => b.text() === '查看流水')!
+    .trigger('click')
+  await flushPromises()
+  expect(
+    (view.get('.business-list').element as HTMLElement).style.display,
+  ).toBe('none')
+  const reads = vi.mocked(request).mock.calls.length
+  await view.get('.back-to-list').trigger('click')
+  await flushPromises()
+  expect(view.find('[aria-label="库存流水"]').exists()).toBe(false)
+  expect(view.get('.inventory-pagination').text()).toContain('第 2 / 2 页')
+  expect((view.findAll('input')[0]!.element as HTMLInputElement).value).toBe(
+    '物料',
+  )
+  expect(request).toHaveBeenCalledTimes(reads)
+  view.unmount()
+})
+
 function mock() {
   vi.mocked(request).mockImplementation(async (path) => {
     if (path.includes('/warehouses'))

@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { navigation } from '../navigation'
+import '../styles/business.css'
 
 const props = defineProps<{
   authorities: string[]
@@ -104,7 +105,28 @@ onBeforeUnmount(() => {
 })
 </script>
 <template>
-  <div class="layout" :class="{ 'nav-closed': !navOpen, 'nav-open': navOpen }">
+  <div
+    class="layout"
+    :class="{
+      'nav-closed': !navOpen,
+      'nav-open': navOpen,
+      'business-workspace': [
+        '/purchasing',
+        '/sales-orders',
+        '/sales',
+        '/production-orders',
+        '/boms',
+        '/issues',
+        '/production',
+        '/finished-goods',
+        '/inventory',
+        '/transfers',
+        '/counts',
+        '/freezes',
+        '/cross-transfers',
+      ].includes(route.path),
+    }"
+  >
     <aside
       v-show="navOpen"
       id="workspace-navigation"

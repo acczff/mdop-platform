@@ -14,6 +14,46 @@ afterEach(() => {
   window.history.replaceState({}, '', '/')
 })
 const base = '/api/v1/sales/documents'
+it('separates read-only sales details and returns to the original page without a new read', async () => {
+  const view = setup(doc, [])
+  vi.mocked(request).mockImplementation(async (path) =>
+    path.includes('?warehouseId=') ? { items: [doc], total: 40 } : data(path),
+  )
+  await flushPromises()
+  await view
+    .findAll('button')
+    .find((b) => b.text() === '下一页')!
+    .trigger('click')
+  await flushPromises()
+  await view
+    .findAll('button')
+    .find((b) => b.text() === '查看')!
+    .trigger('click')
+  await flushPromises()
+  expect(
+    (view.get('.business-list').element as HTMLElement).style.display,
+  ).toBe('none')
+  await view.get('#sales-tab-arrangements').trigger('click')
+  expect(view.get('#sales-tab-arrangements').attributes('aria-selected')).toBe(
+    'true',
+  )
+  await view
+    .get('#sales-tab-arrangements')
+    .trigger('keydown', { key: 'ArrowRight' })
+  expect(view.get('#sales-tab-history').attributes('aria-selected')).toBe(
+    'true',
+  )
+  expect(view.findAll('button').some((b) => b.text() === '安排发货')).toBe(
+    false,
+  )
+  const reads = vi.mocked(request).mock.calls.length
+  await view.get('.back-to-list').trigger('click')
+  await flushPromises()
+  expect(view.find('.detail').exists()).toBe(false)
+  expect(view.get('.result-pager').text()).toContain('第 2 / 2 页')
+  expect(request).toHaveBeenCalledTimes(reads)
+  view.unmount()
+})
 const doc: SalesDocument = {
   id: 10,
   document_no: 'SO-00000010',

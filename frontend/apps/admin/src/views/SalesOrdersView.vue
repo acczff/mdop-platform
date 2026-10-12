@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import ResultPager from '../components/ResultPager.vue'
+import RecordTabs from '../components/RecordTabs.vue'
+import { statusTone } from '../businessPresentation'
+import { useListPosition } from '../composables/useListPosition'
 import RecordHeading from '../components/RecordHeading.vue'
 import OperationRecord from '../components/OperationRecord.vue'
 import OperationTimeNote from '../components/OperationTimeNote.vue'
@@ -72,6 +75,14 @@ const warehouses = ref<Warehouse[]>([]),
   customers = ref<Directory[]>([])
 const result = ref<{ items: Document[]; total: number }>(),
   detail = ref<Document>()
+const { pageRoot, rememberList, focusDetail, restoreList } = useListPosition()
+const detailTab = ref('overview')
+function returnToList() {
+  if (blocked.value) return
+  ++detailGeneration
+  detail.value = undefined
+  void restoreList()
+}
 const closureLines = computed(() => {
   if (!detail.value?.closure) return []
   try {
@@ -199,6 +210,8 @@ async function load(next = 0) {
 }
 async function openDetail(id: number) {
   if (blocked.value) return
+  if (!detail.value) rememberList()
+  if (detail.value?.id !== id) detailTab.value = 'overview'
   const token = ++detailGeneration
   detail.value = undefined
   detailError.value = ''
@@ -206,6 +219,7 @@ async function openDetail(id: number) {
     const data = await request<Document>(`${base}/${id}`)
     if (token === detailGeneration) {
       detail.value = data
+      void focusDetail()
       if (result.value)
         result.value.items = result.value.items.map((d) =>
           d.id === data.id ? data : d,
@@ -423,12 +437,14 @@ onBeforeUnmount(() => {
 })
 </script>
 <template>
-  <main class="page sales-page">
-    <div class="page-heading">
+  <main ref="pageRoot" class="page sales-page">
+    <div v-show="!detail" class="page-heading">
       <h1>销售订单</h1>
       <span v-if="!writable && !reviewable" class="hint">只读</span>
     </div>
-    <p class="hint">客户订单 → 分批发货 → 实际出库 → 数量结案</p>
+    <p v-show="!detail" class="hint">
+      客户订单 → 分批发货 → 实际出库 → 数量结案
+    </p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="notice" class="success" role="status">{{ notice }}</p>
     <div v-if="pending" class="pending panel">
@@ -439,7 +455,7 @@ onBeforeUnmount(() => {
         {{ busy ? '正在核对…' : '原样重试' }}
       </button>
     </div>
-    <section class="panel">
+    <section v-show="!detail" class="panel business-list">
       <div class="filters">
         <label
           >发货仓库<select
@@ -492,13 +508,24 @@ onBeforeUnmount(() => {
           <tbody>
             <tr v-for="d in result?.items" :key="d.id">
               <td>
-                {{ d.document_no }}<small>{{ d.purpose }}</small>
+                <strong class="document-number">{{ d.document_no }}</strong
+                ><small>{{ d.purpose }}</small>
               </td>
               <td>{{ d.customer_name }}</td>
               <td>{{ businessDate(d.needed_date) }}</td>
-              <td>{{ stateText(d.status) }}</td>
               <td>
-                <button :disabled="blocked" @click="openDetail(d.id)">
+                <span
+                  class="purchase-status"
+                  :data-tone="statusTone(d.status)"
+                  >{{ stateText(d.status) }}</span
+                >
+              </td>
+              <td>
+                <button
+                  class="text-action"
+                  :disabled="blocked"
+                  @click="openDetail(d.id)"
+                >
                   查看
                 </button>
               </td>
@@ -529,18 +556,36 @@ onBeforeUnmount(() => {
       详情读取失败：{{ detailError }}，请重新选择单据。
     </p>
     <section v-if="detail" class="panel detail">
+      <button class="back-to-list" :disabled="blocked" @click="returnToList">
+        ← 返回列表
+      </button>
       <RecordHeading
         :title="'销售订单 ' + detail.document_no"
         :subtitle="
           identity(detail.customer_name) + ' · ' + detail.warehouse_name
         "
         :status="stateText(detail.status)"
-        ><button :disabled="blocked" @click="detail = undefined">
-          收起详情
-        </button></RecordHeading
-      >
-      <p class="hint">约定日期：{{ businessDate(detail.needed_date) }}</p>
-      <p>{{ detail.purpose }}</p>
+        :tone="statusTone(detail.status)"
+      />
+      <dl class="purchase-facts">
+        <div>
+          <dt>客户</dt>
+          <dd>{{ identity(detail.customer_name) }}</dd>
+        </div>
+        <div>
+          <dt>发货仓库</dt>
+          <dd>{{ detail.warehouse_name }}</dd>
+        </div>
+        <div>
+          <dt>约定日期</dt>
+          <dd>{{ businessDate(detail.needed_date) }}</dd>
+        </div>
+        <div>
+          <dt>创建账号</dt>
+          <dd>{{ detail.created_by }}</dd>
+        </div>
+      </dl>
+      <p class="purchase-purpose"><span>用途</span>{{ detail.purpose }}</p>
       <p v-if="detail.customer_reference" class="hint">
         客户单号：{{ detail.customer_reference }}
       </p>
@@ -578,35 +623,121 @@ onBeforeUnmount(() => {
       <p v-if="detail.status === 'SUBMITTED' && !canReview" class="hint">
         等待其他销售审批员审核。
       </p>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>物料</th>
-              <th>订单数量</th>
-              <th>已安排</th>
-              <th>实际已发</th>
-              <th>未发数量</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="l in detail.fulfillment.lines" :key="l.orderLineId">
-              <td>
-                {{ l.code
-                }}<small>{{
-                  detail.lines.find((x) => x.id === l.orderLineId)
-                    ?.material_name
-                }}</small>
-              </td>
-              <td>{{ displayQuantity(l.ordered) }} {{ l.unit }}</td>
-              <td>{{ displayQuantity(l.allocated) }}</td>
-              <td>{{ displayQuantity(l.shipped) }}</td>
-              <td>{{ displayQuantity(l.remaining) }}</td>
-            </tr>
-          </tbody>
-        </table>
+      <RecordTabs
+        v-model="detailTab"
+        prefix="sales"
+        :disabled="blocked"
+        :tabs="[
+          { id: 'overview', label: '物料与履约' },
+          { id: 'arrangements', label: '发货安排' },
+          { id: 'history', label: '操作记录' },
+        ]"
+      />
+      <div
+        v-show="detailTab === 'overview'"
+        id="sales-panel-overview"
+        role="tabpanel"
+        aria-labelledby="sales-tab-overview"
+      >
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>物料</th>
+                <th>订单数量</th>
+                <th>已安排</th>
+                <th>实际已发</th>
+                <th>未发数量</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="l in detail.fulfillment.lines" :key="l.orderLineId">
+                <td>
+                  {{
+                    detail.lines.find((x) => x.id === l.orderLineId)
+                      ?.material_name
+                  }}<small>{{ l.code }}</small>
+                </td>
+                <td>{{ displayQuantity(l.ordered) }} {{ l.unit }}</td>
+                <td>{{ displayQuantity(l.allocated) }}</td>
+                <td>{{ displayQuantity(l.shipped) }}</td>
+                <td>{{ displayQuantity(l.remaining) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <section class="arrangements sales-fulfillment" aria-label="履约核对">
+          <div class="detail-heading">
+            <h2>履约核对</h2>
+            <button :disabled="blocked" @click="openDetail(detail.id)">
+              核对最新进度
+            </button>
+          </div>
+          <template v-if="detail.closure"
+            ><OperationRecord
+              title="数量履约结案"
+              result="已保存数量结案快照"
+              :account="detail.closure.closed_by"
+              :at="detail.closure.closed_at"
+              :note="detail.closure.reason"
+              note-label="结案原因"
+            />
+            <OperationTimeNote />
+            <p v-if="!detail.closureMatches" class="error" role="alert">
+              当前事实与结案快照不一致，请联系管理员核对。
+            </p>
+            <details>
+              <summary>结案时数量</summary>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>物料</th>
+                      <th>订单数量</th>
+                      <th>实际已发</th>
+                      <th>未发数量</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="l in closureLines" :key="l.orderLineId">
+                      <td>{{ l.code }}</td>
+                      <td>{{ displayQuantity(l.ordered) }} {{ l.unit }}</td>
+                      <td>{{ displayQuantity(l.shipped) }}</td>
+                      <td>{{ displayQuantity(l.remaining) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </details></template
+          >
+          <template v-else
+            ><ul v-if="detail.fulfillment.blockers.length">
+              <li v-for="b in detail.fulfillment.blockers" :key="b">{{ b }}</li>
+            </ul>
+            <p v-else class="success">
+              授权数量与实际出库、流水一致，可以结案。
+            </p>
+            <button
+              v-if="writable && detail.status === 'FULFILLING'"
+              class="primary"
+              :disabled="blocked || !detail.fulfillment.canClose"
+              @click="open('close')"
+            >
+              履约结案
+            </button></template
+          >
+          <p class="hint">
+            结案仅确认数量履约。金额依据未建立，不代表应收或收款结清。
+          </p>
+        </section>
       </div>
-      <section class="arrangements">
+      <section
+        v-show="detailTab === 'arrangements'"
+        id="sales-panel-arrangements"
+        role="tabpanel"
+        aria-labelledby="sales-tab-arrangements"
+        class="arrangements"
+      >
         <div class="detail-heading">
           <h2>发货安排</h2>
           <button
@@ -675,70 +806,14 @@ onBeforeUnmount(() => {
           </div>
         </article>
       </section>
-      <section class="arrangements">
-        <div class="detail-heading">
-          <h2>履约核对</h2>
-          <button :disabled="blocked" @click="openDetail(detail.id)">
-            核对最新进度
-          </button>
-        </div>
-        <template v-if="detail.closure"
-          ><OperationRecord
-            title="数量履约结案"
-            result="已保存数量结案快照"
-            :account="detail.closure.closed_by"
-            :at="detail.closure.closed_at"
-            :note="detail.closure.reason"
-            note-label="结案原因"
-          />
-          <OperationTimeNote />
-          <p v-if="!detail.closureMatches" class="error" role="alert">
-            当前事实与结案快照不一致，请联系管理员核对。
-          </p>
-          <details>
-            <summary>结案时数量</summary>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>物料</th>
-                    <th>订单数量</th>
-                    <th>实际已发</th>
-                    <th>未发数量</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="l in closureLines" :key="l.orderLineId">
-                    <td>{{ l.code }}</td>
-                    <td>{{ displayQuantity(l.ordered) }} {{ l.unit }}</td>
-                    <td>{{ displayQuantity(l.shipped) }}</td>
-                    <td>{{ displayQuantity(l.remaining) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </details></template
-        >
-        <template v-else
-          ><ul v-if="detail.fulfillment.blockers.length">
-            <li v-for="b in detail.fulfillment.blockers" :key="b">{{ b }}</li>
-          </ul>
-          <p v-else class="success">授权数量与实际出库、流水一致，可以结案。</p>
-          <button
-            v-if="writable && detail.status === 'FULFILLING'"
-            class="primary"
-            :disabled="blocked || !detail.fulfillment.canClose"
-            @click="open('close')"
-          >
-            履约结案
-          </button></template
-        >
-        <p class="hint">
-          结案仅确认数量履约。金额依据未建立，不代表应收或收款结清。
-        </p>
-      </section>
-      <details class="history">
-        <summary>操作历史（{{ detail.history.length }}）</summary>
+      <section
+        v-show="detailTab === 'history'"
+        id="sales-panel-history"
+        role="tabpanel"
+        aria-labelledby="sales-tab-history"
+        class="history"
+      >
+        <h2>操作历史（{{ detail.history.length }}）</h2>
         <div v-for="h in detail.history" :key="h.id" class="history-item">
           <OperationRecord
             :title="auditNames[h.action] || h.action"
@@ -756,7 +831,7 @@ onBeforeUnmount(() => {
           </details>
         </div>
         <OperationTimeNote v-if="detail.history.length" />
-      </details>
+      </section>
     </section>
     <div v-if="mode" class="overlay">
       <section

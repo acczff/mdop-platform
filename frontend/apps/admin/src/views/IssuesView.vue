@@ -320,8 +320,11 @@ onMounted(() =>
           <tbody>
             <tr v-for="row in result?.items" :key="row.id">
               <td>
-                领料单 MI-{{ row.id }}<small>{{ row.demand_no }}</small
-                ><small>{{ row.work_order_no }}</small>
+                领料单 MI-{{ row.id }}<small>{{ row.work_order_no }}</small>
+                <details class="technical-reference">
+                  <summary>接入需求编号</summary>
+                  {{ row.demand_no }}
+                </details>
               </td>
               <td>
                 {{ row.material_name

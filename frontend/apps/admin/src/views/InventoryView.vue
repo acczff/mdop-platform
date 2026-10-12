@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import RecordHeading from '../components/RecordHeading.vue'
+import { statusTone } from '../businessPresentation'
+import { useListPosition } from '../composables/useListPosition'
 import { identity } from '../presentation'
 import { quantity as displayQuantity, timestamp } from '../presentation'
 import { computed, onMounted, ref } from 'vue'
@@ -68,6 +70,15 @@ const includeZero = ref(false),
 const stocks = ref<Page<Stock>>(),
   ledger = ref<Page<Ledger>>(),
   selected = ref<Stock>()
+const { pageRoot, rememberList, focusDetail, restoreList } = useListPosition()
+function returnToList() {
+  if (busy.value) return
+  selected.value = undefined
+  ledger.value = undefined
+  ledgerError.value = ''
+  error.value = ''
+  void restoreList()
+}
 const ledgerError = ref(''),
   ledgerPage = ref(0)
 const qualityNames: Record<string, string> = {
@@ -186,13 +197,14 @@ async function confirmMove() {
   }
 }
 async function followBalance(id: number) {
+  if (!selected.value) rememberList()
   busy.value = true
   error.value = ''
   selected.value = undefined
   ledger.value = undefined
   ledgerError.value = ''
   try {
-    await trace(await request<Stock>(`/api/v1/wms/stock/${id}`))
+    await trace(await request<Stock>(`/api/v1/wms/stock/${id}`), 0, false)
   } catch (e) {
     error.value = (e as Error).message
   } finally {
@@ -227,7 +239,9 @@ async function search(page = 0, apply = false) {
     busy.value = false
   }
 }
-async function trace(stock: Stock, page = 0) {
+async function trace(stock: Stock, page = 0, remember = true) {
+  const openingDetail = selected.value?.id !== stock.id
+  if (remember && !selected.value) rememberList()
   busy.value = true
   error.value = ''
   ledgerError.value = ''
@@ -243,6 +257,7 @@ async function trace(stock: Stock, page = 0) {
     error.value = ledgerError.value
   } finally {
     busy.value = false
+    if (openingDetail) void focusDetail()
   }
 }
 onMounted(async () => {
@@ -278,8 +293,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="page">
-    <header class="page-heading">
+  <main ref="pageRoot" class="page inventory-page">
+    <header v-show="!selected" class="page-heading">
       <div>
         <h1>库存与追溯</h1>
         <p class="muted">
@@ -340,164 +355,171 @@ onMounted(async () => {
         <RouterLink to="/transfers">查看移库记录</RouterLink>
       </form>
     </section>
-    <form class="panel filters" @submit.prevent="search(0, true)">
-      <label
-        >仓库<select v-model="warehouseId" :disabled="busy" required>
-          <option v-for="w in warehouses" :key="w.id" :value="w.id">
-            {{ w.name }}
-          </option>
-        </select></label
-      >
-      <label
-        >物料编码 / 名称<input
-          v-model="keyword"
-          maxlength="100"
-          :disabled="busy"
-      /></label>
-      <label
-        >批次（精确匹配）<input v-model="batch" maxlength="64" :disabled="busy"
-      /></label>
-      <label
-        >质量状态<select v-model="quality" :disabled="busy">
-          <option value="">全部</option>
-          <option
-            v-for="(name, value) in qualityNames"
-            :key="value"
-            :value="value"
+    <div v-show="!selected" class="business-list">
+      <form class="panel filters" @submit.prevent="search(0, true)">
+        <label
+          >仓库<select v-model="warehouseId" :disabled="busy" required>
+            <option v-for="w in warehouses" :key="w.id" :value="w.id">
+              {{ w.name }}
+            </option>
+          </select></label
+        >
+        <label
+          >物料编码 / 名称<input
+            v-model="keyword"
+            maxlength="100"
+            :disabled="busy"
+        /></label>
+        <label
+          >批次（精确匹配）<input
+            v-model="batch"
+            maxlength="64"
+            :disabled="busy"
+        /></label>
+        <label
+          >质量状态<select v-model="quality" :disabled="busy">
+            <option value="">全部</option>
+            <option
+              v-for="(name, value) in qualityNames"
+              :key="value"
+              :value="value"
+            >
+              {{ name }}
+            </option>
+          </select></label
+        >
+        <label class="zero-option"
+          ><input
+            v-model="includeZero"
+            type="checkbox"
+            :disabled="busy"
+          />包含零库存历史</label
+        >
+        <button class="primary" :disabled="busy || !warehouseId">
+          {{ busy ? '查询中…' : '查询库存' }}
+        </button>
+      </form>
+      <p class="hint">
+        待检和不合格库存不可用；合格品上架后才计入可用数量。不同物料和单位不合并汇总。
+      </p>
+      <section class="panel">
+        <div class="inventory-table">
+          <table>
+            <thead>
+              <tr>
+                <th>物料 / 单位</th>
+                <th>库位</th>
+                <th>来源 / 批次</th>
+                <th>质量状态</th>
+                <th>现有数量</th>
+                <th>可用数量</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="s in stocks?.items" :key="s.id">
+                <td>
+                  {{ s.material_name
+                  }}<small>{{ s.material_code }} · {{ s.unit }}</small>
+                </td>
+                <td>
+                  {{ s.location_name }}<small>{{ s.location_code }}</small>
+                </td>
+                <td>
+                  {{ s.supplier_name
+                  }}<small>{{ s.batch_no || '无批次' }}</small>
+                </td>
+                <td>
+                  {{ qualityNames[s.quality_status] || s.quality_status
+                  }}<small v-if="s.active_freeze_id"
+                    >已冻结 · FR-{{ s.active_freeze_id }}</small
+                  >
+                </td>
+                <td>{{ displayQuantity(s.on_hand_qty) }}</td>
+                <td>
+                  {{ displayQuantity(s.available_qty)
+                  }}<small class="muted"
+                    >预占 {{ displayQuantity(s.reserved_qty) }} · 生产占用
+                    {{ displayQuantity(s.production_qty) }}</small
+                  >
+                </td>
+                <td>
+                  <button :disabled="busy" @click="trace(s)">查看流水</button>
+                  <RouterLink
+                    v-if="
+                      (props.authorities.includes('ROLE_ADMIN') ||
+                        props.authorities.includes('wms:freeze:read')) &&
+                      s.warehouse_purpose !== 'LINE_SIDE'
+                    "
+                    :to="`/freezes?warehouseId=${s.warehouse_id}&balanceId=${s.id}`"
+                    >冻结管理</RouterLink
+                  >
+                  <button
+                    v-if="
+                      canTransfer &&
+                      s.quality_status === 'QUALIFIED' &&
+                      Number(s.available_qty) > 0
+                    "
+                    :disabled="busy"
+                    @click="openMove(s)"
+                  >
+                    移库
+                  </button>
+                  <RouterLink
+                    v-if="
+                      (props.authorities.includes('ROLE_ADMIN') ||
+                        props.authorities.includes('wms:count:create')) &&
+                      s.quality_status === 'QUALIFIED'
+                    "
+                    :to="`/counts?balanceId=${s.id}`"
+                    >盘点</RouterLink
+                  >
+                </td>
+              </tr>
+              <tr v-if="!stocks?.items.length">
+                <td colspan="7">
+                  {{
+                    initializing || busy
+                      ? '正在加载…'
+                      : error
+                        ? '查询失败，请重试'
+                        : '没有符合条件的库存记录'
+                  }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div v-if="stocks" class="inventory-pagination">
+          <span
+            >共 {{ stocks.totalElements }} 条 · 第 {{ stocks.page + 1 }} /
+            {{ Math.max(1, stocks.totalPages) }} 页</span
           >
-            {{ name }}
-          </option>
-        </select></label
-      >
-      <label class="zero-option"
-        ><input
-          v-model="includeZero"
-          type="checkbox"
-          :disabled="busy"
-        />包含零库存历史</label
-      >
-      <button class="primary" :disabled="busy || !warehouseId">
-        {{ busy ? '查询中…' : '查询库存' }}
+          <button
+            :disabled="busy || stocks.page === 0"
+            @click="search(stocks.page - 1)"
+          >
+            上一页
+          </button>
+          <button
+            :disabled="busy || stocks.page + 1 >= stocks.totalPages"
+            @click="search(stocks.page + 1)"
+          >
+            下一页
+          </button>
+        </div>
+      </section>
+    </div>
+    <section v-if="selected" class="panel detail" aria-label="库存流水">
+      <button class="back-to-list" :disabled="busy" @click="returnToList">
+        ← 返回列表
       </button>
-    </form>
-    <p class="hint">
-      待检和不合格库存不可用；合格品上架后才计入可用数量。不同物料和单位不合并汇总。
-    </p>
-    <section class="panel">
-      <div class="inventory-table">
-        <table>
-          <thead>
-            <tr>
-              <th>物料 / 单位</th>
-              <th>库位</th>
-              <th>来源 / 批次</th>
-              <th>质量状态</th>
-              <th>现有数量</th>
-              <th>可用数量</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="s in stocks?.items" :key="s.id">
-              <td>
-                {{ s.material_name
-                }}<small>{{ s.material_code }} · {{ s.unit }}</small>
-              </td>
-              <td>
-                {{ s.location_name }}<small>{{ s.location_code }}</small>
-              </td>
-              <td>
-                {{ s.supplier_name }}<small>{{ s.batch_no || '无批次' }}</small>
-              </td>
-              <td>
-                {{ qualityNames[s.quality_status] || s.quality_status
-                }}<small v-if="s.active_freeze_id"
-                  >已冻结 · FR-{{ s.active_freeze_id }}</small
-                >
-              </td>
-              <td>{{ displayQuantity(s.on_hand_qty) }}</td>
-              <td>
-                {{ displayQuantity(s.available_qty)
-                }}<small class="muted"
-                  >预占 {{ displayQuantity(s.reserved_qty) }} · 生产占用
-                  {{ displayQuantity(s.production_qty) }}</small
-                >
-              </td>
-              <td>
-                <button :disabled="busy" @click="trace(s)">查看流水</button>
-                <RouterLink
-                  v-if="
-                    (props.authorities.includes('ROLE_ADMIN') ||
-                      props.authorities.includes('wms:freeze:read')) &&
-                    s.warehouse_purpose !== 'LINE_SIDE'
-                  "
-                  :to="`/freezes?warehouseId=${s.warehouse_id}&balanceId=${s.id}`"
-                  >冻结管理</RouterLink
-                >
-                <button
-                  v-if="
-                    canTransfer &&
-                    s.quality_status === 'QUALIFIED' &&
-                    Number(s.available_qty) > 0
-                  "
-                  :disabled="busy"
-                  @click="openMove(s)"
-                >
-                  移库
-                </button>
-                <RouterLink
-                  v-if="
-                    (props.authorities.includes('ROLE_ADMIN') ||
-                      props.authorities.includes('wms:count:create')) &&
-                    s.quality_status === 'QUALIFIED'
-                  "
-                  :to="`/counts?balanceId=${s.id}`"
-                  >盘点</RouterLink
-                >
-              </td>
-            </tr>
-            <tr v-if="!stocks?.items.length">
-              <td colspan="7">
-                {{
-                  initializing || busy
-                    ? '正在加载…'
-                    : error
-                      ? '查询失败，请重试'
-                      : '没有符合条件的库存记录'
-                }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div v-if="stocks" class="inventory-pagination">
-        <span
-          >共 {{ stocks.totalElements }} 条 · 第 {{ stocks.page + 1 }} /
-          {{ Math.max(1, stocks.totalPages) }} 页</span
-        >
-        <button
-          :disabled="busy || stocks.page === 0"
-          @click="search(stocks.page - 1)"
-        >
-          上一页
-        </button>
-        <button
-          :disabled="busy || stocks.page + 1 >= stocks.totalPages"
-          @click="search(stocks.page + 1)"
-        >
-          下一页
-        </button>
-      </div>
-    </section>
-    <section v-if="selected" class="panel" aria-label="库存流水">
       <RecordHeading
         :title="identity(selected.material_name, selected.material_code)"
         subtitle="库存详情与流水"
         :status="qualityNames[selected.quality_status]"
-        ><button :disabled="busy" @click="selected = undefined">
-          收起详情
-        </button></RecordHeading
-      >
+        :tone="statusTone(selected.quality_status)"
+      />
       <dl class="record-facts">
         <div>
           <dt>在手数量</dt>

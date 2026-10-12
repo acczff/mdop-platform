@@ -325,8 +325,12 @@ onMounted(() =>
             <tbody>
               <tr v-for="row in returns?.items" :key="row.id">
                 <td>
-                  生产退料 PR-{{ row.id }}<small>{{ row.event_no }}</small
-                  ><small>{{ statuses[row.status!] }}</small>
+                  生产退料 PR-{{ row.id
+                  }}<small>{{ statuses[row.status!] }}</small>
+                  <details class="technical-reference">
+                    <summary>事件编号</summary>
+                    {{ row.event_no }}
+                  </details>
                 </td>
                 <td>
                   {{ displayQuantity(row.quantity) }} {{ issue.unit
@@ -400,7 +404,11 @@ onMounted(() =>
             <tbody>
               <tr v-for="row in consumptions?.items" :key="row.id">
                 <td>
-                  生产消耗 PC-{{ row.id }}<small>{{ row.event_no }}</small>
+                  生产消耗 PC-{{ row.id }}
+                  <details class="technical-reference">
+                    <summary>事件编号</summary>
+                    {{ row.event_no }}
+                  </details>
                 </td>
                 <td>{{ displayQuantity(row.quantity) }} {{ issue.unit }}</td>
                 <td>

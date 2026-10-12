@@ -249,6 +249,29 @@ it('rejects detail from another warehouse and does not retain old detail after a
   v.unmount()
 })
 
+it('returns from focused receipt detail without reloading the list', async () => {
+  const v = setup()
+  await flushPromises()
+  vi.mocked(request).mockResolvedValueOnce(receiptDetail)
+  await v
+    .findAll('button')
+    .find((b) => b.text() === '查看详情')!
+    .trigger('click')
+  await flushPromises()
+  expect(v.get('.business-list').attributes('style')).toContain('display: none')
+  const reads = vi.mocked(request).mock.calls.length
+  await v
+    .findAll('button')
+    .find((b) => b.text() === '← 返回列表')!
+    .trigger('click')
+  await flushPromises()
+  expect(v.get('.business-list').attributes('style') || '').not.toContain(
+    'display: none',
+  )
+  expect(vi.mocked(request).mock.calls).toHaveLength(reads)
+  v.unmount()
+})
+
 it('discards a late detail response after the warehouse is refreshed', async () => {
   const v = setup()
   await flushPromises()

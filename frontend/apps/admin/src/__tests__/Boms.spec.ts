@@ -108,6 +108,26 @@ async function detail(v: VueWrapper) {
   await button(v, '查看').trigger('click')
   await flushPromises()
 }
+it('returns from focused detail with the current filter and without reloading', async () => {
+  const v = setup()
+  await flushPromises()
+  await v.get('input[aria-label="搜索产品或版本"]').setValue('FG')
+  await v.get('form.toolbar').trigger('submit')
+  await detail(v)
+  expect(v.get('.business-list').attributes('style')).toContain('display: none')
+  const reads = vi.mocked(request).mock.calls.length
+  await button(v, '← 返回列表').trigger('click')
+  await flushPromises()
+  expect(v.get('.business-list').attributes('style') || '').not.toContain(
+    'display: none',
+  )
+  expect(
+    (v.get('input[aria-label="搜索产品或版本"]').element as HTMLInputElement)
+      .value,
+  ).toBe('FG')
+  expect(vi.mocked(request).mock.calls).toHaveLength(reads)
+  v.unmount()
+})
 async function newForm(v: VueWrapper) {
   await flushPromises()
   await button(v, '新建 BOM').trigger('click')

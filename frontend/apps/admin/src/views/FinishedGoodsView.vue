@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useListPosition } from '../composables/useListPosition'
 import ResultPager from '../components/ResultPager.vue'
 import OperationRecord from '../components/OperationRecord.vue'
 import OperationTimeNote from '../components/OperationTimeNote.vue'
@@ -96,10 +97,16 @@ const names: Record<string, string> = {
   DEAD: '死信',
 }
 const detail = ref<Receipt>()
+const { pageRoot, rememberList, focusDetail, restoreList } = useListPosition()
+function returnToList() {
+  closeDetail()
+  void restoreList()
+}
 const detailError = ref('')
 const detailLoading = ref(false)
 let detailGeneration = 0
 async function showDetail(id: number) {
+  if (!detail.value) rememberList()
   const token = ++detailGeneration
   const selectedWarehouse = warehouse.value
   detail.value = undefined
@@ -111,6 +118,7 @@ async function showDetail(id: number) {
     if (value.warehouse_id !== selectedWarehouse)
       throw Error('该入库单不属于当前仓库，请核对来源。')
     detail.value = value
+    void focusDetail()
   } catch (e) {
     if (token === detailGeneration) detailError.value = (e as Error).message
   } finally {
@@ -282,8 +290,8 @@ onMounted(() =>
 )
 </script>
 <template>
-  <main class="page">
-    <header class="page-heading">
+  <main ref="pageRoot" class="page finished-page">
+    <header v-show="!detail" class="page-heading">
       <div>
         <h1>成品入库</h1>
         <p class="muted">
@@ -300,133 +308,132 @@ onMounted(() =>
     </header>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="notice" role="status">{{ notice }}</p>
-    <section class="panel filters">
-      <label
-        >成品仓<select
-          v-model="warehouse"
+    <div v-show="!detail" class="business-list">
+      <section class="panel filters">
+        <label
+          >成品仓<select
+            v-model="warehouse"
+            :disabled="busy"
+            @change="perform(() => load())"
+          >
+            <option v-for="w in warehouses" :key="w.id" :value="w.id">
+              {{ w.name }}
+            </option>
+          </select></label
+        ><button :disabled="busy" @click="perform(() => load())">刷新</button>
+      </section>
+      <p v-if="!busy && !error && !warehouse">
+        请先维护成品仓、待检位与正式库位，并配置仓库权限。
+      </p>
+      <section class="panel">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>入库单 / 工单</th>
+                <th>成品 / 批次 / 数量</th>
+                <th>状态 / 库位</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="r in result?.items" :key="r.id">
+                <td>
+                  成品入库 FG-{{ r.id
+                  }}<small>工单 {{ r.work_order_no }}</small>
+                  <small>{{
+                    r.completion_report_id
+                      ? `完工报告 ${r.completion_report_no || '编号未提供'}`
+                      : '模拟 MES 来源'
+                  }}</small>
+                </td>
+                <td>
+                  {{ identity(r.material_name, r.material_code)
+                  }}<small
+                    >{{ r.batch_no }} · {{ displayQuantity(r.amount) }}
+                    {{ r.unit }}</small
+                  >
+                </td>
+                <td>
+                  {{ names[r.status]
+                  }}<small>{{ r.stored_location || r.received_location }}</small
+                  ><small>{{ r.quality_reason }}</small>
+                </td>
+                <td>
+                  <div class="row-actions">
+                    <button
+                      :disabled="busy || detailLoading"
+                      @click="showDetail(r.id)"
+                    >
+                      查看详情
+                    </button>
+                    <button
+                      v-if="r.status === 'OPEN' && allowed('receive')"
+                      :disabled="busy"
+                      @click="open('receive', r)"
+                    >
+                      确认实物收货</button
+                    ><button
+                      v-if="r.status === 'RECEIVED' && simulator"
+                      :disabled="busy"
+                      @click="open('quality', r)"
+                    >
+                      模拟 QMS 判定</button
+                    ><button
+                      v-if="r.status === 'QUALIFIED' && allowed('putaway')"
+                      :disabled="busy"
+                      @click="open('putaway', r)"
+                    >
+                      确认上架</button
+                    ><button :disabled="busy" @click="open('feedback', r)">
+                      {{
+                        r.completion_report_id
+                          ? '模拟 QMS 检验请求'
+                          : '反馈记录'
+                      }}</button
+                    ><RouterLink
+                      v-if="r.stored_balance_id"
+                      :to="`/inventory?warehouseId=${warehouse}&balanceId=${r.stored_balance_id}`"
+                      >库存追溯</RouterLink
+                    >
+                  </div>
+                </td>
+              </tr>
+              <tr v-if="!result?.items.length">
+                <td colspan="4">
+                  {{
+                    busy
+                      ? '正在读取成品入库…'
+                      : error
+                        ? '查询失败，请重试'
+                        : '暂无成品入库需求'
+                  }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ResultPager
+          v-if="result"
+          :total="result.totalElements"
+          :page="result.page"
+          :pages="result.totalPages"
           :disabled="busy"
-          @change="perform(() => load())"
-        >
-          <option v-for="w in warehouses" :key="w.id" :value="w.id">
-            {{ w.name }}
-          </option>
-        </select></label
-      ><button :disabled="busy" @click="perform(() => load())">刷新</button>
-    </section>
-    <p v-if="!busy && !error && !warehouse">
-      请先维护成品仓、待检位与正式库位，并配置仓库权限。
-    </p>
-    <section class="panel">
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>入库单 / 工单</th>
-              <th>成品 / 批次 / 数量</th>
-              <th>状态 / 库位</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="r in result?.items" :key="r.id">
-              <td>
-                成品入库 FG-{{ r.id }}<small>工单 {{ r.work_order_no }}</small>
-                <small>{{
-                  r.completion_report_id
-                    ? `完工报告 ${r.completion_report_no || '编号未提供'}`
-                    : '模拟 MES 来源'
-                }}</small>
-              </td>
-              <td>
-                {{ identity(r.material_name, r.material_code)
-                }}<small
-                  >{{ r.batch_no }} · {{ displayQuantity(r.amount) }}
-                  {{ r.unit }}</small
-                >
-              </td>
-              <td>
-                {{ names[r.status]
-                }}<small>{{ r.stored_location || r.received_location }}</small
-                ><small>{{ r.quality_reason }}</small>
-              </td>
-              <td>
-                <div class="row-actions">
-                  <button
-                    :disabled="busy || detailLoading"
-                    @click="showDetail(r.id)"
-                  >
-                    查看详情
-                  </button>
-                  <button
-                    v-if="r.status === 'OPEN' && allowed('receive')"
-                    :disabled="busy"
-                    @click="open('receive', r)"
-                  >
-                    确认实物收货</button
-                  ><button
-                    v-if="r.status === 'RECEIVED' && simulator"
-                    :disabled="busy"
-                    @click="open('quality', r)"
-                  >
-                    模拟 QMS 判定</button
-                  ><button
-                    v-if="r.status === 'QUALIFIED' && allowed('putaway')"
-                    :disabled="busy"
-                    @click="open('putaway', r)"
-                  >
-                    确认上架</button
-                  ><button :disabled="busy" @click="open('feedback', r)">
-                    {{
-                      r.completion_report_id ? '模拟 QMS 检验请求' : '反馈记录'
-                    }}</button
-                  ><RouterLink
-                    v-if="r.stored_balance_id"
-                    :to="`/inventory?warehouseId=${warehouse}&balanceId=${r.stored_balance_id}`"
-                    >库存追溯</RouterLink
-                  >
-                </div>
-              </td>
-            </tr>
-            <tr v-if="!result?.items.length">
-              <td colspan="4">
-                {{
-                  busy
-                    ? '正在读取成品入库…'
-                    : error
-                      ? '查询失败，请重试'
-                      : '暂无成品入库需求'
-                }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <ResultPager
-        v-if="result"
-        :total="result.totalElements"
-        :page="result.page"
-        :pages="result.totalPages"
-        :disabled="busy"
-        @change="(p) => perform(() => load(p))"
-      />
-    </section>
+          @change="(p) => perform(() => load(p))"
+        />
+      </section>
+    </div>
     <p v-if="detailLoading" role="status">正在读取成品入库详情…</p>
     <p v-if="detailError" class="error" role="alert">
       详情读取失败：{{ detailError }}
     </p>
-    <section
-      v-if="detail"
-      class="panel"
-      style="padding: 20px"
-      aria-label="成品入库详情"
-    >
+    <section v-if="detail" class="panel detail" aria-label="成品入库详情">
+      <button class="back-to-list" @click="returnToList">← 返回列表</button>
       <RecordHeading
         :title="`成品入库 FG-${detail.id}`"
         :subtitle="identity(detail.material_name, detail.material_code)"
         :status="names[detail.status] || detail.status"
-      >
-        <button @click="closeDetail">收起详情</button>
-      </RecordHeading>
+      />
       <dl class="record-facts">
         <div>
           <dt>来源工单</dt>
