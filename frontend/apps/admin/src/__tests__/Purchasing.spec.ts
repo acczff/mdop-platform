@@ -197,6 +197,107 @@ function setup(permissions = ['purchasing:write'], username = 'buyer') {
     },
   })
 }
+it('returns to the same list page without reloading and separates detail sections', async () => {
+  const view = setup([])
+  vi.mocked(request).mockImplementation(async (path) => {
+    if (path.includes('?warehouseId=')) return { items: [doc], total: 40 }
+    if (path === `${base}/10`)
+      return { ...doc, kind: 'ORDER', status: 'APPROVED', arrangements: [] }
+    return data(path)
+  })
+  await flushPromises()
+  await button(view, '下一页').trigger('click')
+  await flushPromises()
+  await button(view, '查看').trigger('click')
+  await flushPromises()
+  expect(view.get('.purchase-list').isVisible()).toBe(false)
+  expect(view.get('#purchase-panel-overview').isVisible()).toBe(true)
+  expect(view.get('#purchase-panel-arrangements').isVisible()).toBe(false)
+  await view.get('#purchase-tab-arrangements').trigger('click')
+  expect(
+    view.get('#purchase-tab-arrangements').attributes('aria-selected'),
+  ).toBe('true')
+  expect(
+    (view.get('#purchase-panel-arrangements').element as HTMLElement).style
+      .display,
+  ).not.toBe('none')
+  expect(
+    (view.get('#purchase-panel-overview').element as HTMLElement).style.display,
+  ).toBe('none')
+  await view
+    .get('#purchase-tab-arrangements')
+    .trigger('keydown', { key: 'ArrowRight' })
+  expect(view.get('#purchase-tab-history').attributes('aria-selected')).toBe(
+    'true',
+  )
+  expect(
+    (view.get('#purchase-panel-history').element as HTMLElement).style.display,
+  ).not.toBe('none')
+  expect(button(view, '安排到货')).toBeUndefined()
+  const calls = vi.mocked(request).mock.calls.length
+  await button(view, '← 返回列表').trigger('click')
+  await flushPromises()
+  expect(view.find('.detail').exists()).toBe(false)
+  expect(
+    (view.get('.purchase-list').element as HTMLElement).style.display,
+  ).not.toBe('none')
+  expect(view.get('.result-pager').text()).toContain('第 2 / 2 页')
+  expect(request).toHaveBeenCalledTimes(calls)
+  view.unmount()
+})
+it('does not reopen a late detail after returning to the list during loading', async () => {
+  const view = setup()
+  await flushPromises()
+  let resolve!: (value: unknown) => void
+  vi.mocked(request).mockImplementation((path) =>
+    path === `${base}/10`
+      ? new Promise((r) => {
+          resolve = r
+        })
+      : data(path),
+  )
+  await button(view, '查看').trigger('click')
+  expect(view.get('[role="status"]').text()).toContain('正在读取')
+  await button(view, '返回列表').trigger('click')
+  resolve({ ...doc, purpose: '不应重新出现的单据' })
+  await flushPromises()
+  expect(view.find('.detail').exists()).toBe(false)
+  expect(view.text()).not.toContain('不应重新出现的单据')
+  expect(view.get('.purchase-list').isVisible()).toBe(true)
+  view.unmount()
+})
+it('retries failed details for the original record without showing prior content', async () => {
+  const view = setup()
+  await flushPromises()
+  vi.mocked(request).mockRejectedValueOnce(new ApiError(503, '详情暂不可用'))
+  await button(view, '查看').trigger('click')
+  await flushPromises()
+  expect(view.get('.detail-read-state').text()).toContain('详情读取失败')
+  expect(view.find('.detail').exists()).toBe(false)
+  vi.mocked(request).mockResolvedValueOnce(doc)
+  await button(view, '重新读取详情').trigger('click')
+  await flushPromises()
+  expect(request).toHaveBeenLastCalledWith(`${base}/10`)
+  expect(view.get('.detail').text()).toContain('PR-QA')
+  expect(view.find('.detail-read-state').exists()).toBe(false)
+  view.unmount()
+})
+it('distinguishes list failures from an empty list and recovers on refresh', async () => {
+  const view = setup()
+  vi.mocked(request).mockImplementation(async (path) => {
+    if (path.includes('?warehouseId=')) throw new ApiError(503, '列表不可用')
+    return data(path)
+  })
+  await flushPromises()
+  expect(view.get('tbody').text()).toContain('列表读取失败')
+  expect(view.get('tbody').text()).not.toContain('暂无单据')
+  vi.mocked(request).mockImplementation((path) => data(path))
+  await button(view, '刷新').trigger('click')
+  await flushPromises()
+  expect(view.get('tbody').text()).toContain('PR-QA')
+  expect(view.get('tbody').text()).not.toContain('列表读取失败')
+  view.unmount()
+})
 function button(view: VueWrapper, name: string) {
   return view.findAll('button').find((b) => b.text() === name)!
 }

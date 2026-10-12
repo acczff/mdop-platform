@@ -1,9 +1,14 @@
 <script setup lang="ts">
-defineProps<{ title: string; subtitle?: string; status?: string }>()
+defineProps<{
+  title: string
+  subtitle?: string
+  status?: string
+  tone?: string
+}>()
 </script>
 
 <template>
-  <header class="record-heading">
+  <header class="record-heading" :data-tone="tone">
     <div>
       <h2>{{ title }}</h2>
       <p v-if="subtitle" class="record-subtitle">{{ subtitle }}</p>

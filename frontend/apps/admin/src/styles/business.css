@@ -1,0 +1,655 @@
+/* Shared business UI; activated only for the explicitly selected routes. */
+.business-workspace {
+  background: #f5f7fa;
+  color: #202939;
+}
+.business-workspace .workspace {
+  background: #f5f7fa;
+}
+.business-workspace .page .detail-actions:empty {
+  display: none;
+}
+.business-workspace .brand,
+.business-workspace .sidebar a.router-link-active {
+  color: #245dd8;
+}
+.business-workspace .sidebar a.router-link-active {
+  background: #eaf0fd;
+}
+.business-workspace .sidebar,
+.business-workspace .topbar {
+  border-color: #e4e8ef;
+}
+.business-workspace .nav-group-toggle,
+.business-workspace .sidebar a,
+.business-workspace .breadcrumb,
+.business-workspace .account-menu summary {
+  color: #536074;
+}
+.business-workspace .page {
+  --muted: #647287;
+  --border: #e4e8ef;
+  --purchase-muted: #647287;
+  --purchase-line: #e4e8ef;
+  --purchase-blue: #245dd8;
+  color: #202939;
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 28px 30px 40px;
+}
+.business-workspace .page .page-heading {
+  margin-bottom: 6px;
+}
+.business-workspace .page .page-intro {
+  font-size: 13px;
+  color: var(--purchase-muted);
+  margin-bottom: 24px;
+}
+.business-workspace .page .panel {
+  border: 1px solid var(--purchase-line);
+  border-radius: 10px;
+  box-shadow: 0 2px 6px #162d4d04;
+}
+.business-workspace .page button {
+  font-size: 13px;
+  color: #354157;
+  border-color: #d4dce7;
+  background: #fff;
+}
+.business-workspace .page button:hover:not(:disabled) {
+  background: #f0f4fc;
+  border-color: #8baae5;
+}
+.business-workspace .page button.primary {
+  background: var(--purchase-blue);
+  border-color: var(--purchase-blue);
+  color: #fff;
+}
+.business-workspace .page button.primary:hover:not(:disabled) {
+  background: #194cb4;
+}
+.business-workspace .page a {
+  color: var(--purchase-blue);
+}
+.business-workspace .page :focus-visible {
+  outline-color: #769eed;
+}
+.business-workspace .page .hint {
+  color: var(--purchase-muted);
+  line-height: 1.7;
+}
+.business-workspace .page input,
+.business-workspace .page select,
+.business-workspace .page textarea {
+  border-color: #cbd5e1;
+  font-size: 14px;
+}
+.business-workspace .page label {
+  color: #4d5d72;
+  font-weight: 500;
+  font-size: 13px;
+}
+.business-workspace .page .purchase-tabs {
+  padding: 12px 20px 0;
+  gap: 24px;
+  border-bottom: 1px solid var(--purchase-line);
+}
+.business-workspace .page .purchase-tabs button {
+  border: 0;
+  border-radius: 0;
+  padding: 10px 0 13px;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--purchase-muted);
+}
+.business-workspace .page .purchase-tabs button.active {
+  border-bottom-color: var(--purchase-blue);
+  color: var(--purchase-blue);
+  background: transparent;
+}
+.business-workspace .page .filters {
+  padding: 20px;
+  gap: 12px;
+  align-items: end;
+  border-bottom: 0;
+}
+.business-workspace .page .filters label {
+  min-width: 210px;
+}
+.business-workspace .page .table-wrap {
+  border-radius: 0;
+}
+.business-workspace .page table {
+  font-size: 13px;
+}
+.business-workspace .page th {
+  background: #f8fafc;
+  color: #647287;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 12px 20px;
+  border-color: var(--purchase-line);
+  white-space: nowrap;
+}
+.business-workspace .page td {
+  padding: 17px 20px;
+  border-color: var(--purchase-line);
+  overflow-wrap: anywhere;
+}
+.business-workspace .page tbody tr:hover {
+  background: #f7faff;
+}
+.business-workspace .page td small {
+  display: block;
+  font-size: 12px;
+  color: var(--purchase-muted);
+  margin-top: 5px;
+}
+.business-workspace .page .document-number {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.business-workspace .page .material-code {
+  font-family: ui-monospace, Consolas, monospace;
+}
+.business-workspace .page .quantity-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.business-workspace .page .text-action {
+  border-color: transparent;
+  color: var(--purchase-blue);
+  padding: 5px 0;
+  background: transparent;
+}
+.business-workspace .page .purchase-status,
+.business-workspace .page .record-status {
+  display: inline-flex;
+  padding: 4px 9px;
+  border-radius: 5px;
+  font-size: 12px;
+  white-space: nowrap;
+  background: #eef1f5;
+  color: #606f82;
+}
+.business-workspace .page [data-tone='active'].purchase-status,
+.business-workspace .page [data-tone='active'] .record-status {
+  background: #edf3ff;
+  color: #235cbb;
+}
+.business-workspace .page [data-tone='waiting'].purchase-status,
+.business-workspace .page [data-tone='waiting'] .record-status {
+  background: #fff5e4;
+  color: #8c5813;
+}
+.business-workspace .page [data-tone='complete'].purchase-status,
+.business-workspace .page [data-tone='complete'] .record-status {
+  background: #eaf6ef;
+  color: #23744d;
+}
+.business-workspace .page [data-tone='rejected'].purchase-status,
+.business-workspace .page [data-tone='rejected'] .record-status {
+  background: #fff0ef;
+  color: #b43a3a;
+}
+.business-workspace .page .detail {
+  padding: 0;
+  margin-top: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.business-workspace .page .back-to-list {
+  margin-bottom: 22px;
+  border-color: transparent;
+  background: transparent;
+  padding-left: 0;
+  color: var(--purchase-muted);
+}
+.business-workspace .page .record-heading {
+  justify-content: flex-start;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 22px;
+}
+.business-workspace .page .record-heading h2 {
+  font-size: 24px;
+  margin-bottom: 7px;
+}
+.business-workspace .page .record-heading .record-status {
+  margin-top: 4px;
+}
+.business-workspace .page .record-subtitle {
+  font-size: 13px;
+  color: var(--purchase-muted);
+}
+.business-workspace .page .purchase-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+  padding: 20px;
+  margin: 0;
+  border: 1px solid var(--purchase-line);
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  background: #fff;
+}
+.business-workspace .page .purchase-facts dt {
+  font-size: 12px;
+  color: var(--purchase-muted);
+  margin-bottom: 8px;
+}
+.business-workspace .page .purchase-facts dd {
+  font-size: 13px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.business-workspace .page .purchase-purpose {
+  background: #fff;
+  border: 1px solid var(--purchase-line);
+  border-top: 0;
+  border-radius: 0 0 10px 10px;
+  padding: 0 20px 20px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.business-workspace .page .purchase-purpose span {
+  display: inline-block;
+  margin-right: 18px;
+  color: var(--purchase-muted);
+}
+.business-workspace .page .detail-actions {
+  padding: 0;
+  margin: 18px 0;
+  gap: 8px;
+}
+.business-workspace .page .purchase-detail-tabs {
+  display: flex;
+  gap: 24px;
+  margin: 25px 0 20px;
+  border-bottom: 1px solid #dce3ee;
+}
+.business-workspace .page .purchase-detail-tabs button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 10px 0 13px;
+  background: transparent;
+  color: var(--purchase-muted);
+}
+.business-workspace .page .purchase-detail-tabs button[aria-selected='true'] {
+  color: var(--purchase-blue);
+  border-bottom-color: var(--purchase-blue);
+  font-weight: 600;
+}
+.business-workspace .page .detail .table-wrap {
+  border: 1px solid var(--purchase-line);
+  border-radius: 9px;
+  background: #fff;
+}
+.business-workspace .page .detail-read-state {
+  padding: 24px;
+}
+.business-workspace .page .detail-read-state p {
+  margin: 20px 0;
+}
+.business-workspace .page .fulfillment {
+  margin-top: 24px;
+  padding: 22px;
+  background: #fff;
+  border: 1px solid var(--purchase-line);
+  border-radius: 10px;
+}
+.business-workspace .page .fulfillment header {
+  margin-bottom: 20px;
+}
+.business-workspace .page .fulfillment h2 {
+  font-size: 17px;
+}
+.business-workspace .page .fulfillment .blockers {
+  background: #fff8ed;
+  border: 1px solid #f3dfba;
+  padding: 14px 17px;
+  border-radius: 7px;
+  color: #805316;
+  font-size: 13px;
+  margin: 0 0 20px;
+}
+.business-workspace .page .fulfillment .blockers ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.business-workspace .page .fulfillment .line {
+  border-color: var(--purchase-line);
+  padding: 16px 0 22px;
+}
+.business-workspace .page .fulfillment .line > strong {
+  font-size: 14px;
+}
+.business-workspace .page .fulfillment .line > p {
+  margin: 10px 0 0;
+  font-size: 13px;
+}
+.business-workspace .page .fulfillment .line > dl {
+  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
+}
+.business-workspace .page .fulfillment .line > dl dd {
+  font-size: 23px;
+  font-weight: 600;
+  color: #25364b;
+}
+.business-workspace .page .fulfillment .line > dl dt {
+  font-size: 12px;
+  color: var(--purchase-muted);
+}
+.business-workspace .page .fulfillment > .hint {
+  margin: 16px 0;
+}
+.business-workspace .page .fulfillment summary {
+  color: #365a8f;
+  font-size: 13px;
+}
+.business-workspace .page .arrangements {
+  margin-top: 0;
+  padding: 22px;
+  background: #fff;
+  border: 1px solid var(--purchase-line);
+  border-radius: 10px;
+}
+.business-workspace .page .arrangements h2,
+.business-workspace .page .history h2 {
+  font-size: 17px;
+}
+.business-workspace .page .arrangement-record {
+  border-color: var(--purchase-line);
+  font-size: 13px;
+}
+.business-workspace .page .arrangement-record strong {
+  display: block;
+  margin-bottom: 8px;
+}
+.business-workspace .page .history {
+  margin-top: 0;
+  padding: 22px;
+  background: #fff;
+  border: 1px solid var(--purchase-line);
+  border-radius: 10px;
+}
+.business-workspace .page .history summary {
+  color: #365a8f;
+}
+.business-workspace .page .history-item {
+  border-color: var(--purchase-line);
+}
+.business-workspace .page .related {
+  margin-top: 20px;
+  font-size: 13px;
+}
+.business-workspace .page .modal {
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  border: 1px solid var(--purchase-line);
+  border-radius: 12px;
+  box-shadow: 0 24px 80px #172a4940;
+}
+.business-workspace .page .modal h2 {
+  font-size: 20px;
+}
+.business-workspace .page .empty {
+  padding: 38px 20px;
+}
+.business-workspace .page .result-pager {
+  padding: 14px 20px;
+  border-top: 1px solid var(--purchase-line);
+}
+.business-workspace .page .result-pager span {
+  color: var(--purchase-muted);
+  font-size: 13px;
+}
+.business-workspace .page .detail-actions,
+.business-workspace .page .related {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.business-workspace .page .detail-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.business-workspace .page .arrangement-record {
+  padding: 16px 0;
+  border-top: 1px solid var(--purchase-line);
+}
+.business-workspace .page .history-item {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--purchase-line);
+}
+.business-workspace .page .history-item details {
+  margin-top: 12px;
+  font-size: 13px;
+}
+.business-workspace .page .history summary {
+  cursor: pointer;
+}
+.business-workspace .page .create {
+  margin-left: auto;
+}
+.business-workspace .page .draft-line {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin: 12px 0;
+}
+.business-workspace .page .reason {
+  margin-top: 16px;
+}
+.business-workspace .page pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.business-workspace .page .pending {
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.business-workspace .page .pending p {
+  margin: 6px 0 12px;
+}
+.business-workspace .page .muted,
+.business-workspace .page > .hint {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.business-workspace .page :is(.table-scroll, .inventory-table) {
+  overflow-x: auto;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.business-workspace .page .business-list > .toolbar {
+  margin: 0;
+  padding: 20px;
+  align-items: end;
+}
+.business-workspace .page :is(.inventory-pagination, .pager) {
+  padding: 14px 20px;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.business-workspace .page .record-facts {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+.business-workspace .page .record-facts dd {
+  font-size: 14px;
+  font-weight: 400;
+  color: #25364b;
+}
+.business-workspace .page .record-facts dd small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+}
+.business-workspace .inventory-page .record-facts > div:nth-child(-n + 3) dd {
+  font-size: 20px;
+  font-weight: 600;
+}
+.business-workspace
+  .page
+  :is(.order, .record-section, .line-card, .submit-box) {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+}
+.business-workspace .page .order {
+  margin-top: 20px;
+}
+.business-workspace .page .order > .heading h3 {
+  font-size: 17px;
+  margin: 0;
+}
+.business-workspace .page .order > .heading {
+  margin-bottom: 16px;
+}
+.business-workspace .page .record-section > summary {
+  font-size: 15px;
+  color: #354157;
+}
+.business-workspace .page :is(.tabs, .purchase-tabs) button.active {
+  background: #eaf0fd;
+  color: #245dd8;
+  border-color: #94b1e8;
+}
+.business-workspace .page .purchase-tabs button.active {
+  background: transparent;
+}
+.business-workspace .page :is(.record-row, .row-actions, .toolbar) {
+  overflow-wrap: anywhere;
+}
+.business-workspace .page .record-subtitle,
+.business-workspace .page .record-heading h2,
+.business-workspace .page .order p {
+  overflow-wrap: anywhere;
+}
+.business-workspace .page .sales-fulfillment {
+  margin-top: 20px;
+}
+.business-workspace .page .confirmation {
+  background: #f0f5ff;
+  border: 1px solid #d5e1f7;
+}
+.business-workspace .page .technical-reference {
+  max-width: 28ch;
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.business-workspace .page .technical-reference summary {
+  cursor: pointer;
+}
+.business-workspace .page .business-list .text-action {
+  color: #245dd8;
+}
+.business-workspace .page .quantity-cell {
+  text-align: right;
+}
+@media (max-width: 1100px) {
+  .business-workspace .page {
+    padding: 24px;
+  }
+  .business-workspace .page .purchase-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .business-workspace .page .filters .zero-option {
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+  }
+  .business-workspace .page :is(.record-facts, .order, .record-section) {
+    padding: 16px;
+  }
+  .business-workspace .page .record-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .business-workspace .page .inventory-table th,
+  .business-workspace .page .inventory-table td {
+    padding: 12px;
+  }
+  .business-workspace .page {
+    padding: 20px 16px 32px;
+  }
+  .business-workspace .page .purchase-tabs {
+    gap: 20px;
+    padding-inline: 16px;
+  }
+  .business-workspace .page .filters {
+    padding: 16px;
+  }
+  .business-workspace .page .filters label {
+    min-width: 0;
+  }
+  .business-workspace .page .detail {
+    padding: 0;
+  }
+  .business-workspace .page .record-heading h2 {
+    font-size: 20px;
+    overflow-wrap: anywhere;
+  }
+  .business-workspace .page .record-heading > div {
+    min-width: 0;
+  }
+  .business-workspace .page .purchase-facts {
+    padding: 16px;
+    gap: 16px;
+  }
+  .business-workspace .page .purchase-purpose {
+    padding: 0 16px 16px;
+  }
+  .business-workspace .page .purchase-detail-tabs {
+    gap: 20px;
+  }
+  .business-workspace .page .purchase-detail-tabs button {
+    white-space: nowrap;
+  }
+  .business-workspace .page .fulfillment,
+  .business-workspace .page .arrangements,
+  .business-workspace .page .history {
+    padding: 16px;
+  }
+  .business-workspace .page .fulfillment .line > dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .business-workspace .page input,
+  .business-workspace .page select,
+  .business-workspace .page textarea {
+    font-size: 16px;
+  }
+  .business-workspace .page button {
+    min-height: 40px;
+  }
+  .business-workspace .page .draft-line {
+    grid-template-columns: 1fr;
+  }
+  .business-workspace .page .filters label {
+    flex: 1 1 100%;
+  }
+  .business-workspace .page .table-wrap table {
+    min-width: 580px;
+  }
+}

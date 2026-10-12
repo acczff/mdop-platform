@@ -79,6 +79,12 @@ const state: Record<string, string> = {
     <p v-if="!matches" class="error" role="alert">
       结案后事实发生变化，待核对。原结案快照已保留，不自动重开或覆盖；请核对下方来源单据。
     </p>
+    <div v-if="value.blockers.length" class="blockers">
+      <strong>尚有未完成事项，暂不可结案</strong>
+      <ul>
+        <li v-for="reason in value.blockers" :key="reason">{{ reason }}</li>
+      </ul>
+    </div>
     <div v-for="line in value.lines" :key="line.orderLineId" class="line">
       <strong
         >{{
@@ -121,13 +127,7 @@ const state: Record<string, string> = {
         </div>
       </dl>
     </div>
-    <div v-if="value.blockers.length" class="blockers">
-      <strong>未完成事项</strong>
-      <ul>
-        <li v-for="reason in value.blockers" :key="reason">{{ reason }}</li>
-      </ul>
-    </div>
-    <p v-else-if="!closure" class="hint">
+    <p v-if="!value.blockers.length && !closure" class="hint">
       数量与处置已完成，可以确认{{
         value.outcome === 'WITH_RETURNS' ? '含退供' : '合格交付'
       }}结案。

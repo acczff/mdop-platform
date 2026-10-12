@@ -8,6 +8,32 @@ vi.mock('../api', async (original) => ({
   request: vi.fn(),
 }))
 const base = '/api/v1/manufacturing'
+it('returns from production detail without losing the list page or refetching', async () => {
+  const view = setup()
+  vi.mocked(request).mockImplementation(async (path) =>
+    path.startsWith(base + '/demands?')
+      ? { items: [current], total: 40 }
+      : response(path),
+  )
+  await flushPromises()
+  await btn(view, '下一页')!.trigger('click')
+  await flushPromises()
+  await btn(view, '查看')!.trigger('click')
+  await flushPromises()
+  expect(
+    (view.get('.business-list').element as HTMLElement).style.display,
+  ).toBe('none')
+  expect(view.get('[aria-label="生产需求详情"]').text()).toContain(
+    'MFG-00000002',
+  )
+  const reads = vi.mocked(request).mock.calls.length
+  await view.get('.back-to-list').trigger('click')
+  await flushPromises()
+  expect(view.find('[aria-label="生产需求详情"]').exists()).toBe(false)
+  expect(view.get('.result-pager').text()).toContain('第 2 / 2 页')
+  expect(request).toHaveBeenCalledTimes(reads)
+  view.unmount()
+})
 it.each([401, 403])(
   'retains unknown production writes after HTTP %s on retry',
   async (status) => {

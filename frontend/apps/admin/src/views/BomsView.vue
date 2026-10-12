@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useListPosition } from '../composables/useListPosition'
+import RecordHeading from '../components/RecordHeading.vue'
 import ResultPager from '../components/ResultPager.vue'
 import { quantity as displayQuantity, timestamp } from '../presentation'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
@@ -56,6 +58,13 @@ const base = '/api/v1/manufacturing/boms'
 const storageKey = `mdop-bom-pending:${props.username}`
 const result = ref<{ items: Bom[]; total: number }>()
 const detail = ref<Bom>()
+const { pageRoot, rememberList, focusDetail, restoreList } = useListPosition()
+function returnToList() {
+  if (blocked.value) return
+  ++detailGeneration
+  detail.value = undefined
+  void restoreList()
+}
 const materials = ref<Material[]>([])
 const query = ref(''),
   status = ref(''),
@@ -139,12 +148,16 @@ async function load(next = 0) {
 }
 async function openDetail(id: number) {
   if (blocked.value || loading.value) return
+  if (!detail.value) rememberList()
   const token = ++detailGeneration
   detail.value = undefined
   detailError.value = ''
   try {
     const d = await request<Bom>(`${base}/${id}`)
-    if (token === detailGeneration) detail.value = d
+    if (token === detailGeneration) {
+      detail.value = d
+      void focusDetail()
+    }
   } catch (e) {
     if (token === detailGeneration) detailError.value = (e as Error).message
   }
@@ -298,12 +311,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="page bom-page">
-    <div class="page-heading">
+  <main ref="pageRoot" class="page bom-page">
+    <div v-show="!detail" class="page-heading">
       <h1>BOM 版本</h1>
       <span v-if="!writable" class="muted">只读</span>
     </div>
-    <p class="muted">定义单层产品用料，发布后保留版本依据。</p>
+    <p v-show="!detail" class="muted">定义单层产品用料，发布后保留版本依据。</p>
     <p v-if="notice" role="status">{{ notice }}</p>
     <p v-if="error" role="alert" class="error">{{ error }}</p>
     <div v-if="pending" class="pending" role="status">
@@ -313,99 +326,131 @@ onBeforeUnmount(() => {
       </button>
       <p v-if="!writable">当前账号无写权限，请联系管理员核对原操作。</p>
     </div>
-    <form class="toolbar" @submit.prevent="load(0)">
-      <label
-        >搜索<input
-          v-model="query"
-          aria-label="搜索产品或版本"
-          placeholder="产品编码、名称或版本"
-          maxlength="100"
-          :disabled="blocked"
-      /></label>
-      <label
-        >状态<select v-model="status" :disabled="blocked">
-          <option value="">全部状态</option>
-          <option value="DRAFT">草稿</option>
-          <option value="PUBLISHED">已发布</option>
-          <option value="DISABLED">已停用</option>
-        </select></label
+    <div v-show="!detail" class="panel business-list">
+      <form class="toolbar" @submit.prevent="load(0)">
+        <label
+          >搜索<input
+            v-model="query"
+            aria-label="搜索产品或版本"
+            placeholder="产品编码、名称或版本"
+            maxlength="100"
+            :disabled="blocked"
+        /></label>
+        <label
+          >状态<select v-model="status" :disabled="blocked">
+            <option value="">全部状态</option>
+            <option value="DRAFT">草稿</option>
+            <option value="PUBLISHED">已发布</option>
+            <option value="DISABLED">已停用</option>
+          </select></label
+        >
+        <button :disabled="blocked || loading">查询</button>
+        <button
+          v-if="writable"
+          type="button"
+          class="primary"
+          :disabled="blocked || loading || !result"
+          @click="open('create')"
+        >
+          新建 BOM
+        </button>
+      </form>
+      <div
+        class="table-scroll"
+        role="region"
+        aria-label="BOM 版本列表，可横向滚动"
+        tabindex="0"
       >
-      <button :disabled="blocked || loading">查询</button>
-      <button
-        v-if="writable"
-        type="button"
-        class="primary"
-        :disabled="blocked || loading || !result"
-        @click="open('create')"
-      >
-        新建 BOM
-      </button>
-    </form>
-    <div
-      class="table-scroll"
-      role="region"
-      aria-label="BOM 版本列表，可横向滚动"
-      tabindex="0"
-    >
-      <table>
-        <thead>
-          <tr>
-            <th>产品</th>
-            <th>版本</th>
-            <th>基准产量</th>
-            <th>状态</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="b in result?.items" :key="b.id">
-            <td>
-              {{ b.product_code }}<small>{{ b.product_name }}</small>
-            </td>
-            <td>{{ b.version_label }}</td>
-            <td>{{ displayQuantity(b.base_quantity) }} {{ b.product_unit }}</td>
-            <td>{{ label(b.status) }}</td>
-            <td>
-              <button :disabled="blocked || loading" @click="openDetail(b.id)">
-                查看
-              </button>
-            </td>
-          </tr>
-          <tr v-if="!result?.items.length">
-            <td colspan="5">
-              {{
-                loading
-                  ? '正在加载…'
-                  : result
-                    ? '暂无 BOM 版本'
-                    : '数据未就绪，请查询重试'
-              }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <ResultPager
-      v-if="result"
-      :total="result.total"
-      :page="page"
-      :disabled="blocked || loading"
-      @change="load"
-    />
-    <p v-if="detailError" role="alert" class="error">
-      详情读取失败：{{ detailError }}
-    </p>
-    <section v-if="detail" class="detail" aria-label="BOM 详情">
-      <div class="page-heading">
-        <h2>{{ detail.product_code }} · {{ detail.version_label }}</h2>
-        <span>{{ label(detail.status) }}</span>
+        <table>
+          <thead>
+            <tr>
+              <th>产品</th>
+              <th>版本</th>
+              <th>基准产量</th>
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="b in result?.items" :key="b.id">
+              <td>
+                {{ b.product_code }}<small>{{ b.product_name }}</small>
+              </td>
+              <td>{{ b.version_label }}</td>
+              <td>
+                {{ displayQuantity(b.base_quantity) }} {{ b.product_unit }}
+              </td>
+              <td>{{ label(b.status) }}</td>
+              <td>
+                <button
+                  :disabled="blocked || loading"
+                  @click="openDetail(b.id)"
+                >
+                  查看
+                </button>
+              </td>
+            </tr>
+            <tr v-if="!result?.items.length">
+              <td colspan="5">
+                {{
+                  loading
+                    ? '正在加载…'
+                    : result
+                      ? '暂无 BOM 版本'
+                      : '数据未就绪，请查询重试'
+                }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-      <p>
-        {{ detail.product_name }} · 基准产量
-        {{ displayQuantity(detail.base_quantity) }}
-        {{ detail.product_unit }}
+      <ResultPager
+        v-if="result"
+        :total="result.total"
+        :page="page"
+        :disabled="blocked || loading"
+        @change="load"
+      />
+      <p v-if="detailError" role="alert" class="error">
+        详情读取失败：{{ detailError }}
       </p>
-      <p>{{ detail.description }}</p>
+    </div>
+    <section v-if="detail" class="detail" aria-label="BOM 详情">
+      <button class="back-to-list" :disabled="blocked" @click="returnToList">
+        ← 返回列表
+      </button>
+      <RecordHeading
+        :title="detail.product_name + ' · ' + detail.version_label"
+        :subtitle="detail.product_code"
+        :status="label(detail.status)"
+      />
+      <dl class="record-facts">
+        <div>
+          <dt>基准产量</dt>
+          <dd>
+            {{ displayQuantity(detail.base_quantity) }}
+            {{ detail.product_unit }}
+          </dd>
+        </div>
+        <div>
+          <dt>版本说明</dt>
+          <dd>{{ detail.description || '—' }}</dd>
+        </div>
+        <div v-if="detail.published_at">
+          <dt>发布账号与时间</dt>
+          <dd>
+            {{ detail.published_by
+            }}<small>{{ timestamp(detail.published_at) }}</small>
+          </dd>
+        </div>
+        <div v-if="detail.disabled_at">
+          <dt>停用账号与时间</dt>
+          <dd>
+            {{ detail.disabled_by
+            }}<small>{{ timestamp(detail.disabled_at) }}</small>
+          </dd>
+        </div>
+      </dl>
       <div v-if="writable" class="toolbar">
         <button
           v-if="detail.status === 'DRAFT'"
@@ -431,12 +476,6 @@ onBeforeUnmount(() => {
           停用版本
         </button>
       </div>
-      <p v-if="detail.published_at">
-        发布：{{ detail.published_by }} · {{ timestamp(detail.published_at) }}
-      </p>
-      <p v-if="detail.disabled_at">
-        停用：{{ detail.disabled_by }} · {{ timestamp(detail.disabled_at) }}
-      </p>
       <p v-if="detail.copied_from_id">
         复制自
         <button :disabled="blocked" @click="openDetail(detail.copied_from_id)">

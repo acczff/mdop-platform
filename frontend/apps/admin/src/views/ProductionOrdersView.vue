@@ -2,6 +2,8 @@
 import OperationRecord from '../components/OperationRecord.vue'
 import OperationTimeNote from '../components/OperationTimeNote.vue'
 import ResultPager from '../components/ResultPager.vue'
+import { statusTone } from '../businessPresentation'
+import { useListPosition } from '../composables/useListPosition'
 import RecordHeading from '../components/RecordHeading.vue'
 import { identity } from '../presentation'
 import { quantity as displayQuantity, businessDate } from '../presentation'
@@ -102,6 +104,13 @@ const materials = ref<Directory[]>([]),
 const result = ref<{ items: Demand[]; total: number }>(),
   detail = ref<Demand>(),
   selected = ref<Order>()
+const { pageRoot, rememberList, focusDetail, restoreList } = useListPosition()
+function returnToList() {
+  if (blocked.value) return
+  ++detailGeneration
+  detail.value = undefined
+  void restoreList()
+}
 const error = ref(''),
   notice = ref(''),
   mode = ref(''),
@@ -237,12 +246,16 @@ async function load(next = 0) {
 }
 async function openDetail(id: number) {
   if (blocked.value || loading.value) return
+  if (!detail.value) rememberList()
   const token = ++detailGeneration
   detail.value = undefined
   error.value = ''
   try {
     const d = await request<Demand>(`${base}/demands/${id}`)
-    if (token === detailGeneration) detail.value = d
+    if (token === detailGeneration) {
+      detail.value = d
+      void focusDetail()
+    }
   } catch (e) {
     if (token === detailGeneration)
       error.value = `详情读取失败：${(e as Error).message}`
@@ -435,8 +448,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="page production-orders">
-    <div class="heading">
+  <main ref="pageRoot" class="page production-orders">
+    <div v-show="!detail" class="heading">
       <h1>生产需求与订单</h1>
       <span v-if="!write && !review" class="muted">{{
         authorities.includes('manufacturing:completion:report')
@@ -444,7 +457,7 @@ onBeforeUnmount(() => {
           : '只读'
       }}</span>
     </div>
-    <p class="muted">
+    <p v-show="!detail" class="muted">
       按需求整量建单，批准后办理领料与完工登记，复核后衔接成品入库。
     </p>
     <p v-if="notice" role="status">{{ notice }}</p>
@@ -459,113 +472,131 @@ onBeforeUnmount(() => {
         >当前账号无原操作权限，请联系管理员核对。</span
       >
     </div>
-    <form class="toolbar" @submit.prevent="load(0)">
-      <label
-        >目标成品仓<select
-          v-model.number="warehouse"
-          :disabled="blocked || loading"
-          @change="load(0)"
+    <div v-show="!detail" class="business-list panel">
+      <form class="toolbar" @submit.prevent="load(0)">
+        <label
+          >目标成品仓<select
+            v-model.number="warehouse"
+            :disabled="blocked || loading"
+            @change="load(0)"
+          >
+            <option v-for="w in warehouses" :key="w.id" :value="w.id">
+              {{ w.code }} · {{ w.name
+              }}{{ w.status === 'ENABLED' ? '' : '（停用）' }}
+            </option>
+          </select></label
         >
-          <option v-for="w in warehouses" :key="w.id" :value="w.id">
-            {{ w.code }} · {{ w.name
-            }}{{ w.status === 'ENABLED' ? '' : '（停用）' }}
-          </option>
-        </select></label
+        <button :disabled="blocked || loading">刷新</button
+        ><button
+          v-if="write"
+          type="button"
+          class="primary"
+          :disabled="
+            blocked ||
+            loading ||
+            !result ||
+            warehouses.find((w) => w.id === warehouse)?.status !== 'ENABLED'
+          "
+          @click="open('create')"
+        >
+          新建需求
+        </button>
+      </form>
+      <p v-if="!loading && !warehouse" class="muted">
+        尚未分配成品仓权限，请联系系统管理员。
+      </p>
+      <div
+        class="table-scroll"
+        role="region"
+        aria-label="生产需求列表，可横向滚动"
+        tabindex="0"
       >
-      <button :disabled="blocked || loading">刷新</button
-      ><button
-        v-if="write"
-        type="button"
-        class="primary"
-        :disabled="
-          blocked ||
-          loading ||
-          !result ||
-          warehouses.find((w) => w.id === warehouse)?.status !== 'ENABLED'
-        "
-        @click="open('create')"
-      >
-        新建需求
-      </button>
-    </form>
-    <p v-if="!loading && !warehouse" class="muted">
-      尚未分配成品仓权限，请联系系统管理员。
-    </p>
-    <div
-      class="table-scroll"
-      role="region"
-      aria-label="生产需求列表，可横向滚动"
-      tabindex="0"
-    >
-      <table>
-        <thead>
-          <tr>
-            <th>来源 / 产品</th>
-            <th>计划数量</th>
-            <th>需求日期</th>
-            <th>当前工单</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="d in result?.items" :key="d.id">
-            <td>
-              {{ d.source_reference
-              }}<small>{{ d.product_code }} · {{ d.product_name }}</small>
-            </td>
-            <td>{{ displayQuantity(d.quantity) }} {{ d.unit }}</td>
-            <td>{{ businessDate(d.needed_date) }}</td>
-            <td>
-              {{ d.order_no || '无有效工单'
-              }}<small>{{ label(d.order_status || d.status) }}</small>
-            </td>
-            <td>
-              <button :disabled="blocked || loading" @click="openDetail(d.id)">
-                查看
-              </button>
-            </td>
-          </tr>
-          <tr v-if="!result?.items.length">
-            <td colspan="5">
-              {{
-                loading
-                  ? '正在加载…'
-                  : result
-                    ? '暂无生产需求'
-                    : '资料未就绪，请刷新'
-              }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+        <table>
+          <thead>
+            <tr>
+              <th>来源 / 产品</th>
+              <th>计划数量</th>
+              <th>需求日期</th>
+              <th>当前工单</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="d in result?.items" :key="d.id">
+              <td>
+                {{ d.source_reference
+                }}<small>{{ d.product_code }} · {{ d.product_name }}</small>
+              </td>
+              <td>{{ displayQuantity(d.quantity) }} {{ d.unit }}</td>
+              <td>{{ businessDate(d.needed_date) }}</td>
+              <td>
+                {{ d.order_no || '无有效工单'
+                }}<small>{{ label(d.order_status || d.status) }}</small>
+              </td>
+              <td>
+                <button
+                  :disabled="blocked || loading"
+                  @click="openDetail(d.id)"
+                >
+                  查看
+                </button>
+              </td>
+            </tr>
+            <tr v-if="!result?.items.length">
+              <td colspan="5">
+                {{
+                  loading
+                    ? '正在加载…'
+                    : result
+                      ? '暂无生产需求'
+                      : '资料未就绪，请刷新'
+                }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <ResultPager
+        v-if="result"
+        :total="result.total"
+        :page="page"
+        :disabled="blocked || loading"
+        @change="load"
+      />
     </div>
-    <ResultPager
-      v-if="result"
-      :total="result.total"
-      :page="page"
-      :disabled="blocked || loading"
-      @change="load"
-    />
     <section v-if="detail" aria-label="生产需求详情" class="detail">
+      <button class="back-to-list" :disabled="blocked" @click="returnToList">
+        ← 返回列表
+      </button>
       <RecordHeading
         :title="identity(detail.product_name, detail.product_code)"
         :subtitle="
           '需求量：' + displayQuantity(detail.quantity) + ' ' + detail.unit
         "
         :status="label(detail.status)"
-        ><button :disabled="blocked" @click="detail = undefined">
-          收起详情
-        </button></RecordHeading
-      >
-      <p>
-        {{ detail.source_type === 'SALES' ? '销售来源' : '手工依据' }}：{{
-          detail.source_reference
-        }}
-        · {{ label(detail.status) }}
-      </p>
-      <p>
-        {{ detail.purpose }} · 需求日期 {{ businessDate(detail.needed_date) }}
-      </p>
+        :tone="statusTone(detail.status)"
+      />
+      <dl class="purchase-facts">
+        <div>
+          <dt>
+            {{ detail.source_type === 'SALES' ? '销售来源' : '手工依据' }}
+          </dt>
+          <dd>{{ detail.source_reference }}</dd>
+        </div>
+        <div>
+          <dt>需求日期</dt>
+          <dd>{{ businessDate(detail.needed_date) }}</dd>
+        </div>
+        <div>
+          <dt>计划数量</dt>
+          <dd>{{ displayQuantity(detail.quantity) }} {{ detail.unit }}</dd>
+        </div>
+        <div>
+          <dt>创建账号</dt>
+          <dd>{{ detail.created_by }}</dd>
+        </div>
+      </dl>
+      <p class="purchase-purpose"><span>用途</span>{{ detail.purpose }}</p>
       <div v-if="write && detail.status === 'OPEN' && !active" class="toolbar">
         <button :disabled="blocked" @click="open('order')">转生产订单</button
         ><button :disabled="blocked" @click="open('cancel-demand')">
@@ -575,7 +606,9 @@ onBeforeUnmount(() => {
       <article v-for="o in detail.orders" :key="o.id" class="order">
         <div class="heading">
           <h3>生产订单 {{ o.order_no }}</h3>
-          <span>{{ label(o.status) }}</span>
+          <span class="purchase-status" :data-tone="statusTone(o.status)">{{
+            label(o.status)
+          }}</span>
         </div>
         <p>
           {{ o.site_code }} · {{ o.site_name }} → {{ o.warehouse_name }} · 计划

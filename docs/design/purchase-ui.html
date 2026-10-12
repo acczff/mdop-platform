@@ -1,0 +1,1441 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MDOP · 采购界面设计对比</title>
+    <style>
+      :root {
+        font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+        color: #202939;
+        background: #eef1f5;
+        font-synthesis: none;
+        --brand: #245dd8;
+        --muted: #687487;
+        --line: #e4e8ef;
+        --surface: #fff;
+        --canvas: #f5f7fa;
+        --radius: 10px;
+        --cell: 18px;
+        --shadow: 0 2px 6px #162d4d04;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+      button,
+      a,
+      input,
+      select {
+        touch-action: manipulation;
+      }
+      button,
+      a {
+        cursor: pointer;
+      }
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+      button:focus-visible,
+      a:focus-visible,
+      input:focus-visible,
+      select:focus-visible,
+      summary:focus-visible {
+        outline: 3px solid #789ff5;
+        outline-offset: 3px;
+      }
+      button {
+        color: inherit;
+      }
+      a {
+        color: var(--brand);
+      }
+      button {
+        border: 1px solid var(--line);
+        background: var(--surface);
+        border-radius: 7px;
+        padding: 9px 13px;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+      button:hover:not(:disabled) {
+        background: #f0f4fc;
+      }
+      button.primary {
+        background: var(--brand);
+        color: #fff;
+        border-color: var(--brand);
+      }
+      button.primary:hover:not(:disabled) {
+        background: #184ebc;
+      }
+      button.quiet {
+        border-color: transparent;
+        background: transparent;
+        color: var(--muted);
+      }
+      button.link {
+        border: 0;
+        background: none;
+        color: var(--brand);
+        padding: 5px 0;
+        text-align: left;
+        white-space: normal;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      h1 {
+        font-size: 26px;
+        letter-spacing: -0.7px;
+        font-weight: 650;
+      }
+      h2 {
+        font-size: 17px;
+        font-weight: 650;
+      }
+      h3 {
+        font-size: 14px;
+      }
+      small,
+      .sub {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.65;
+      }
+      .mono {
+        font-family: ui-monospace, Consolas, monospace;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.2px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .spread {
+        justify-content: space-between;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 5px;
+        padding: 4px 8px;
+        font-size: 12px;
+        white-space: nowrap;
+        font-weight: 500;
+      }
+      .badge:before {
+        content: "";
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+      .blue {
+        color: #235cbb;
+        background: #edf3ff;
+      }
+      .green {
+        color: #23744d;
+        background: #eaf6ef;
+      }
+      .amber {
+        color: #8c5813;
+        background: #fff5e4;
+      }
+      .gray {
+        color: #667080;
+        background: #eef1f5;
+      }
+      .red {
+        color: #b43a3a;
+        background: #fff0ef;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      .studio {
+        background: #182336;
+        color: #fff;
+        padding: 14px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .studio-title {
+        font-size: 13px;
+        letter-spacing: 0.3px;
+      }
+      .studio small {
+        color: #b6c2d4;
+      }
+      .variants {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+      .variants button {
+        background: transparent;
+        border-color: #536074;
+        color: #d5dfef;
+      }
+      .variants button[aria-pressed="true"] {
+        background: #fff;
+        color: #1f2d43;
+        border-color: #fff;
+      }
+      .scenario {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+      }
+      .scenario select {
+        max-width: 155px;
+        background: #25344c;
+        border: 1px solid #536074;
+        color: #fff;
+        border-radius: 6px;
+        padding: 8px;
+      }
+      .study-note {
+        padding: 12px 24px;
+        background: #fff;
+        border-bottom: 1px solid var(--line);
+        font-size: 12px;
+        color: #57677b;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .study-note strong {
+        color: #245dd8;
+      }
+      .swatches {
+        display: flex;
+        gap: 4px;
+        margin-left: auto;
+      }
+      .swatches i {
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        background: var(--brand);
+      }
+      .swatches i:nth-child(2) {
+        background: #dce4ee;
+      }
+      .swatches i:nth-child(3) {
+        background: #2c394b;
+      }
+      .app {
+        display: grid;
+        grid-template-columns: 196px minmax(0, 1fr);
+        min-height: 850px;
+        background: var(--canvas);
+      }
+      .sidebar {
+        padding: 27px 16px;
+        background: var(--surface);
+        border-right: 1px solid var(--line);
+      }
+      .brand {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 0 10px 30px;
+      }
+      .brand-mark {
+        background: var(--brand);
+        color: #fff;
+        width: 31px;
+        height: 31px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        font-weight: 700;
+      }
+      .brand strong {
+        letter-spacing: 1.5px;
+        font-size: 18px;
+      }
+      .group-label {
+        color: #8290a3;
+        font-size: 11px;
+        padding: 18px 12px 7px;
+      }
+      .nav-item {
+        display: flex;
+        gap: 11px;
+        align-items: center;
+        padding: 12px;
+        font-size: 13px;
+        color: #536074;
+        border-radius: 7px;
+        margin: 3px 0;
+      }
+      .nav-item.current {
+        background: #eaf0fd;
+        color: var(--brand);
+        font-weight: 600;
+      }
+      .nav-icon {
+        width: 16px;
+        display: inline-flex;
+        justify-content: center;
+        opacity: 0.75;
+      }
+      .side-foot {
+        border-top: 1px solid var(--line);
+        margin: 35px 12px 0;
+        padding-top: 16px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .content {
+        min-width: 0;
+      }
+      .topbar {
+        height: 65px;
+        padding: 0 30px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .crumb {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .crumb span:last-child {
+        color: #27354b;
+      }
+      .account {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+      .avatar {
+        width: 29px;
+        height: 29px;
+        border-radius: 50%;
+        background: #edf2fa;
+        color: #456395;
+        display: grid;
+        place-items: center;
+        font-size: 11px;
+      }
+      .workspace {
+        padding: 28px 30px 40px;
+        max-width: 1560px;
+        margin: auto;
+      }
+      .page-heading {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 23px;
+      }
+      .page-heading .sub {
+        margin-top: 7px;
+      }
+      .page-heading .context {
+        font-size: 12px;
+        color: var(--muted);
+        padding-top: 10px;
+      }
+      .paper {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+      .toolbar {
+        padding: 18px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 16px;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        font-size: 12px;
+        color: #536074;
+      }
+      .field select,
+      .field input {
+        background: var(--surface);
+        border: 1px solid #ccd5e1;
+        border-radius: 6px;
+        color: #202939;
+        min-height: 36px;
+        padding: 7px 10px;
+        min-width: 175px;
+        max-width: 100%;
+      }
+      .tools {
+        display: flex;
+        gap: 10px;
+        align-items: end;
+      }
+      .table-scroll {
+        overflow: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th {
+        padding: 12px 20px;
+        text-align: left;
+        background: #f8fafc;
+        color: #647287;
+        font-size: 12px;
+        font-weight: 500;
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        white-space: nowrap;
+      }
+      td {
+        padding: var(--cell) 20px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: middle;
+      }
+      tbody tr:last-child td {
+        border-bottom: 0;
+      }
+      tbody tr:hover {
+        background: #f7faff;
+      }
+      td .sub {
+        margin-top: 4px;
+      }
+      td .document-link {
+        font-weight: 600;
+      }
+      .pager {
+        padding: 13px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-top: 1px solid var(--line);
+        font-size: 12px;
+        color: var(--muted);
+        gap: 10px;
+      }
+      .pager button {
+        padding: 5px 10px;
+      }
+      .table-footer {
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.8;
+      }
+      .empty {
+        padding: 65px 24px;
+        text-align: center;
+      }
+      .empty .empty-sign {
+        font-size: 25px;
+        color: #8393ad;
+        margin-bottom: 15px;
+      }
+      .empty p {
+        font-size: 13px;
+        color: var(--muted);
+        margin: 9px 0 17px;
+      }
+      .back {
+        margin-bottom: 18px;
+      }
+      .detail-title {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .detail-title h1 {
+        font-size: 24px;
+      }
+      .detail-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+      .detail-meta {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 20px;
+        padding: 22px;
+      }
+      .detail-meta dt {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 9px;
+      }
+      .detail-meta dd {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.5;
+        overflow-wrap: anywhere;
+      }
+      .purpose {
+        padding: 0 22px 22px;
+        font-size: 13px;
+        color: #4a586d;
+      }
+      .purpose span {
+        color: var(--muted);
+        margin-right: 18px;
+      }
+      .detail-tabs {
+        display: flex;
+        border-bottom: 1px solid var(--line);
+        gap: 25px;
+        margin: 24px 0 20px;
+      }
+      .detail-tabs button {
+        padding: 12px 0;
+        border: 0;
+        border-bottom: 2px solid transparent;
+        border-radius: 0;
+        background: transparent;
+        color: var(--muted);
+      }
+      .detail-tabs button[aria-selected="true"] {
+        color: var(--brand);
+        border-color: var(--brand);
+        font-weight: 600;
+      }
+      .section-head {
+        padding: 20px 22px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .notice {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        background: #fff8ed;
+        border: 1px solid #f3dfba;
+        border-radius: 8px;
+        padding: 14px 17px;
+        margin-bottom: 18px;
+        font-size: 13px;
+        color: #805316;
+        line-height: 1.7;
+      }
+      .notice p {
+        color: #806340;
+        font-size: 12px;
+      }
+      .notice.info {
+        background: #f0f5fe;
+        border-color: #d7e4fb;
+        color: #345b95;
+      }
+      .notice.info p {
+        color: #526a8e;
+      }
+      .notice.error {
+        background: #fff3f2;
+        border-color: #f3d1cf;
+        color: #a33933;
+      }
+      .fulfillment {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0;
+        padding: 22px;
+      }
+      .metric {
+        border-right: 1px solid var(--line);
+        padding: 2px 22px;
+      }
+      .metric:first-child {
+        padding-left: 0;
+      }
+      .metric:last-child {
+        border: 0;
+      }
+      .metric .value {
+        font-size: 26px;
+        font-weight: 600;
+        margin: 10px 0 5px;
+        font-variant-numeric: tabular-nums;
+      }
+      .metric .value span {
+        font-size: 12px;
+        color: var(--muted);
+        font-weight: 400;
+        margin-left: 5px;
+      }
+      .metric small {
+        font-size: 12px;
+      }
+      .progress {
+        height: 5px;
+        border-radius: 5px;
+        background: #e8edf5;
+        overflow: hidden;
+        margin-top: 12px;
+      }
+      .progress span {
+        display: block;
+        height: 100%;
+        background: #547cce;
+        width: 60%;
+      }
+      .history-item {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        gap: 25px;
+        padding: 20px 22px;
+        border-bottom: 1px solid var(--line);
+        font-size: 13px;
+      }
+      .history-item:last-child {
+        border: 0;
+      }
+      .history-item p {
+        margin-top: 7px;
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+      .technical {
+        margin-top: 20px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .technical summary {
+        cursor: pointer;
+      }
+      .technical dl {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        gap: 10px;
+        margin: 15px 0;
+      }
+      .technical dd {
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+      .bottom-note {
+        margin-top: 16px;
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.8;
+      }
+      .quiet-box {
+        padding: 22px;
+      }
+      .quiet-box p {
+        margin: 10px 0;
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.8;
+      }
+      dialog {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 0;
+        width: min(560px, calc(100% - 32px));
+        box-shadow: 0 24px 80px #172a4940;
+      }
+      dialog::backdrop {
+        background: #13243c60;
+      }
+      dialog header,
+      dialog footer {
+        padding: 20px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      dialog header {
+        border-bottom: 1px solid var(--line);
+      }
+      dialog footer {
+        border-top: 1px solid var(--line);
+        justify-content: flex-end;
+      }
+      dialog .dialog-body {
+        padding: 22px 24px;
+      }
+      .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin: 20px 0;
+      }
+      .form-grid input {
+        min-width: 0;
+        width: 100%;
+      }
+      .form-grid .full {
+        grid-column: 1/-1;
+      }
+      .form-grid label {
+        font-size: 13px;
+      }
+      #form-error {
+        font-size: 13px;
+        color: #ae3838;
+        margin-top: 12px;
+      }
+      .toast {
+        margin: 16px 0;
+        padding: 13px 16px;
+        border: 1px solid #c6dfd0;
+        background: #eef8f2;
+        border-radius: 8px;
+        color: #28714b;
+        font-size: 13px;
+      }
+      [data-theme="glass"] {
+        --canvas: #f0f3f2;
+        --surface: #ffffffed;
+        --radius: 16px;
+        --line: #dce4e2;
+        --brand: #236de9;
+        --shadow: 0 4px 18px #233c3b07, inset 0 1px 0 #fff;
+        --cell: 20px;
+      }
+      .app[data-theme="glass"] {
+        background:
+          radial-gradient(ellipse at 90% 0, #e9f1e4, transparent 42%),
+          radial-gradient(ellipse at 15% 0, #e3ecfa, transparent 40%),
+          var(--canvas);
+      }
+      [data-theme="glass"] .sidebar,
+      [data-theme="glass"] .topbar {
+        background: #ffffffa8;
+        backdrop-filter: blur(16px);
+      }
+      [data-theme="glass"] .nav-item.current {
+        background: linear-gradient(135deg, #fff, #f7fafacc);
+        box-shadow:
+          0 2px 10px #233b4b10,
+          inset 0 1px 0 #fff;
+        border: 1px solid #fff;
+      }
+      [data-theme="glass"] .paper {
+        background: linear-gradient(135deg, #fffffff7, #fcfdfcf2);
+      }
+      [data-theme="glass"] .brand-mark {
+        border-radius: 11px;
+        box-shadow: 0 4px 12px #236de92b;
+      }
+      [data-theme="glass"] button {
+        border-radius: 9px;
+      }
+      [data-theme="glass"] th {
+        background: #f5f8f7;
+      }
+      [data-theme="glass"] .badge {
+        border-radius: 20px;
+      }
+      [data-theme="compact"] {
+        --canvas: #f3f4f6;
+        --radius: 3px;
+        --cell: 11px;
+        --shadow: none;
+        --brand: #2456b8;
+        --line: #dce1e8;
+      }
+      .app[data-theme="compact"] {
+        grid-template-columns: 178px minmax(0, 1fr);
+      }
+      [data-theme="compact"] .workspace {
+        padding: 20px 24px 32px;
+      }
+      [data-theme="compact"] .topbar {
+        height: 53px;
+      }
+      [data-theme="compact"] .page-heading {
+        margin-bottom: 17px;
+      }
+      [data-theme="compact"] h1 {
+        font-size: 23px;
+      }
+      [data-theme="compact"] .toolbar {
+        padding: 12px 16px;
+      }
+      [data-theme="compact"] th {
+        padding: 10px 16px;
+      }
+      [data-theme="compact"] td {
+        padding: var(--cell) 16px;
+      }
+      [data-theme="compact"] .nav-item {
+        padding: 10px;
+        border-radius: 3px;
+      }
+      [data-theme="compact"] .detail-meta {
+        padding: 17px;
+        gap: 14px;
+      }
+      [data-theme="compact"] .detail-tabs {
+        margin: 17px 0 14px;
+      }
+      [data-theme="compact"] .section-head {
+        padding: 15px 17px;
+      }
+      [data-theme="compact"] button {
+        border-radius: 4px;
+      }
+      [data-theme="compact"] .fulfillment {
+        padding: 17px;
+      }
+      [data-theme="compact"] .metric .value {
+        font-size: 23px;
+      }
+      [data-theme="compact"] .history-item {
+        padding: 14px 17px;
+      }
+      @media (min-width: 1500px) {
+        .workspace {
+          padding-top: 36px;
+        }
+        .app {
+          grid-template-columns: 220px minmax(0, 1fr);
+        }
+      }
+      @media (max-width: 1000px) {
+        .app,
+        .app[data-theme="compact"] {
+          grid-template-columns: 160px minmax(0, 1fr);
+        }
+        .workspace,
+        [data-theme="compact"] .workspace {
+          padding: 22px 20px;
+        }
+        .sidebar {
+          padding: 24px 10px;
+        }
+        .brand {
+          padding-left: 7px;
+        }
+        .topbar {
+          padding: 0 20px;
+        }
+        .detail-meta {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .page-heading {
+          flex-wrap: wrap;
+        }
+        .metric {
+          padding: 2px 13px;
+        }
+        .fulfillment {
+          padding: 18px;
+        }
+        .account .account-text {
+          display: none;
+        }
+        th,
+        td {
+          padding-left: 15px;
+          padding-right: 15px;
+        }
+      }
+      @media (max-width: 720px) {
+        .studio {
+          padding: 14px 16px;
+          gap: 12px;
+        }
+        .studio-title {
+          width: 100%;
+        }
+        .study-note {
+          padding: 12px 16px;
+        }
+        .swatches {
+          display: none;
+        }
+        .app,
+        .app[data-theme="compact"] {
+          display: block;
+          min-height: 0;
+        }
+        .sidebar {
+          display: none;
+        }
+        .topbar {
+          height: 52px;
+          padding: 0 16px;
+        }
+        .workspace,
+        [data-theme="compact"] .workspace {
+          padding: 22px 16px 30px;
+        }
+        .page-heading .context {
+          display: none;
+        }
+        .page-heading {
+          margin-bottom: 18px;
+        }
+        h1 {
+          font-size: 23px;
+        }
+        .detail-title h1 {
+          font-size: 20px;
+        }
+        .detail-actions {
+          width: 100%;
+          justify-content: flex-start;
+        }
+        .toolbar {
+          padding: 16px;
+          align-items: end;
+        }
+        .field select {
+          min-width: 150px;
+          width: 100%;
+        }
+        .field {
+          min-width: 0;
+        }
+        .pager {
+          padding: 12px 16px;
+        }
+        .paper {
+          border-radius: 8px;
+        }
+        .detail-meta {
+          padding: 16px;
+          gap: 18px;
+        }
+        .purpose {
+          padding: 0 16px 16px;
+        }
+        .fulfillment {
+          grid-template-columns: 1fr 1fr;
+          gap: 20px;
+        }
+        .metric:nth-child(2) {
+          border: 0;
+        }
+        .metric:nth-child(3) {
+          padding-left: 0;
+        }
+        .detail-tabs {
+          gap: 20px;
+          overflow: auto;
+          white-space: nowrap;
+        }
+        .history-item {
+          grid-template-columns: 1fr;
+          gap: 8px;
+          padding: 17px;
+        }
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
+        .form-grid .full {
+          grid-column: auto;
+        }
+        .studio .scenario {
+          width: 100%;
+        }
+        .section-head {
+          padding: 16px;
+        }
+        .table-scroll table {
+          min-width: 660px;
+        }
+        .notice {
+          padding: 13px;
+        }
+        .technical dl {
+          grid-template-columns: 100px 1fr;
+        }
+        .study-note {
+          align-items: flex-start;
+        }
+        .bottom-note {
+          overflow-wrap: anywhere;
+        }
+        button {
+          min-height: 36px;
+        }
+        .variants button {
+          padding: 9px 10px;
+        }
+        .tools {
+          gap: 5px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          scroll-behavior: auto !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="studio">
+      <div class="studio-title">
+        MDOP · 界面设计对比<small>采购订单 / 同一组演示数据</small>
+      </div>
+      <div class="variants" role="group" aria-label="设计风格">
+        <button data-style="business" aria-pressed="true">简洁商务</button
+        ><button data-style="glass" aria-pressed="false">珍珠玻璃</button
+        ><button data-style="compact" aria-pressed="false">紧凑专业</button>
+      </div>
+      <label class="scenario"
+        >场景
+        <select id="scenario">
+          <option value="normal">正常读取</option>
+          <option value="list-error">列表读取失败</option>
+          <option value="detail-error">详情读取失败</option>
+          <option value="empty">暂无订单</option>
+          <option value="readonly">只读账号</option>
+        </select></label
+      >
+    </header>
+    <div class="study-note">
+      <strong id="style-title">推荐方向</strong
+      ><span id="style-desc">清晰分区 · 适中密度 · 操作聚焦</span
+      ><span class="swatches" aria-hidden="true"><i></i><i></i><i></i></span>
+    </div>
+    <div class="app" id="app" data-theme="business">
+      <aside class="sidebar" aria-label="导航布局示意">
+        <div class="brand">
+          <span class="brand-mark">M</span>
+          <div><strong>MDOP</strong><small>制造运营平台</small></div>
+        </div>
+        <div class="group-label">业务协同</div>
+        <div class="nav-item"><span class="nav-icon">▦</span>基础资料</div>
+        <div class="nav-item current">
+          <span class="nav-icon">▤</span>采购管理
+        </div>
+        <div class="nav-item"><span class="nav-icon">▥</span>销售管理</div>
+        <div class="nav-item"><span class="nav-icon">◇</span>生产管理</div>
+        <div class="group-label">仓储执行</div>
+        <div class="nav-item"><span class="nav-icon">↓</span>收货与入库</div>
+        <div class="nav-item"><span class="nav-icon">↑</span>发料与出库</div>
+        <div class="nav-item"><span class="nav-icon">⇄</span>库存与追溯</div>
+        <div class="nav-item"><span class="nav-icon">⊙</span>差异与冲正</div>
+        <div class="side-foot">
+          界面原型 · 演示数据<br /><span class="sub">导航仅示意业务分组</span>
+        </div>
+      </aside>
+      <div class="content">
+        <header class="topbar">
+          <div class="crumb">
+            <span>采购管理</span><span>/</span><span id="crumb">采购订单</span>
+          </div>
+          <div class="account">
+            <span class="avatar">采</span
+            ><span class="account-text" id="account">操作账号 demo.buyer</span
+            ><span class="badge gray" id="access">设计预览</span>
+          </div>
+        </header>
+        <main class="workspace" id="workspace"></main>
+      </div>
+    </div>
+    <dialog id="arrange-dialog" aria-labelledby="dialog-title">
+      <form id="arrange-form">
+        <header>
+          <h2 id="dialog-title">安排到货</h2>
+          <button
+            type="button"
+            class="quiet"
+            id="close-dialog"
+            aria-label="关闭安排到货"
+          >
+            关闭
+          </button>
+        </header>
+        <div class="dialog-body">
+          <p id="dialog-order" class="mono"></p>
+          <p class="sub" style="margin-top: 8px">
+            交互演示，确认不会写入业务数据。
+          </p>
+          <div class="form-grid">
+            <label class="field"
+              >预计到货日期<input
+                type="date"
+                id="expected"
+                required
+                value="2026-10-16" /></label
+            ><label class="field"
+              >本次安排数量（千克）<input
+                id="amount"
+                inputmode="decimal"
+                required
+                type="number"
+                min="0.001"
+                max="400"
+                step="0.001"
+                value="400"
+              /><span class="sub">演示物料 · 剩余可安排 400 千克</span></label
+            ><label class="field full"
+              >操作说明<input
+                id="reason"
+                required
+                maxlength="500"
+                placeholder="填写本次安排依据"
+            /></label>
+          </div>
+          <p id="form-error" role="alert"></p>
+        </div>
+        <footer>
+          <button type="button" id="cancel-dialog">取消</button
+          ><button class="primary" type="submit">预览确认</button>
+        </footer>
+      </form>
+    </dialog>
+    <script>
+      (() => {
+        "use strict";
+        const orders = [
+          {
+            no: "PO-00000028",
+            purpose: "十月生产用料 · 冷轧钢带",
+            supplier: "演示供应商 · 华成金属",
+            date: "2026-10-16",
+            status: "履约中",
+            tone: "blue",
+            creator: "demo.buyer",
+            material: "冷轧钢带",
+            code: "RM-0001",
+            qty: "1,000",
+            unit: "千克",
+          },
+          {
+            no: "PO-00000027",
+            purpose: "装配线辅料补充",
+            supplier: "演示供应商 · 安达辅材",
+            date: "2026-10-15",
+            status: "待审核",
+            tone: "amber",
+            creator: "demo.buyer",
+            material: "防护垫片",
+            code: "RM-0002",
+            qty: "500",
+            unit: "件",
+          },
+          {
+            no: "PO-00000026",
+            purpose: "成品包装材料",
+            supplier: "演示供应商 · 东辰包装",
+            date: "2026-10-14",
+            status: "已批准",
+            tone: "blue",
+            creator: "demo.purchaser",
+            material: "包装箱",
+            code: "PK-0001",
+            qty: "200",
+            unit: "个",
+          },
+          {
+            no: "PO-00000025",
+            purpose: "设备维护备料",
+            supplier: "演示供应商 · 华成金属",
+            date: "2026-10-12",
+            status: "已结案",
+            tone: "green",
+            creator: "demo.buyer",
+            material: "定位销",
+            code: "RM-0003",
+            qty: "120",
+            unit: "件",
+          },
+          {
+            no: "PO-00000024",
+            purpose: "试制批次材料",
+            supplier: "演示供应商 · 安达辅材",
+            date: "2026-10-11",
+            status: "已驳回",
+            tone: "red",
+            creator: "demo.buyer",
+            material: "绝缘垫",
+            code: "RM-0004",
+            qty: "80",
+            unit: "件",
+          },
+          {
+            no: "PO-00000023",
+            purpose: "下一批生产备料",
+            supplier: "演示供应商 · 华成金属",
+            date: "2026-10-20",
+            status: "草稿",
+            tone: "gray",
+            creator: "demo.buyer",
+            material: "冷轧钢带",
+            code: "RM-0001",
+            qty: "300",
+            unit: "千克",
+          },
+        ];
+        const state = {
+          theme: "business",
+          scenario: "normal",
+          page: 0,
+          selected: null,
+          tab: "overview",
+          toast: "",
+        };
+        const main = document.getElementById("workspace"),
+          app = document.getElementById("app"),
+          scenario = document.getElementById("scenario"),
+          dialog = document.getElementById("arrange-dialog");
+        const badge = (o) => `<span class="badge ${o.tone}">${o.status}</span>`;
+        const table = (headers, rows) =>
+          `<div class="table-scroll" role="region" aria-label="可横向滚动的数据表" tabindex="0"><table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`;
+        function empty(title, description, retry) {
+          return `<div class="empty" ${retry ? 'role="alert"' : 'role="status"'}><div class="empty-sign" aria-hidden="true">${retry ? "!" : "—"}</div><h2>${title}</h2><p>${description}</p>${retry ? '<button data-action="retry">重新读取</button>' : ""}</div>`;
+        }
+        function list() {
+          const failed = state.scenario === "list-error",
+            noData = state.scenario === "empty";
+          const rows = orders
+            .slice(state.page * 3, state.page * 3 + 3)
+            .map(
+              (o) =>
+                `<tr><td><button class="link document-link mono" data-order="${o.no}">${o.no}</button><span class="sub">${o.purpose}</span></td><td>${o.supplier}</td><td class="mono">${o.date}</td><td>${badge(o)}</td><td class="mono">${o.creator}</td><td><button class="link" data-order="${o.no}" aria-label="查看采购订单 ${o.no}">查看详情 →</button></td></tr>`,
+            )
+            .join("");
+          main.innerHTML = `<div class="page-heading"><div><h1>采购订单</h1><p class="sub">核对已批准需求的采购安排与收货履约。</p></div><span class="context">由采购需求转单生成</span></div><section class="paper" aria-label="采购订单列表"><div class="toolbar"><label class="field">收货仓库<select aria-label="收货仓库"><option>原材料仓 · WH-01</option></select></label><button data-action="refresh">刷新列表</button></div>${failed ? empty("订单列表读取失败", "尚未取得查询结果，请重新读取。", true) : noData ? empty("当前仓库暂无采购订单", "已批准的采购需求转单后，将在这里显示。", false) : table(["单号 / 用途", "供应商", "约定到货日期", "单据状态", "创建账号", "操作"], rows)}${!failed ? `<div class="pager"><span>${noData ? "共 0 条" : "共 6 条 · 每页 3 条"}</span><div class="row"><button data-action="prev" ${state.page === 0 || noData ? "disabled" : ""} aria-label="上一页">←</button><span>第 ${noData ? 1 : state.page + 1} / ${noData ? 1 : 2} 页</span><button data-action="next" ${state.page === 1 || noData ? "disabled" : ""} aria-label="下一页">→</button></div></div>` : ""}</section><p class="table-footer">单据状态与收货进度分别展示；查看详情可核对物料、到货安排与履约事实。</p>`;
+        }
+        function overview(o) {
+          const active = o.no === orders[0].no;
+          const blocker = active
+            ? '<div class="notice"><span aria-hidden="true">!</span><div><strong>尚有未完成事项，暂不可结案</strong><p>冷轧钢带尚欠 400 千克；另有 200 千克已收货待检。</p></div></div>'
+            : o.status === "待审核"
+              ? '<div class="notice info"><div><strong>等待独立采购审批员审核</strong><p>当前账号为建单经办人，不能审批自己提交的单据。</p></div></div>'
+              : o.status === "已驳回"
+                ? '<div class="notice error"><div><strong>审批已驳回</strong><p>演示原因：请核对到货日期后重新提交。</p></div></div>'
+                : "";
+          return `${blocker}<section class="paper"><div class="section-head"><h2>物料明细</h2><span class="sub">按基本单位记录 · 1 项物料</span></div>${table(["物料 / 编码", "订单数量", "单位", "已安排 / 剩余"], `<tr><td>${o.material}<span class="sub mono">${o.code}</span></td><td class="num">${o.qty}</td><td>${o.unit}</td><td class="num">${active ? "600 / 400" : o.status === "已结案" ? "120 / 0" : `0 / ${o.qty}`}</td></tr>`)}</section>${active ? `<section class="paper" style="margin-top:18px"><div class="section-head"><h2>履约进度</h2><span class="sub">冷轧钢带 · 千克</span></div><div class="fulfillment"><div class="metric"><small>净收货 / 订单</small><div class="value">600<span>/ 1,000</span></div><small>已收 600 − 冲正 0</small><div class="progress" role="progressbar" aria-label="净收货进度" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100"><span></span></div></div><div class="metric"><small>尚欠数量</small><div class="value">400<span>千克</span></div><small>需继续安排到货</small></div><div class="metric"><small>待检数量</small><div class="value">200<span>千克</span></div><small>尚未完成质量判定</small></div><div class="metric"><small>累计合格上架</small><div class="value">400<span>千克</span></div><small>不代表当前库存</small></div></div><div class="quiet-box" style="padding-top:0"><small>合格待上架 0 · 不合格待退 0 · 已实际退供 0（千克）</small></div></section>` : o.status === "已结案" ? '<section class="paper" style="margin-top:18px"><div class="quiet-box"><h2>已完成数量履约结案</h2><p>定位销：净收货 120 件，合格上架 120 件，尚欠 0 件。结案快照已保留。</p><small>数量结案不代表财务结清；上架数量不代表当前库存。</small></div></section>' : '<p class="bottom-note">当前演示单据尚无收货记录；空记录不表示收货已完成。</p>'}<p class="bottom-note">订单物料与数量沿用已批准需求。当前未建立金额依据；本页不展示推算金额。</p>`;
+        }
+        function arrangements(o) {
+          if (o.status === "已结案") {
+            return `<section class="paper"><div class="section-head"><h2>到货安排</h2><span class="sub">共 1 条</span></div>${table(["到货日期 / 物料", "安排数量", "送达状态", "来源"], '<tr><td><span class="mono">2026-10-12</span><small>定位销 · RM-0003</small></td><td class="num">120 件</td><td><span class="badge green">已送达 WMS</span></td><td>到货安排 #15<small>内部引用 · 非业务单号</small></td></tr>')}</section><p class="bottom-note">本演示订单已完成收货与合格上架，并保留数量履约结案快照。</p>`;
+          }
+          return o.no === orders[0].no
+            ? `<section class="paper"><div class="section-head"><h2>到货安排</h2><span class="sub">共 1 条</span></div>${table(["到货日期 / 物料", "安排数量", "送达状态", "来源"], `<tr><td><span class="mono">2026-10-14</span><small>冷轧钢带 · RM-0001</small></td><td class="num">600 千克</td><td><span class="badge green">已送达 WMS</span></td><td>到货安排 #18<small>内部引用 · 非业务单号</small></td></tr>`)}</section><p class="bottom-note">安排送达不等于完成收货，实收数量以 WMS 收货记录为准。</p>`
+            : `<section class="paper">${empty("暂无到货安排", "仅已批准且符合条件的订单可以安排到货。", false)}</section>`;
+        }
+        function history(o) {
+          return `<section class="paper"><div class="section-head"><h2>操作记录</h2><span class="sub">演示记录</span></div>${o.status === "履约中" || o.status === "已批准" || o.status === "已结案" ? '<div class="history-item"><div class="mono">2026-10-12<br>09:20:08</div><div><strong>采购订单批准</strong><p>操作账号：demo.reviewer<br>操作依据：已核对来源需求与供应商。</p></div></div>' : ""}<div class="history-item"><div class="mono">2026-10-12<br>08:46:20</div><div><strong>生成采购订单</strong><p>操作账号：${o.creator}<br>操作依据：按已批准需求转单。</p></div></div></section><p class="bottom-note">以上时间未提供时区，按原记录展示。账号不代表姓名或岗位。</p>`;
+        }
+        function detail() {
+          const o = orders.find((item) => item.no === state.selected);
+          if (!o) {
+            state.selected = null;
+            return list();
+          }
+          const readonly = state.scenario === "readonly",
+            active = o.no === orders[0].no;
+          if (state.scenario === "detail-error") {
+            main.innerHTML = `<button class="quiet back" data-action="back">← 返回订单列表</button><section class="paper">${empty("采购订单详情读取失败", `未能读取 ${o.no}，请重试。`, true)}</section>`;
+            return;
+          }
+          main.innerHTML = `<button class="quiet back" data-action="back">← 返回订单列表</button><div class="page-heading"><div><div class="detail-title"><h1 class="mono">${o.no}</h1>${badge(o)}</div><p class="sub">采购订单 · ${o.supplier}</p></div><div class="detail-actions">${active && !readonly ? '<button disabled aria-describedby="close-reason">履约结案</button><button class="primary" data-action="arrange">安排到货</button>' : ""}${readonly ? '<span class="badge gray">只读</span>' : ""}</div></div>${state.toast ? '<div class="toast" role="status">交互演示完成。未创建到货安排，原有数据未改变。</div>' : ""}${readonly ? '<div class="notice info"><div>当前账号可查看订单及来源记录，无业务操作权限。</div></div>' : ""}<section class="paper"><dl class="detail-meta"><div><dt>供应商</dt><dd>${o.supplier}</dd></div><div><dt>收货仓库</dt><dd>原材料仓 <span class="sub mono">WH-01</span></dd></div><div><dt>约定到货日期</dt><dd class="mono">${o.date}</dd></div><div><dt>创建账号</dt><dd class="mono">${o.creator}</dd></div></dl><p class="purpose"><span>采购用途</span>${o.purpose}</p></section><div class="detail-tabs" role="tablist" aria-label="订单详情分区">${[
+            ["overview", "物料与履约"],
+            ["arrangements", "到货安排"],
+            ["history", "操作记录"],
+          ]
+            .map(
+              ([key, title]) =>
+                `<button role="tab" id="tab-${key}" data-tab="${key}" aria-selected="${state.tab === key}" aria-controls="detail-panel">${title}</button>`,
+            )
+            .join(
+              "",
+            )}</div><div id="detail-panel" role="tabpanel" aria-labelledby="tab-${state.tab}">${state.tab === "overview" ? overview(o) : state.tab === "arrangements" ? arrangements(o) : history(o)}</div>${active ? '<p id="close-reason" class="bottom-note">结案条件未满足：尚欠数量及待检数量均需完成处置。</p>' : ""}<details class="technical"><summary>来源与技术标识</summary><dl><dt>来源采购需求</dt><dd class="mono">PR-00000016（演示）</dd><dt>内部订单记录号</dt><dd>${28 - orders.indexOf(o)}</dd><dt>版本</dt><dd>演示版本 3</dd></dl><p>内部记录号用于定位记录，业务沟通优先使用采购订单号。</p></details>`;
+        }
+        function render() {
+          app.dataset.theme = state.theme;
+          document.getElementById("crumb").textContent = state.selected
+            ? "订单详情"
+            : "采购订单";
+          document.getElementById("account").textContent =
+            state.scenario === "readonly"
+              ? "操作账号 demo.reader"
+              : "操作账号 demo.buyer";
+          document.getElementById("access").textContent =
+            state.scenario === "readonly" ? "只读预览" : "设计预览";
+          state.selected ? detail() : list();
+        }
+        function remember() {
+          try {
+            localStorage.setItem("mdop-ui-study-theme", state.theme);
+          } catch {}
+        }
+        document.querySelectorAll("[data-style]").forEach((button) =>
+          button.addEventListener("click", () => {
+            state.theme = button.dataset.style;
+            document
+              .querySelectorAll("[data-style]")
+              .forEach((b) =>
+                b.setAttribute("aria-pressed", String(b === button)),
+              );
+            const descriptions = {
+              business: ["推荐方向", "清晰分区 · 适中密度 · 操作聚焦"],
+              glass: ["质感方向", "轻透导航 · 柔和层次 · 实色阅读区域"],
+              compact: ["效率方向", "压缩间距 · 更高信息密度 · 保持清晰字号"],
+            };
+            document.getElementById("style-title").textContent =
+              descriptions[state.theme][0];
+            document.getElementById("style-desc").textContent =
+              descriptions[state.theme][1];
+            remember();
+            render();
+          }),
+        );
+        scenario.addEventListener("change", () => {
+          state.scenario = scenario.value;
+          state.toast = "";
+          state.page = 0;
+          state.tab = "overview";
+          if (state.scenario === "detail-error") state.selected = orders[0].no;
+          else if (["list-error", "empty"].includes(state.scenario))
+            state.selected = null;
+          render();
+        });
+        main.addEventListener("click", (event) => {
+          const button = event.target.closest("button");
+          if (!button || button.disabled) return;
+          if (button.dataset.order) {
+            state.selected = button.dataset.order;
+            state.tab = "overview";
+            state.toast = "";
+            render();
+            main.querySelector("[data-action=back]").focus();
+            return;
+          }
+          if (button.dataset.tab) {
+            state.tab = button.dataset.tab;
+            render();
+            document.getElementById(`tab-${state.tab}`).focus();
+            return;
+          }
+          switch (button.dataset.action) {
+            case "back":
+              state.selected = null;
+              state.toast = "";
+              if (state.scenario === "detail-error") {
+                state.scenario = "normal";
+                scenario.value = "normal";
+              }
+              render();
+              break;
+            case "prev":
+              state.page--;
+              render();
+              break;
+            case "next":
+              state.page++;
+              render();
+              break;
+            case "refresh":
+            case "retry":
+              state.scenario =
+                state.scenario === "readonly" ? "readonly" : "normal";
+              scenario.value = state.scenario;
+              render();
+              break;
+            case "arrange":
+              document.getElementById("arrange-form").reset();
+              document.getElementById("form-error").textContent = "";
+              document.getElementById("dialog-order").textContent =
+                state.selected;
+              dialog.showModal();
+              break;
+          }
+        });
+        main.addEventListener("keydown", (event) => {
+          if (!event.target.matches("[role=tab]")) return;
+          const keys = ["overview", "arrangements", "history"];
+          const position = keys.indexOf(state.tab);
+          let next;
+          if (event.key === "ArrowRight") next = (position + 1) % 3;
+          if (event.key === "ArrowLeft") next = (position + 2) % 3;
+          if (event.key === "Home") next = 0;
+          if (event.key === "End") next = 2;
+          if (next !== undefined) {
+            event.preventDefault();
+            state.tab = keys[next];
+            render();
+            document.getElementById(`tab-${state.tab}`).focus();
+          }
+        });
+        const closeDialog = () => {
+          dialog.close();
+          main.querySelector("[data-action=arrange]")?.focus();
+        };
+        document
+          .getElementById("close-dialog")
+          .addEventListener("click", closeDialog);
+        document
+          .getElementById("cancel-dialog")
+          .addEventListener("click", closeDialog);
+        document
+          .getElementById("arrange-form")
+          .addEventListener("submit", (event) => {
+            event.preventDefault();
+            if (!document.getElementById("reason").value.trim()) {
+              document.getElementById("form-error").textContent =
+                "请填写操作说明。";
+              return;
+            }
+            dialog.close();
+            state.toast = "preview";
+            render();
+            main.querySelector("[data-action=arrange]")?.focus();
+          });
+        let saved;
+        try {
+          saved = localStorage.getItem("mdop-ui-study-theme");
+        } catch {}
+        if (["business", "glass", "compact"].includes(saved))
+          document.querySelector(`[data-style=${saved}]`).click();
+        else render();
+      })();
+    </script>
+  </body>
+</html>
