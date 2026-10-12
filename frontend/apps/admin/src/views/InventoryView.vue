@@ -240,6 +240,7 @@ async function search(page = 0, apply = false) {
   }
 }
 async function trace(stock: Stock, page = 0, remember = true) {
+  const openingDetail = selected.value?.id !== stock.id
   if (remember && !selected.value) rememberList()
   busy.value = true
   error.value = ''
@@ -247,7 +248,6 @@ async function trace(stock: Stock, page = 0, remember = true) {
   ledgerPage.value = page
   ledger.value = undefined
   selected.value = stock
-  void focusDetail()
   try {
     ledger.value = await request<Page<Ledger>>(
       `/api/v1/wms/stock/${stock.id}/transactions?page=${page}&size=20`,
@@ -257,6 +257,7 @@ async function trace(stock: Stock, page = 0, remember = true) {
     error.value = ledgerError.value
   } finally {
     busy.value = false
+    if (openingDetail) void focusDetail()
   }
 }
 onMounted(async () => {
