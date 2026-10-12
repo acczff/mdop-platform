@@ -1,5 +1,16 @@
 export const navigation = [
   {
+    name: '财务往来',
+    items: [
+      {
+        path: '/finance',
+        name: '金额依据与往来',
+        permission: 'finance:read',
+        legacyAdmin: false,
+      },
+    ],
+  },
+  {
     name: '基础设置',
     items: [
       { path: '/catalog', name: '基础资料', permission: 'warehouse:read' },

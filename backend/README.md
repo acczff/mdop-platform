@@ -12,11 +12,14 @@
 - `mdop-purchasing`
 - `mdop-sales`
 - `mdop-manufacturing`
+- `mdop-finance`
 - `mdop-wms`
 - `mdop-integration`
 - `mdop-test-support`
 
 生产模块通过公共契约读取 WMS 可用参考、生成带工单来源的采购需求草稿；材料计算不直接改库存。接口、事务和数量口径见[材料需求实现](../docs/erp/材料需求实现与验收.md)。
+
+财务模块通过 `FinanceSourcePort` 读取采购/销售已确认收发事实，人工登记金额并经异人复核形成应收/应付；不写 WMS 数量账。演示口径、初始化与异常边界见[金额依据与往来确认](../docs/erp/金额依据与往来确认实现与验收.md)。
 
 ## 共享基础设施测试
 

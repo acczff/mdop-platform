@@ -429,7 +429,15 @@ onMounted(() => {
       return
     }
   }
-  void load()
+  const linked = new URLSearchParams(window.location.search)
+  const linkedId = Number(linked.get('documentId'))
+  if (!pending.value && linkedId > 0 && Number.isSafeInteger(linkedId)) {
+    warehouse.value = Number(linked.get('warehouseId')) || 0
+
+    void load().then(() => {
+      if (ready.value && !pending.value) void openDetail(linkedId)
+    })
+  } else void load()
 })
 onBeforeUnmount(() => {
   generation++
@@ -623,6 +631,12 @@ onBeforeUnmount(() => {
       <p v-if="detail.status === 'SUBMITTED' && !canReview" class="hint">
         等待其他销售审批员审核。
       </p>
+      <p v-if="authorities.includes('finance:read')">
+        <a
+          :href="`/finance?warehouseId=${detail.warehouse_id}&direction=RECEIVABLE&orderNumber=${encodeURIComponent(detail.document_no)}`"
+          >查看金额依据与应收</a
+        >
+      </p>
       <RecordTabs
         v-model="detailTab"
         prefix="sales"
@@ -727,7 +741,7 @@ onBeforeUnmount(() => {
             </button></template
           >
           <p class="hint">
-            结案仅确认数量履约。金额依据未建立，不代表应收或收款结清。
+            结案仅确认数量履约。应收金额请在财务往来核对，不代表收款结清。
           </p>
         </section>
       </div>

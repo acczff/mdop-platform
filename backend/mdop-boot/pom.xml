@@ -19,6 +19,7 @@
   <description>MDOP应用启动与装配模块</description>
 
   <dependencies>
+    <dependency><groupId>io.github.acczff.mdop</groupId><artifactId>mdop-finance</artifactId></dependency>
     <dependency>
       <groupId>io.github.acczff.mdop</groupId>
       <artifactId>mdop-manufacturing</artifactId>

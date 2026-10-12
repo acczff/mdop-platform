@@ -76,7 +76,26 @@ public final class PermissionCatalog {
         read.add("sales:read");
         read.add("bom:read");
         read.add("manufacturing:read");
+        read.add("finance:read");
         return List.of(
+                new Role(
+                        "FINANCE_OPERATOR",
+                        "财务录入员",
+                        Set.of(
+                                "warehouse:read",
+                                "finance:read",
+                                "finance:write",
+                                "purchasing:read",
+                                "sales:read")),
+                new Role(
+                        "FINANCE_REVIEWER",
+                        "财务复核员",
+                        Set.of(
+                                "warehouse:read",
+                                "finance:read",
+                                "finance:review",
+                                "purchasing:read",
+                                "sales:read")),
                 new Role(
                         "PRODUCTION_RECORDER",
                         "生产记录员",
@@ -142,6 +161,8 @@ public final class PermissionCatalog {
             throw invalid("系统管理与业务职责必须使用不同账号");
         if (codes.contains("BUSINESS_REVIEWER") && codes.contains("WAREHOUSE_OPERATOR"))
             throw invalid("业务审批与作业职责必须使用不同账号");
+        if (codes.contains("FINANCE_REVIEWER") && codes.contains("FINANCE_OPERATOR"))
+            throw invalid("财务录入与复核职责必须使用不同账号");
         if (codes.contains("PURCHASE_REVIEWER") && codes.contains("PURCHASE_OPERATOR"))
             throw invalid("采购审批与作业职责必须使用不同账号");
         if (codes.contains("SALES_REVIEWER") && codes.contains("SALES_OPERATOR"))

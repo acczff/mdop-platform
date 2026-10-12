@@ -547,7 +547,15 @@ onMounted(() => {
       return
     }
   }
-  void load()
+  const linked = new URLSearchParams(window.location.search)
+  const linkedId = Number(linked.get('documentId'))
+  if (!pending.value && linkedId > 0 && Number.isSafeInteger(linkedId)) {
+    warehouse.value = Number(linked.get('warehouseId')) || 0
+    kind.value = 'ORDER'
+    void load().then(() => {
+      if (ready.value && !pending.value) void openDetail(linkedId)
+    })
+  } else void load()
 })
 onBeforeUnmount(() => {
   generation++
@@ -850,6 +858,12 @@ onBeforeUnmount(() => {
       <p v-if="detail.status === 'SUBMITTED' && !canReview" class="hint">
         等待其他采购审批员审核。
       </p>
+      <p v-if="authorities.includes('finance:read') && detail.kind === 'ORDER'">
+        <a
+          :href="`/finance?warehouseId=${detail.warehouse_id}&direction=PAYABLE&orderNumber=${encodeURIComponent(detail.document_no)}`"
+          >查看金额依据与应付</a
+        >
+      </p>
       <RecordTabs
         v-model="detailTab"
         prefix="purchase"
@@ -863,7 +877,7 @@ onBeforeUnmount(() => {
         aria-labelledby="purchase-tab-overview"
       >
         <p v-if="detail.kind === 'ORDER'" class="hint">
-          金额依据：未建立。物料与数量来自已批准需求，不能在订单中修改。
+          金额由财务独立确认；数量履约不代表已付款。物料与数量来自已批准需求。
         </p>
         <div class="table-wrap">
           <table>
