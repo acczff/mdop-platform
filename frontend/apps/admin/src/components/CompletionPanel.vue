@@ -461,7 +461,7 @@ onBeforeUnmount(() => {
       </div>
       <OperationTimeNote v-if="data.reports.length" />
       <p class="muted">
-        不合格品保持隔离待处理；本页不办理返工、报废或工单结案。
+        不合格品保持隔离待处理；此处不办理返工或报废；工单结束请查看结束核对。
       </p>
     </template>
   </section>

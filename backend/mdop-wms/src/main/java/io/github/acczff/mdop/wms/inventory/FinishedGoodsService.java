@@ -124,10 +124,21 @@ public class FinishedGoodsService
 
     @Override
     public List<Map<String, Object>> references(long orderId) {
-        return db.sql(SELECT + " WHERE d.production_order_id=? ORDER BY d.id")
-                .param(orderId)
-                .query()
-                .listOfRows();
+        var rows =
+                db.sql(SELECT + " WHERE d.production_order_id=? ORDER BY d.id")
+                        .param(orderId)
+                        .query()
+                        .listOfRows();
+        for (var row : rows) {
+            row.put(
+                    "ledger",
+                    db.sql(
+                                    "SELECT id,transaction_type,CAST(change_qty AS CHAR) quantity,balance_id FROM wms_inventory_transaction WHERE finished_receipt_id=? ORDER BY id")
+                            .param(n(row, "id"))
+                            .query()
+                            .listOfRows());
+        }
+        return rows;
     }
 
     private Map<String, Object> createDemand(

@@ -147,6 +147,7 @@ public class ProductionService {
                 throw conflict("消耗事件号已用于其他登记内容或记录人");
             return consumption(n(o, "id"));
         }
+        issues.requireOpen(d);
         issues.eligibleWarehouses(n(d, "warehouse_id"), n(d, "target_warehouse_id"));
         if (input.quantity().compareTo(free(d)) > 0) throw conflict("消耗超过领料剩余额度，请先核对已消耗和待退数量");
         var b = balance(n(d, "target_balance_id"));
@@ -208,6 +209,7 @@ public class ProductionService {
                 throw conflict("退料事件号已用于其他登记内容或记录人");
             return returned(n(o, "id"));
         }
+        issues.requireOpen(d);
         issues.eligibleWarehouses(n(d, "warehouse_id"), n(d, "target_warehouse_id"));
         if (input.quantity().compareTo(free(d)) > 0) throw conflict("退料超过可申请额度，已消耗或待退数量不能重复退回");
         var b = balance(n(d, "target_balance_id"));
@@ -251,6 +253,7 @@ public class ProductionService {
         if ("RETURNED".equals(p.get("status"))) return returned(id);
         if (!"PENDING".equals(p.get("status"))) throw conflict("只有待确认退料单可接收实物");
         var d = issues.locked(n(p, "issue_id"));
+        issues.requireOpen(d);
         issues.eligibleWarehouses(n(d, "warehouse_id"), n(d, "target_warehouse_id"));
         var b = balance(n(d, "target_balance_id"));
         long location = n(p, "target_location_id"), warehouse = n(d, "warehouse_id");
