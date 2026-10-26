@@ -8,6 +8,7 @@
 |---|---|
 | 了解项目、能力与边界 | [项目首页](../README.md) |
 | 从空环境启动、创建账号 | [快速开始](guides/quickstart.md) |
+| 交接源码或换机继续开发 | [开发环境交接与换机续接](guides/workspace-handoff.md) |
 | 跑通收货并检查基本异常 | [WMS 业务演练](guides/wms-walkthrough.md) |
 | 理解列表、详情和业务编号 | [数据展示与业务标识](guides/data-presentation.md) |
 | 了解业务界面风格与验收范围 | [简洁商务设计与采购原型](design/README.md)（采购、销售、生产和库存页面） |
