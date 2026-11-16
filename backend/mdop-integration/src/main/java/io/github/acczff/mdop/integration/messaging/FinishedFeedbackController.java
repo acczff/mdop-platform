@@ -1,6 +1,6 @@
 package io.github.acczff.mdop.integration.messaging;
 
-import io.github.acczff.mdop.wms.inventory.FinishedGoodsService;
+import io.github.acczff.mdop.wms.inventory.finished.application.FinishedGoodsService;
 import jakarta.validation.constraints.Positive;
 import java.util.*;
 import org.springframework.jdbc.core.simple.JdbcClient;

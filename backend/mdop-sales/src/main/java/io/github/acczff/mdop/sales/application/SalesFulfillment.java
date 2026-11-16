@@ -1,6 +1,6 @@
 package io.github.acczff.mdop.sales.application;
 
-import io.github.acczff.mdop.common.sales.SalesShippingPort;
+import io.github.acczff.mdop.salesapi.SalesShippingPort;
 import java.math.BigDecimal;
 import java.util.*;
 import org.springframework.jdbc.core.simple.JdbcClient;

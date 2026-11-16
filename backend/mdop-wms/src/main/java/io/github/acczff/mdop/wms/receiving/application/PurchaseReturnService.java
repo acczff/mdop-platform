@@ -6,6 +6,7 @@ import static io.github.acczff.mdop.wms.receiving.application.ReceivingModels.*;
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
 import io.github.acczff.mdop.masterdata.catalog.CatalogService;
+import io.github.acczff.mdop.wms.inventory.ledger.InventoryLedger;
 import io.github.acczff.mdop.wms.receiving.ReceivingAccess;
 import io.github.acczff.mdop.wms.receiving.domain.ArrivalLockPort;
 import java.math.BigDecimal;
@@ -30,6 +31,7 @@ public class PurchaseReturnService {
     private final CatalogService catalog;
     private final Clock clock;
     private final ObjectMapper json;
+    private final InventoryLedger ledger;
 
     public PurchaseReturnService(
             JdbcClient db,
@@ -38,7 +40,8 @@ public class PurchaseReturnService {
             CurrentActorProvider actor,
             CatalogService catalog,
             Clock clock,
-            ObjectMapper json) {
+            ObjectMapper json,
+            InventoryLedger ledger) {
         this.db = db;
         this.access = access;
         this.arrivalLock = arrivalLock;
@@ -46,6 +49,7 @@ public class PurchaseReturnService {
         this.catalog = catalog;
         this.clock = clock;
         this.json = json;
+        this.ledger = ledger;
     }
 
     @Transactional(readOnly = true)
@@ -218,7 +222,7 @@ public class PurchaseReturnService {
                         .param(balanceId)
                         .query()
                         .singleRow();
-        io.github.acczff.mdop.wms.inventory.StockFreeze.requireUnfrozen(balance);
+        io.github.acczff.mdop.wms.inventory.ledger.StockFreeze.requireUnfrozen(balance);
         if (!balance.get("quality_status").equals("REJECTED")
                 || ((BigDecimal) balance.get("available_qty")).signum() != 0)
             throw conflict("退货来源必须是不合格不可用库存");
@@ -226,22 +230,17 @@ public class PurchaseReturnService {
         var after = before.subtract(record.quantity());
         if (after.signum() < 0) throw conflict("不合格库存不足，不能确认实际退货");
         String handover = text(input.handoverNo(), 64);
-        db.sql("UPDATE wms_inventory_balance SET on_hand_qty=? WHERE id=?")
-                .params(after, balanceId)
-                .update();
-        db.sql(
-                        "INSERT INTO wms_inventory_transaction(receipt_id,receipt_item_id,balance_id,before_qty,change_qty,after_qty,created_by,created_at,transaction_type,purchase_return_id) VALUES (?,?,?,?,?,?,?,?,'RETURN_OUT',?)")
-                .params(
-                        receipt.id(),
-                        item.id(),
+        ledger.postMovement(
+                InventoryLedger.MovementCommand.of(
                         balanceId,
-                        before,
                         record.quantity().negate(),
-                        after,
-                        actor.currentActor(),
-                        now(),
-                        id)
-                .update();
+                        BigDecimal.ZERO,
+                        false,
+                        true,
+                        "RETURN_OUT",
+                        InventoryLedger.LedgerRef.purchaseReturn(receipt.id(), item.id(), id),
+                        "CONFLICT",
+                        "不合格库存不足，不能确认实际退货"));
         db.sql(
                         "UPDATE wms_purchase_return SET status='RETURNED',version=version+1,confirm_key=?,confirm_hash=?,handover_no=?,confirmed_by=?,confirmed_at=? WHERE id=?")
                 .params(input.idempotencyKey(), digest, handover, actor.currentActor(), now(), id)

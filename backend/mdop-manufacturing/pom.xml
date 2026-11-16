@@ -9,5 +9,6 @@
     <dependency><groupId>io.github.acczff.mdop</groupId><artifactId>mdop-master-data</artifactId></dependency>
     <dependency><groupId>io.github.acczff.mdop</groupId><artifactId>mdop-security</artifactId></dependency>
     <dependency><groupId>io.github.acczff.mdop</groupId><artifactId>mdop-common</artifactId></dependency>
+    <dependency><groupId>io.github.acczff.mdop</groupId><artifactId>mdop-manufacturing-api</artifactId></dependency>
   </dependencies>
 </project>

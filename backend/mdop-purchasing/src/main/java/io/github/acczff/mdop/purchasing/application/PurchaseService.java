@@ -5,9 +5,9 @@ import static io.github.acczff.mdop.purchasing.application.PurchaseModels.*;
 
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
-import io.github.acczff.mdop.common.purchasing.PurchaseReceivingPort;
 import io.github.acczff.mdop.masterdata.catalog.CatalogService;
 import io.github.acczff.mdop.purchasing.domain.PurchaseRepository;
+import io.github.acczff.mdop.purchasingapi.PurchaseReceivingPort;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -32,7 +32,7 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 @Transactional(isolation = Isolation.READ_COMMITTED)
 public class PurchaseService
-        implements io.github.acczff.mdop.common.manufacturing.ProductionPurchasePort {
+        implements io.github.acczff.mdop.manufacturingapi.ProductionPurchasePort {
     private final JdbcClient db;
     private final CatalogService catalog;
     private final CurrentActorProvider actor;
@@ -64,7 +64,7 @@ public class PurchaseService
     public record Page(List<Map<String, Object>> items, long total, int page, int size) {}
 
     @Override
-    public long create(io.github.acczff.mdop.common.manufacturing.ProductionPurchasePort.Input in) {
+    public long create(io.github.acczff.mdop.manufacturingapi.ProductionPurchasePort.Input in) {
         lockWarehouse(in.warehouseId());
         catalog.requireReceivingWarehouse(in.warehouseId());
         var m = catalog.referenceMaterial(in.materialId());

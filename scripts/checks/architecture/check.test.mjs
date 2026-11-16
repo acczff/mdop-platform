@@ -9,6 +9,7 @@ import {
   compare,
   controllerLeaks,
   declaredDependencies,
+  dmlOwnershipViolations,
   importViolations,
   layerViolations,
   inventoryWriteViolations,
@@ -144,7 +145,7 @@ test("inventoryWriteViolations 放行唯一写入口", () => {
   const source = 'db.sql("UPDATE wms_inventory_balance SET on_hand_qty=?")';
   assert.deepEqual(
     inventoryWriteViolations(
-      "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/InventoryLedger.java",
+      "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/ledger/InventoryLedger.java",
       source,
     ),
     [],
@@ -168,4 +169,35 @@ test("inventoryWriteViolations 按文件聚合并带上条数", () => {
   const found = inventoryWriteViolations("backend/mdop-wms/src/main/java/C.java", source);
   assert.equal(found.length, 1);
   assert.equal(found[0].subject, "writes=2");
+});
+
+test("dmlOwnershipViolations 允许本模块前缀并拦截跨模块 SQL", () => {
+  const own = 'db.sql("SELECT * FROM wms_inventory_balance WHERE id=?")';
+  assert.deepEqual(
+    dmlOwnershipViolations("mdop-wms", "backend/mdop-wms/src/main/java/A.java", own),
+    [],
+  );
+
+  const cross =
+    'db.sql("""SELECT f.* FROM wms_finished_receipt f JOIN mfg_completion c ON c.id=f.id""")';
+  const found = dmlOwnershipViolations(
+    "mdop-wms",
+    "backend/mdop-wms/src/main/java/FinishedGoodsService.java",
+    cross,
+  );
+  assert.equal(found.length, 1);
+  assert.equal(found[0].rule, "DML_OWNERSHIP");
+  assert.equal(found[0].subject, "mdop-wms → mfg_completion");
+});
+
+test("dmlOwnershipViolations 忽略注释与非 SQL 文本", () => {
+  const source = [
+    "// SELECT * FROM mfg_completion",
+    "/* UPDATE pur_document SET status='X' */",
+    'String msg = "mfg_completion";',
+  ].join("\n");
+  assert.deepEqual(
+    dmlOwnershipViolations("mdop-wms", "backend/mdop-wms/src/main/java/B.java", source),
+    [],
+  );
 });

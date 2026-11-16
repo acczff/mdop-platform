@@ -1,6 +1,6 @@
 package io.github.acczff.mdop.manufacturing.infrastructure;
 
-import io.github.acczff.mdop.common.manufacturing.ProductionMaterialGuard;
+import io.github.acczff.mdop.manufacturingapi.ProductionMaterialGuard;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 

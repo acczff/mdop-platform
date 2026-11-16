@@ -6,6 +6,7 @@ import static io.github.acczff.mdop.wms.receiving.application.ReceivingModels.*;
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
 import io.github.acczff.mdop.masterdata.catalog.CatalogService;
+import io.github.acczff.mdop.wms.inventory.ledger.InventoryLedger;
 import io.github.acczff.mdop.wms.receiving.ReceivingAccess;
 import io.github.acczff.mdop.wms.receiving.domain.ArrivalLockPort;
 import java.math.BigDecimal;
@@ -31,6 +32,7 @@ public class QualityService {
     private final Clock clock;
     private final ObjectMapper json;
     private final ReceivingQueries queries;
+    private final InventoryLedger ledger;
 
     public QualityService(
             JdbcClient db,
@@ -40,7 +42,8 @@ public class QualityService {
             CurrentActorProvider actor,
             Clock clock,
             ObjectMapper json,
-            ReceivingQueries queries) {
+            ReceivingQueries queries,
+            InventoryLedger ledger) {
         this.db = db;
         this.access = access;
         this.arrivalLock = arrivalLock;
@@ -49,6 +52,7 @@ public class QualityService {
         this.clock = clock;
         this.json = json;
         this.queries = queries;
+        this.ledger = ledger;
     }
 
     @Transactional(readOnly = true)
@@ -290,9 +294,8 @@ public class QualityService {
 
     private Map<String, Object> balance(Arrival a, Item i, long location, String quality) {
         String key = stockKey(a, i, location, quality);
-        db.sql(
-                        "INSERT INTO wms_inventory_balance(stock_key,warehouse_id,location_id,material_id,supplier_id,batch_no,date_code,production_date,expiry_date,quality_status) VALUES (?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE stock_key=stock_key")
-                .params(
+        return ledger.ensureAndLock(
+                new InventoryLedger.BalanceSpec(
                         key,
                         a.warehouseId(),
                         location,
@@ -302,13 +305,10 @@ public class QualityService {
                         i.dateCode(),
                         i.productionDate(),
                         i.expiryDate(),
-                        quality)
-                .update();
-        return db.sql(
-                        "SELECT id,on_hand_qty,active_freeze_id FROM wms_inventory_balance WHERE stock_key=? FOR UPDATE")
-                .param(key)
-                .query()
-                .singleRow();
+                        quality,
+                        "ENTERPRISE",
+                        0L,
+                        "PURCHASE"));
     }
 
     private void change(
@@ -320,29 +320,18 @@ public class QualityService {
             boolean available,
             String type) {
         var row = balance(a, i, location, quality);
-        if (delta.signum() < 0)
-            io.github.acczff.mdop.wms.inventory.StockFreeze.requireUnfrozen(row);
-        var before = (BigDecimal) row.get("on_hand_qty");
-        var after = before.add(delta);
-        if (after.signum() < 0) throw conflict("库存不足，请核对库存流水");
         long id = ((Number) row.get("id")).longValue();
-        db.sql(
-                        "UPDATE wms_inventory_balance SET on_hand_qty=?,available_qty=IF(active_freeze_id IS NULL,available_qty+?,0) WHERE id=?")
-                .params(after, available ? delta : BigDecimal.ZERO, id)
-                .update();
-        db.sql(
-                        "INSERT INTO wms_inventory_transaction(receipt_id,receipt_item_id,balance_id,before_qty,change_qty,after_qty,created_by,created_at,transaction_type) VALUES (?,?,?,?,?,?,?,?,?)")
-                .params(
-                        i.receiptId(),
-                        i.id(),
+        ledger.postMovement(
+                InventoryLedger.MovementCommand.of(
                         id,
-                        before,
                         delta,
-                        after,
-                        actor.currentActor(),
-                        now(),
-                        type)
-                .update();
+                        available ? delta : BigDecimal.ZERO,
+                        true,
+                        delta.signum() < 0,
+                        type,
+                        InventoryLedger.LedgerRef.receipt(i.receiptId(), i.id()),
+                        "CONFLICT",
+                        "库存不足，请核对库存流水"));
     }
 
     private void audit(long receipt, String action) {

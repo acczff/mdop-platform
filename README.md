@@ -75,7 +75,7 @@ Windows 一键启动由仓库脚本提供；Linux CI 使用 Maven Wrapper/Corepa
 
 | 路径 | 内容 |
 |---|---|
-| [backend](backend/README.md) | 12 个 Maven 模块：公共契约、安全、账号、主数据、采购、销售、生产、财务、WMS、集成、测试基座与装配 |
+| [backend](backend/README.md) | 16 个 Maven 模块：公共契约、4 个域 API 契约、安全、账号、主数据、采购、销售、生产、财务、WMS、集成、测试基座与装配 |
 | [frontend](frontend/README.md) | Vue 管理端、统一 API 客户端、数量运算与组件测试 |
 | [deploy](deploy/README.md) | 本地 Compose、环境模板、发布配置与恢复手册 |
 | [scripts](scripts/README.md) | 启停、验证、库存对账、发布/备份和文档检查 |

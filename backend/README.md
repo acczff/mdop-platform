@@ -6,6 +6,10 @@
 
 - `mdop-boot`
 - `mdop-common`
+- `mdop-finance-api`
+- `mdop-purchasing-api`
+- `mdop-sales-api`
+- `mdop-manufacturing-api`
 - `mdop-security`
 - `mdop-system`
 - `mdop-master-data`

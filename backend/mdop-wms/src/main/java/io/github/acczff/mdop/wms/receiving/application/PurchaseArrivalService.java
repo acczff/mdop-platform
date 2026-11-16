@@ -1,6 +1,6 @@
 package io.github.acczff.mdop.wms.receiving.application;
 
-import static io.github.acczff.mdop.common.purchasing.PurchaseReceivingPort.*;
+import static io.github.acczff.mdop.purchasingapi.PurchaseReceivingPort.*;
 
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;

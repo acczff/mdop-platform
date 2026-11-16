@@ -1,7 +1,7 @@
 package io.github.acczff.mdop.sales.infrastructure;
 
 import io.github.acczff.mdop.common.BusinessException;
-import io.github.acczff.mdop.common.manufacturing.SalesDemandSource;
+import io.github.acczff.mdop.manufacturingapi.SalesDemandSource;
 import java.math.BigDecimal;
 import java.util.*;
 import org.springframework.jdbc.core.simple.JdbcClient;

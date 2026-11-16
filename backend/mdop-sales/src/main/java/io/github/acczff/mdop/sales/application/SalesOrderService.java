@@ -5,8 +5,8 @@ import static io.github.acczff.mdop.sales.application.SalesModels.*;
 
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
-import io.github.acczff.mdop.common.sales.SalesShippingPort;
 import io.github.acczff.mdop.masterdata.catalog.CatalogService;
+import io.github.acczff.mdop.salesapi.SalesShippingPort;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -30,7 +30,7 @@ public class SalesOrderService {
     private final ObjectMapper json;
     private final SalesShippingPort shipping;
     private final SalesFulfillment fulfillment;
-    private final io.github.acczff.mdop.common.manufacturing.ProductionDemandUsage production;
+    private final io.github.acczff.mdop.manufacturingapi.ProductionDemandUsage production;
 
     public SalesOrderService(
             JdbcClient db,
@@ -40,7 +40,7 @@ public class SalesOrderService {
             ObjectMapper json,
             SalesShippingPort shipping,
             SalesFulfillment fulfillment,
-            io.github.acczff.mdop.common.manufacturing.ProductionDemandUsage production) {
+            io.github.acczff.mdop.manufacturingapi.ProductionDemandUsage production) {
         this.db = db;
         this.catalog = catalog;
         this.actor = actor;

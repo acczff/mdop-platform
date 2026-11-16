@@ -13,10 +13,10 @@ mdop-boot            启动、全局异常、时钟、跨模块测试
       ├── mdop-security   认证与会话
       ├── mdop-system     账号、角色、权限
       ├── mdop-master-data 主数据（仓库聚合用 JPA，其余 JDBC）
-      ├── mdop-purchasing 采购
-      ├── mdop-sales      销售
-      ├── mdop-manufacturing 生产
-      ├── mdop-finance    财务
+      ├── mdop-purchasing 采购（契约：mdop-purchasing-api）
+      ├── mdop-sales      销售（契约：mdop-sales-api）
+      ├── mdop-manufacturing 生产（契约：mdop-manufacturing-api）
+      ├── mdop-finance    财务（契约：mdop-finance-api）
       ├── mdop-wms        仓储
       └── mdop-integration 消息与外部适配
                     │
@@ -24,7 +24,7 @@ mdop-boot            启动、全局异常、时钟、跨模块测试
               MySQL 8.4（Flyway 管理表结构）
 ```
 
-跨模块协作只通过 `mdop-common` 的接口（端口），实现放在 `mdop-integration` 或各业务模块。
+跨模块协作只通过各域 `*-api` 契约模块（依赖 `mdop-common` 通用异常、文本与审计端口），实现放在 `mdop-integration` 或各业务模块。
 
 ## 分层
 
@@ -45,7 +45,8 @@ mdop-boot            启动、全局异常、时钟、跨模块测试
 |---|---|---|
 | `mdop-master-data/warehouse` | 四层完整 | `WarehouseRepository` |
 | `mdop-purchasing` | 四层完整 | `PurchaseRepository` |
-| `mdop-wms/receiving` | 四层完整 | `ReceivingQueries`（查询端口） |
+| `mdop-wms/receiving` | 四层完整 | `ReceivingQueries`（查询端口）、`InventoryLedger` |
+| `mdop-wms/inventory` | 按子域分包（`api`/`application`/`infrastructure`/`ledger`） | 余额写入统一经 `InventoryLedger` |
 | `mdop-sales` / `mdop-manufacturing` / `mdop-finance` | 四层归位，`domain` 暂空 | 读查询仍在应用层，待按切片迁移 |
 
 层间方向由 `node scripts/checks/architecture/check.mjs` 自动校验：`api` 不得引用 `infrastructure`，
