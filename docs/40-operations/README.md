@@ -13,8 +13,8 @@
 
 ## 排障顺序
 
-1. 看健康检查：`/actuator/health` 的 db、rabbit 是否为 UP。
-2. 看应用日志：本地在 `logs/local/`，容器看 `docker logs`。
+1. 看健康检查与指标：管理端口 `/actuator/health` 的 db、rabbit、redis 是否为 UP，`/actuator/prometheus` 的 Outbox 积压、投递失败与登录锁定指标。
+2. 看应用日志：本地在 `logs/local/`，容器看 `docker logs`（发布配置输出 ECS 结构化日志，可按 `X-Request-Id` / `requestId` 关联请求）。
 3. 看数据库迁移：启动失败先确认 Flyway 版本与校验和。
 4. 看端口占用：后端、前端、MySQL、RabbitMQ、Redis。
 5. 看消息：Outbox/Inbox 是否有积压或死信。

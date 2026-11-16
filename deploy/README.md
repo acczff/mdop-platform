@@ -1,6 +1,6 @@
 # Deploy（部署）
 
-本目录保存当前已实现的本地基础设施编排、环境模板、健康检查和候选发布包配置。应用镜像构建及监控系统尚未交付。
+本目录保存当前已实现的本地基础设施编排、发布编排、容器镜像定义、环境模板、健康检查和候选发布包配置。
 
 真实凭据、生产配置、数据库备份和运行数据不得进入仓库。
 
@@ -16,15 +16,16 @@
 - 本地环境变量模板
 - 仅绑定本机地址的服务端口
 - Redis AOF（追加文件）持久化基线
+- 基于已验证候选包的应用容器镜像（`deploy/docker/backend.Dockerfile`、`deploy/docker/frontend.Dockerfile`）与发布编排（`deploy/compose/compose.release.yml`）
 
-候选发布包和隔离升级恢复流程见[发布包操作手册](release/RUNBOOK.md)及[验收记录](../docs/40-operations/release-recovery.md)。该包包含已验证的 JAR 和静态前端，不是应用镜像发布；生产部署和监控系统仍需后续确认。
+候选发布包和隔离升级恢复流程见[发布包操作手册](release/RUNBOOK.md)及[验收记录](../docs/40-operations/release-recovery.md)。发布支持“已验证 JAR + 静态前端”与“基于同次候选包的容器镜像”两条路径；生产部署仍需目标环境独立完成 TLS、密钥与高可用配置。
 
 三项基础设施的职责：
 
 ```text
 MySQL：业务事实和最终数据源
 RabbitMQ：可靠跨系统事件
-Redis：基础设施与测试基线；业务缓存、限流和分布式会话尚未实现
+Redis：外部化 Servlet 会话（Spring Session）与分布式登录限流状态
 ```
 
 Redis 不作为库存余额、正式幂等结果等核心业务事实的唯一数据源，Redis Pub/Sub 不替代 RabbitMQ。
@@ -34,7 +35,12 @@ Redis 不作为库存余额、正式幂等结果等核心业务事实的唯一�
 ```text
 deploy
 ├─ compose
-│  └─ compose.local.yml
+│  ├─ compose.local.yml
+│  └─ compose.release.yml
+├─ docker
+│  ├─ backend.Dockerfile
+│  ├─ frontend.Dockerfile
+│  └─ nginx.conf.template
 ├─ env
 │  ├─ .env.example
 │  └─ .env.local
@@ -47,9 +53,10 @@ deploy
 说明：
 
 - `compose.local.yml`：本地容器编排配置
+- `compose.release.yml`：基于已验证候选包的完整发布编排（前端 Nginx + 后端 + MySQL + RabbitMQ + Redis）
+- `docker/`：基于 JRE 25 非 root 运行的后端镜像、Nginx 前端镜像与容器反向代理模板
 - `.env.example`：可以提交的环境变量模板，只包含安全占位值
 - `.env.local`：包含本地真实密码，不得提交
-- 应用镜像和监控目录尚未建立；需要时按确认的范围新增，不把预留目录当作现有功能。
 
 ## 3. 前置条件
 

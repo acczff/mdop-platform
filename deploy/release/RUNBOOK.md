@@ -33,17 +33,33 @@ node .\tools\database.mjs restore <隔离MySQL容器> <空数据库名> <旧版J
 
 工具会拒绝非空目标、损坏备份及不匹配的 JAR。导入失败可能留下部分数据，此时保持应用停止，保留证据并新建另一个空目标重试，不自动删表或覆盖。
 
-将 `config/application-release.yml` 复制到包外，设置当前终端/进程的环境变量 `MDOP_JDBC_URL`、`MDOP_DB_USER`、`MDOP_DB_PASSWORD`、`MDOP_ADMIN_USERNAME`、`MDOP_ADMIN_PASSWORD` 和独立的 `MDOP_BACKEND_PORT`。管理员初始密码至少 12 字符，不能写入仓库；原操作员需在外部配置的 `mdop.auth.operators` 列表保留原名称、密码及权限供首次导入。初始化后配置不能重置已保存账号。
+将 `config/application-release.yml` 复制到包外，设置当前终端/进程的环境变量 `MDOP_JDBC_URL`、`MDOP_DB_USER`、`MDOP_DB_PASSWORD`、`MDOP_REDIS_HOST`、`MDOP_REDIS_PORT`、`MDOP_REDIS_PASSWORD`、`MDOP_ADMIN_USERNAME`、`MDOP_ADMIN_PASSWORD` 和独立的 `MDOP_BACKEND_PORT`。管理员初始密码至少 12 字符，不能写入仓库；原操作员需在外部配置的 `mdop.auth.operators` 列表保留原名称、密码及权限供首次导入。初始化后配置不能重置已保存账号。
+
+发布配置默认启用 ECS 结构化控制台日志（`logging.structured.format.console=ecs`），并将管理端口与业务端口分离：`MDOP_MANAGEMENT_ADDRESS=127.0.0.1`、`MDOP_MANAGEMENT_PORT=8091`。`/actuator/health`（`show-details: never`）与 `/actuator/prometheus` 仅监听管理地址，Nginx 入口对 `/actuator/` 返回 `404`。
 
 隔离演练保持 `MDOP_MESSAGING_ENABLED=false`，不连接原 RabbitMQ；不用 `local` 或 `test` profile。仅本机 HTTP 演练可设置当前进程 `MDOP_COOKIE_SECURE=false`；网络部署必须使用 HTTPS 和 Secure Cookie。
+
+### 路径 A：JAR 与静态代理部署
 
 ```powershell
 java -jar .\backend\mdop.jar --spring.config.additional-location=file:<包外application-release.yml的绝对路径>
 ```
 
-启动会执行缺失的 Flyway 迁移，不能在未经确认的数据库上试启动。检查后端健康 `/actuator/health` 为 `UP`、日志无迁移/初始化错误、已执行版本与清单一致。仅 Java 进程存在或端口打开不代表就绪。
+启动会执行缺失的 Flyway 迁移，不能在未经确认的数据库上试启动。检查管理端口健康 `http://127.0.0.1:8091/actuator/health` 为 `UP`、日志无迁移/初始化错误、已执行版本与清单一致。仅 Java 进程存在或端口打开不代表就绪。
 
 静态代理参考 `config/nginx.conf`，在包外调整 root 和后端地址，执行 `nginx -t` 后由部署环境的服务管理器启动。前端必须与 `/api/` 同源，保留 Cookie/CSRF，不使用 Vite 开发服务器代替部署。默认示例只监听本机 HTTP；TLS、域名、服务自启与实际生产网络配置需由目标环境决定。
+
+### 路径 B：容器镜像与 Compose 发布编排
+
+在已校验候选包目录（或 CI 组装目录 `tmp/release/candidate`）下可构建同源镜像，并使用 `deploy/compose/compose.release.yml` 启动全栈（不含任何默认密码，全部通过环境变量文件注入）：
+
+```powershell
+docker build -f deploy/docker/backend.Dockerfile -t mdop-backend:release .
+docker build -f deploy/docker/frontend.Dockerfile -t mdop-frontend:release .
+docker compose --env-file <包外env文件> -f deploy/compose/compose.release.yml up -d
+```
+
+容器内后端以非 root 用户（`mdop`）在 JRE 25 上运行，通过管理端口 `8091` 执行 `HEALTHCHECK`；前端 Nginx 容器将 `/api/` 反向代理至 `backend:8081` 并屏蔽 `/actuator/`。多实例扩缩容与滚动升级需遵循 [ADR-0003](../../docs/50-decisions/ADR-0003-多实例部署与共享状态外部化.md) 的 Expand/Contract 数据库迁移纪律。
 
 ## 4. 验收与开放作业
 
