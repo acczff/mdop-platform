@@ -1,17 +1,19 @@
-export interface Warehouse {
-  id: number
-  code: string
-  name: string
-  purpose: string
-  form: string
-  managementCategory: string
-  status: string
+import type { components } from '@/shared/api'
+
+type WarehouseSchema = components['schemas']['WarehouseResponse']
+type WarehousePageSchema = components['schemas']['WarehousePageResponse']
+
+export type WarehousePurpose = NonNullable<WarehouseSchema['purpose']>
+export type WarehouseForm = NonNullable<WarehouseSchema['form']>
+export type WarehouseManagementCategory = NonNullable<
+  WarehouseSchema['managementCategory']
+>
+export type WarehouseStatus = NonNullable<WarehouseSchema['status']>
+export type Warehouse = Omit<Required<WarehouseSchema>, 'remark'> & {
   remark: string | null
-  version: number
-  createdBy: string
-  createdAt: string
-  updatedBy: string
-  updatedAt: string
+}
+export type WarehousePage = Omit<Required<WarehousePageSchema>, 'items'> & {
+  items: Warehouse[]
 }
 
 export const purposes: Record<string, string> = {

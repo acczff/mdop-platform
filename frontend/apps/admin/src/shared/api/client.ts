@@ -1,3 +1,26 @@
+import type { components } from './schema'
+
+export interface FieldError {
+  field: string
+  message: string
+}
+
+export interface ProblemDetail {
+  type?: string
+  title?: string
+  status?: number
+  detail?: string
+  instance?: string
+  code?: string
+  fieldErrors?: FieldError[]
+}
+
+export type Session = Required<components['schemas']['SessionResponse']>
+export type CsrfToken = Required<components['schemas']['CsrfResponse']>
+export type Page<T> = Omit<Required<components['schemas']['Page']>, 'items'> & {
+  items: T[]
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -7,10 +30,10 @@ export class ApiError extends Error {
   }
 }
 
-let csrf: { headerName: string; token: string } | undefined
+let csrf: CsrfToken | undefined
 
 export async function refreshCsrf() {
-  csrf = await request<{ headerName: string; token: string }>('/api/auth/csrf')
+  csrf = await request<CsrfToken>('/api/auth/csrf')
 }
 
 export async function request<T>(
@@ -41,13 +64,13 @@ export async function request<T>(
     )
   }
   if (!response.ok) {
-    const problem = await response.json().catch(() => ({}))
+    const problem: ProblemDetail = await response.json().catch(() => ({}))
     if (response.status === 401 && path !== '/api/auth/login') {
       csrf = undefined
       window.dispatchEvent(new Event('session-expired'))
     }
     const fields = problem.fieldErrors
-      ?.map((item: { message: string }) => item.message)
+      ?.map((item: FieldError) => item.message)
       .join('；')
     const messages: Record<number, string> = {
       401: '账号或密码错误，或登录已过期',
@@ -63,17 +86,4 @@ export async function request<T>(
     )
   }
   return response.status === 204 ? (undefined as T) : response.json()
-}
-
-export interface Session {
-  username: string
-  authorities: string[]
-}
-
-export interface Page<T> {
-  items: T[]
-  page: number
-  size: number
-  totalElements: number
-  totalPages: number
 }

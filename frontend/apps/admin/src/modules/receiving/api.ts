@@ -1,29 +1,37 @@
-export interface Supplier {
-  id: number
-  code: string
-  name: string
-}
-export interface Material extends Supplier {
-  unit: string
-  trackingMode: string
-  requireDateCode: boolean
-  requireExpiry: boolean
-}
+import type { components } from '@/shared/api'
+
+export type Supplier = Pick<
+  Required<components['schemas']['Supplier']>,
+  'id' | 'code' | 'name'
+>
+
+export type Material = Pick<
+  Required<components['schemas']['Material']>,
+  | 'id'
+  | 'code'
+  | 'name'
+  | 'unit'
+  | 'trackingMode'
+  | 'requireDateCode'
+  | 'requireExpiry'
+>
+
 export interface Location extends Supplier {
   warehouseId: number
   areaType: string
 }
-export interface Arrival {
-  id: number
-  externalNoticeNo: string
-  purchaseOrderNo: string
-  supplierId: number
-  supplierCode?: string
-  supplierName?: string
-  warehouseId: number
-  status: string
-  version: number
-}
+
+export type Arrival = Pick<
+  Required<components['schemas']['Arrival']>,
+  | 'id'
+  | 'externalNoticeNo'
+  | 'purchaseOrderNo'
+  | 'supplierId'
+  | 'warehouseId'
+  | 'status'
+  | 'version'
+> &
+  Pick<components['schemas']['Arrival'], 'supplierCode' | 'supplierName'>
 export interface ArrivalItem {
   id: number
   materialId: number

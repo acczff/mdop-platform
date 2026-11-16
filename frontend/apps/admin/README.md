@@ -14,31 +14,39 @@
 
 ## 源码结构
 
+管理端按业务域（`src/modules/<domain>`）与共享基础设施（`src/shared`）组织，域内测试就近放置于 `src/modules/<domain>/__tests__/*.spec.ts`，共享测试放置于 `src/shared/__tests__/*.spec.ts`，根组件与跨模块集成测试位于 `src/__tests__/`：
+
 ```text
 src
-├─ __tests__
-│  ├─ App.spec.ts
-│  ├─ Warehouses.spec.ts
-│  ├─ Receiving.spec.ts
-│  └─ Quantity.spec.ts
-├─ router
-│  └─ index.ts
-├─ components/WorkspaceShell.vue
+├─ __tests__/              # App.spec.ts 与跨模块集成测试
+├─ modules/
+│  ├─ masterdata/          # catalog、warehouses
+│  ├─ purchasing/          # purchasing
+│  ├─ receiving/           # receiving、quality、purchase-returns、corrections
+│  ├─ inventory/           # inventory、transfers、cross-transfers、counts、freezes
+│  ├─ manufacturing/       # production-orders、boms、issues、production、finished-goods
+│  ├─ sales/               # sales-orders、sales
+│  ├─ finance/             # finance
+│  └─ system/              # users、account、messages
+├─ shared/
+│  ├─ api/                 # client.ts、index.ts、openapi.json、schema.d.ts
+│  ├─ components/          # WorkspaceShell、RecordHeading、RecordTabs、ResultPager、OperationRecord 等
+│  ├─ composables/         # useListPosition.ts
+│  ├─ presentation/        # index.ts、business.ts
+│  ├─ navigation.ts        # 单一导航配置
+│  └─ quantity.ts          # 六位定点数量运算
+├─ router/index.ts         # 路由入口（懒加载各域视图）
+├─ styles/business.css
 ├─ App.vue
-├─ navigation.ts
-├─ api.ts
-├─ quantity.ts
-├─ receiving.ts
-├─ style.css
-├─ views/
 └─ main.ts
 ```
 
 - `main.ts`：创建 Vue 应用并装配 Pinia、Vue Router。
-- `router/index.ts`：维护业务路由和默认跳转。
+- `router/index.ts`：维护业务路由和默认跳转，懒加载 `src/modules/<domain>/views/*`。
 - `App.vue`：管理会话恢复、登录与退出。
-- `WorkspaceShell.vue`、`navigation.ts`：按原有权限筛选六组业务导航，每次只展开一个分组，只有一个可见菜单的分组直接显示入口；当前路由所在分组自动展开，窄屏默认收起导航。账号入口位于右上角菜单，导航与业务内容独立滚动。
-- `App.spec.ts`：验证登录请求与会话过期处理；业务组件测试覆盖表单、权限入口、库存精度、失败重试与迟到响应保护。
+- `shared/components/WorkspaceShell.vue`、`shared/navigation.ts`：按原有权限筛选业务导航，每次只展开一个分组，只有一个可见菜单的分组直接显示入口；当前路由所在分组自动展开，窄屏默认收起导航。账号入口位于右上角菜单，导航与业务内容独立滚动。
+- `shared/api/`：`client.ts` 统一发送同源请求、处理 CSRF、会话过期和错误；`openapi.json` 由后端 `OpenApiSpecTests`（`MDOP_OPENAPI_WRITE=true`）导出，`schema.d.ts` 由 `openapi-typescript` 生成并受 `api:check` 校验。
+- `App.spec.ts` 与各域 `__tests__/*.spec.ts`：验证登录请求、会话过期、表单、权限入口、库存精度、失败重试与迟到响应保护。
 
 ## 运行与验证
 

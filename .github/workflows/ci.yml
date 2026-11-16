@@ -133,6 +133,8 @@ jobs:
           pnpm install --frozen-lockfile 2>&1 | tee ../logs/ci/frontend-install.log
       - name: Verify frontend
         run: pnpm run verify 2>&1 | tee ../logs/ci/frontend.log
+      - name: Check OpenAPI types sync
+        run: pnpm run api:check
       - name: Preserve frontend diagnostics
         if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
