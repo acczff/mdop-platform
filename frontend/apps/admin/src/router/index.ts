@@ -3,65 +3,103 @@ import { createRouter, createWebHistory } from 'vue-router'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    { path: '/finance', component: () => import('../views/FinanceView.vue') },
+    {
+      path: '/finance',
+      component: () => import('../modules/finance/views/FinanceView.vue'),
+    },
     {
       path: '/production-orders',
-      component: () => import('../views/ProductionOrdersView.vue'),
+      component: () =>
+        import('../modules/manufacturing/views/ProductionOrdersView.vue'),
     },
-    { path: '/boms', component: () => import('../views/BomsView.vue') },
+    {
+      path: '/boms',
+      component: () => import('../modules/manufacturing/views/BomsView.vue'),
+    },
     {
       path: '/sales-orders',
-      component: () => import('../views/SalesOrdersView.vue'),
+      component: () => import('../modules/sales/views/SalesOrdersView.vue'),
     },
     {
       path: '/purchasing',
-      component: () => import('../views/PurchasingView.vue'),
+      component: () => import('../modules/purchasing/views/PurchasingView.vue'),
     },
-    { path: '/users', component: () => import('../views/UsersView.vue') },
-    { path: '/account', component: () => import('../views/AccountView.vue') },
-    { path: '/freezes', component: () => import('../views/FreezesView.vue') },
+    {
+      path: '/users',
+      component: () => import('../modules/system/views/UsersView.vue'),
+    },
+    {
+      path: '/account',
+      component: () => import('../modules/system/views/AccountView.vue'),
+    },
+    {
+      path: '/freezes',
+      component: () => import('../modules/inventory/views/FreezesView.vue'),
+    },
     {
       path: '/cross-transfers',
-      component: () => import('../views/CrossTransfersView.vue'),
+      component: () =>
+        import('../modules/inventory/views/CrossTransfersView.vue'),
     },
-    { path: '/sales', component: () => import('../views/SalesView.vue') },
+    {
+      path: '/sales',
+      component: () => import('../modules/sales/views/SalesView.vue'),
+    },
     {
       path: '/finished-goods',
-      component: () => import('../views/FinishedGoodsView.vue'),
+      component: () =>
+        import('../modules/manufacturing/views/FinishedGoodsView.vue'),
     },
     {
       path: '/production',
-      component: () => import('../views/ProductionView.vue'),
+      component: () =>
+        import('../modules/manufacturing/views/ProductionView.vue'),
     },
     { path: '/', redirect: '/account' },
-    { path: '/issues', component: () => import('../views/IssuesView.vue') },
-    { path: '/counts', component: () => import('../views/CountsView.vue') },
+    {
+      path: '/issues',
+      component: () => import('../modules/manufacturing/views/IssuesView.vue'),
+    },
+    {
+      path: '/counts',
+      component: () => import('../modules/inventory/views/CountsView.vue'),
+    },
     {
       path: '/warehouses',
-      component: () => import('../views/WarehousesView.vue'),
+      component: () => import('../modules/masterdata/views/WarehousesView.vue'),
     },
-    { path: '/catalog', component: () => import('../views/CatalogView.vue') },
-    { path: '/messages', component: () => import('../views/MessagesView.vue') },
-    { path: '/quality', component: () => import('../views/QualityView.vue') },
+    {
+      path: '/catalog',
+      component: () => import('../modules/masterdata/views/CatalogView.vue'),
+    },
+    {
+      path: '/messages',
+      component: () => import('../modules/system/views/MessagesView.vue'),
+    },
+    {
+      path: '/quality',
+      component: () => import('../modules/receiving/views/QualityView.vue'),
+    },
     {
       path: '/transfers',
-      component: () => import('../views/TransfersView.vue'),
+      component: () => import('../modules/inventory/views/TransfersView.vue'),
     },
     {
       path: '/inventory',
-      component: () => import('../views/InventoryView.vue'),
+      component: () => import('../modules/inventory/views/InventoryView.vue'),
     },
     {
       path: '/purchase-returns',
-      component: () => import('../views/PurchaseReturnsView.vue'),
+      component: () =>
+        import('../modules/receiving/views/PurchaseReturnsView.vue'),
     },
     {
       path: '/corrections',
-      component: () => import('../views/CorrectionsView.vue'),
+      component: () => import('../modules/receiving/views/CorrectionsView.vue'),
     },
     {
       path: '/receiving',
-      component: () => import('../views/ReceivingView.vue'),
+      component: () => import('../modules/receiving/views/ReceivingView.vue'),
     },
     { path: '/:pathMatch(.*)*', redirect: '/account' },
   ],

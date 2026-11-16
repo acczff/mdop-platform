@@ -5,3 +5,5 @@ coverage
 .pnpm-store
 pnpm-lock.yaml
 **/.vscode
+apps/admin/src/shared/api/openapi.json
+apps/admin/src/shared/api/schema.d.ts

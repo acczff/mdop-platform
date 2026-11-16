@@ -15,7 +15,7 @@
 
 浏览器使用同源 `/api`，Cookie 为 HttpOnly、SameSite=Strict，默认会话超时 30 分钟；没有 JWT。账号停用、启用、权限或密码变化递增版本，旧会话下一请求失效。登录/退出由安全过滤链处理，因此不出现在自动控制器表中。
 
-可从已登录的前端浏览器网络面板查看请求；不要把包含 Cookie、密码和 CSRF 的复制请求贴到 Issue。客户端实现参考 [api.ts](../../frontend/apps/admin/src/api.ts) 和 [App.vue](../../frontend/apps/admin/src/App.vue)。
+可从已登录的前端浏览器网络面板查看请求；不要把包含 Cookie、密码和 CSRF 的复制请求贴到 Issue。客户端实现参考 [client.ts](../../frontend/apps/admin/src/shared/api/client.ts) 和 [App.vue](../../frontend/apps/admin/src/App.vue)。
 
 ## 数据与错误
 

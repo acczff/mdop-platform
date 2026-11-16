@@ -47,6 +47,8 @@ admin 应用的职责、源码结构和验证方式见 [apps/admin/README.md](ap
 .\scripts\pnpm.cmd run format:check
 .\scripts\pnpm.cmd run lint
 .\scripts\pnpm.cmd run lint:fix
+.\scripts\pnpm.cmd run api:types
+.\scripts\pnpm.cmd run api:check
 .\scripts\pnpm.cmd run test
 .\scripts\pnpm.cmd run type-check
 .\scripts\pnpm.cmd run build
@@ -58,10 +60,12 @@ admin 应用的职责、源码结构和验证方式见 [apps/admin/README.md](ap
 - `format:check`：检查格式，不修改文件。
 - `lint`：执行 Vue 与 TypeScript 静态检查，警告也会导致失败。
 - `lint:fix`：自动修复 ESLint 能够安全修复的问题。
+- `api:types`：根据 `apps/admin/src/shared/api/openapi.json` 生成 `schema.d.ts`。
+- `api:check`：校验 `schema.d.ts` 与 `openapi.json` 是否同步。
 - `test`：执行单元测试并自动退出。
 - `type-check`：执行 TypeScript 和 Vue 类型检查。
 - `build`：完成类型检查和生产构建。
-- `verify`：依次执行格式检查、静态检查、单元测试、类型检查和生产构建。
+- `verify`：依次执行格式检查、静态检查、OpenAPI 类型同步检查、单元测试、类型检查和生产构建。
 
 生产构建输出位于 `apps/admin/dist`，依赖目录位于 `node_modules`；两者均已被 Git 忽略。
 

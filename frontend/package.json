@@ -11,7 +11,9 @@
     "format:check": "prettier . --check",
     "lint": "pnpm --filter @mdop/admin run lint",
     "lint:fix": "pnpm --filter @mdop/admin run lint:fix",
-    "verify": "pnpm run format:check && pnpm run lint && pnpm run test && pnpm run build"
+    "api:types": "pnpm --filter @mdop/admin run api:types",
+    "api:check": "pnpm --filter @mdop/admin run api:check",
+    "verify": "pnpm run format:check && pnpm run lint && pnpm run api:check && pnpm run test && pnpm run build"
   },
   "packageManager": "pnpm@11.13.1",
   "engines": {

@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import App from '../App.vue'
-import { ApiError, request, refreshCsrf } from '../api'
+import { ApiError, request, refreshCsrf } from '@/shared/api'
 import { createMemoryHistory, createRouter } from 'vue-router'
-vi.mock('../api', async (original) => ({
-  ...(await original<typeof import('../api')>()),
+vi.mock('@/shared/api', async (original) => ({
+  ...(await original<typeof import('@/shared/api')>()),
   request: vi.fn(),
   refreshCsrf: vi.fn(),
 }))

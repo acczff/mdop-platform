@@ -29,29 +29,24 @@
 
 | 路径 | 源码 |
 |---|---|
-| `/finance` | [FinanceView.vue](../../frontend/apps/admin/src/views/FinanceView.vue) |
-| `/production-orders` | [ProductionOrdersView.vue](../../frontend/apps/admin/src/views/ProductionOrdersView.vue) |
-| `/boms` | [BomsView.vue](../../frontend/apps/admin/src/views/BomsView.vue) |
-| `/sales-orders` | [SalesOrdersView.vue](../../frontend/apps/admin/src/views/SalesOrdersView.vue) |
-| `/purchasing` | [PurchasingView.vue](../../frontend/apps/admin/src/views/PurchasingView.vue) |
-| `/users` | [UsersView.vue](../../frontend/apps/admin/src/views/UsersView.vue) |
-| `/account` | [AccountView.vue](../../frontend/apps/admin/src/views/AccountView.vue) |
-| `/freezes` | [FreezesView.vue](../../frontend/apps/admin/src/views/FreezesView.vue) |
-| `/cross-transfers` | [CrossTransfersView.vue](../../frontend/apps/admin/src/views/CrossTransfersView.vue) |
-| `/sales` | [SalesView.vue](../../frontend/apps/admin/src/views/SalesView.vue) |
-| `/finished-goods` | [FinishedGoodsView.vue](../../frontend/apps/admin/src/views/FinishedGoodsView.vue) |
-| `/production` | [ProductionView.vue](../../frontend/apps/admin/src/views/ProductionView.vue) |
-| `/issues` | [IssuesView.vue](../../frontend/apps/admin/src/views/IssuesView.vue) |
-| `/counts` | [CountsView.vue](../../frontend/apps/admin/src/views/CountsView.vue) |
-| `/warehouses` | [WarehousesView.vue](../../frontend/apps/admin/src/views/WarehousesView.vue) |
-| `/catalog` | [CatalogView.vue](../../frontend/apps/admin/src/views/CatalogView.vue) |
-| `/messages` | [MessagesView.vue](../../frontend/apps/admin/src/views/MessagesView.vue) |
-| `/quality` | [QualityView.vue](../../frontend/apps/admin/src/views/QualityView.vue) |
-| `/transfers` | [TransfersView.vue](../../frontend/apps/admin/src/views/TransfersView.vue) |
-| `/inventory` | [InventoryView.vue](../../frontend/apps/admin/src/views/InventoryView.vue) |
-| `/purchase-returns` | [PurchaseReturnsView.vue](../../frontend/apps/admin/src/views/PurchaseReturnsView.vue) |
-| `/corrections` | [CorrectionsView.vue](../../frontend/apps/admin/src/views/CorrectionsView.vue) |
-| `/receiving` | [ReceivingView.vue](../../frontend/apps/admin/src/views/ReceivingView.vue) |
+| `/finance` | [FinanceView.vue](../../frontend/apps/admin/src/modules/finance/views/FinanceView.vue) |
+| `/boms` | [BomsView.vue](../../frontend/apps/admin/src/modules/manufacturing/views/BomsView.vue) |
+| `/sales-orders` | [SalesOrdersView.vue](../../frontend/apps/admin/src/modules/sales/views/SalesOrdersView.vue) |
+| `/purchasing` | [PurchasingView.vue](../../frontend/apps/admin/src/modules/purchasing/views/PurchasingView.vue) |
+| `/users` | [UsersView.vue](../../frontend/apps/admin/src/modules/system/views/UsersView.vue) |
+| `/account` | [AccountView.vue](../../frontend/apps/admin/src/modules/system/views/AccountView.vue) |
+| `/freezes` | [FreezesView.vue](../../frontend/apps/admin/src/modules/inventory/views/FreezesView.vue) |
+| `/sales` | [SalesView.vue](../../frontend/apps/admin/src/modules/sales/views/SalesView.vue) |
+| `/issues` | [IssuesView.vue](../../frontend/apps/admin/src/modules/manufacturing/views/IssuesView.vue) |
+| `/counts` | [CountsView.vue](../../frontend/apps/admin/src/modules/inventory/views/CountsView.vue) |
+| `/warehouses` | [WarehousesView.vue](../../frontend/apps/admin/src/modules/masterdata/views/WarehousesView.vue) |
+| `/catalog` | [CatalogView.vue](../../frontend/apps/admin/src/modules/masterdata/views/CatalogView.vue) |
+| `/messages` | [MessagesView.vue](../../frontend/apps/admin/src/modules/system/views/MessagesView.vue) |
+| `/quality` | [QualityView.vue](../../frontend/apps/admin/src/modules/receiving/views/QualityView.vue) |
+| `/transfers` | [TransfersView.vue](../../frontend/apps/admin/src/modules/inventory/views/TransfersView.vue) |
+| `/inventory` | [InventoryView.vue](../../frontend/apps/admin/src/modules/inventory/views/InventoryView.vue) |
+| `/corrections` | [CorrectionsView.vue](../../frontend/apps/admin/src/modules/receiving/views/CorrectionsView.vue) |
+| `/receiving` | [ReceivingView.vue](../../frontend/apps/admin/src/modules/receiving/views/ReceivingView.vue) |
 
 根路径及未知路径跳转见 [index.ts](../../frontend/apps/admin/src/router/index.ts)。页面可见性不代替后端授权。
 
