@@ -148,7 +148,11 @@ public final class PermissionCatalog {
                 new Role("WAREHOUSE_OPERATOR", "仓库作业员", operate),
                 new Role("BUSINESS_REVIEWER", "业务审批员", review),
                 new Role("READER", "业务只读", read),
-                new Role("INTEGRATION_OPERATOR", "模拟接口与消息管理员", Set.of("integration:simulate")));
+                new Role("MESSAGE_OPERATOR", "消息管理员", Set.of("integration:messages:manage")),
+                new Role(
+                        "INTEGRATION_OPERATOR",
+                        "模拟接口与消息管理员",
+                        Set.of("integration:simulate", "integration:messages:manage")));
     }
 
     public static Set<String> resolve(Set<String> codes, Set<Long> warehouses) {
