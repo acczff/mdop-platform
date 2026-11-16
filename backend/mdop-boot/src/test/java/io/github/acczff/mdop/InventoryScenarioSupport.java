@@ -30,7 +30,7 @@ abstract class InventoryScenarioSupport extends MdopInfrastructureTestBase {
         return db
                 .queryForList(
                         java.nio.file.Files.readString(
-                                java.nio.file.Path.of("../../scripts/audit-inventory.sql")))
+                                java.nio.file.Path.of("../../scripts/checks/audit-inventory.sql")))
                 .stream()
                 .filter(row -> "sales_feedback".equals(row.get("check_name")))
                 .mapToLong(row -> ((Number) row.get("mismatch_count")).longValue())

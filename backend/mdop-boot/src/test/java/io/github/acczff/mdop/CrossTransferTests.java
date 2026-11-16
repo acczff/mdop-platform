@@ -36,7 +36,7 @@ class CrossTransferTests extends InventoryScenarioSupport {
         for (var check :
                 db.queryForList(
                         java.nio.file.Files.readString(
-                                java.nio.file.Path.of("../../scripts/audit-inventory.sql"))))
+                                java.nio.file.Path.of("../../scripts/checks/audit-inventory.sql"))))
             assertThat(((Number) check.get("mismatch_count")).longValue())
                     .as(check.get("check_name").toString())
                     .isZero();
@@ -625,7 +625,7 @@ class CrossTransferTests extends InventoryScenarioSupport {
                 .isEqualTo(4);
         String audit =
                 java.nio.file.Files.readString(
-                        java.nio.file.Path.of("../../scripts/audit-inventory.sql"));
+                        java.nio.file.Path.of("../../scripts/checks/audit-inventory.sql"));
         for (var check : db.queryForList(audit))
             assertThat(((Number) check.get("mismatch_count")).longValue())
                     .as(check.get("check_name").toString())

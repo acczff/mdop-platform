@@ -97,7 +97,7 @@ class PurchasingTests extends InventoryScenarioSupport {
             String purpose,
             java.time.LocalDate neededDate,
             Long supplierId,
-            List<io.github.acczff.mdop.purchasing.PurchaseModels.Line> lines,
+            List<io.github.acczff.mdop.purchasing.application.PurchaseModels.Line> lines,
             String reason) {}
 
     @Test

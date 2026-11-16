@@ -1,7 +1,7 @@
 package io.github.acczff.mdop.integration.purchasing;
 
 import io.github.acczff.mdop.common.purchasing.PurchaseReceivingPort;
-import io.github.acczff.mdop.wms.receiving.PurchaseArrivalService;
+import io.github.acczff.mdop.wms.receiving.application.PurchaseArrivalService;
 import org.springframework.stereotype.Component;
 
 /** In-process bridge; both module writes participate in the purchasing transaction. */

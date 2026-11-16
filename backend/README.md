@@ -1,6 +1,6 @@
 # Backend
 
-后端以 Java 25、Spring Boot 和 Maven 多模块的模块化单体工程承载业务。当前代码、主干与部署状态见[版本记录](../docs/project/status.md)；模块职责、事务阅读顺序和现实边界见[架构指南](../docs/reference/architecture.md)，全部控制器及迁移见[源码导航](../docs/reference/source-index.md)。
+后端以 Java 25、Spring Boot 和 Maven 多模块的模块化单体工程承载业务。当前代码、主干与部署状态见[版本记录](../docs/40-operations/status.md)；模块职责、事务阅读顺序和现实边界见[架构指南](../docs/10-architecture/code-reading.md)，全部控制器及迁移见[源码导航](../docs/10-architecture/source-index.md)。
 
 当前模块包括：
 
@@ -17,9 +17,9 @@
 - `mdop-integration`
 - `mdop-test-support`
 
-生产模块通过公共契约读取 WMS 可用参考、生成带工单来源的采购需求草稿；材料计算不直接改库存。接口、事务和数量口径见[材料需求实现](../docs/erp/材料需求实现与验收.md)。
+生产模块通过公共契约读取 WMS 可用参考、生成带工单来源的采购需求草稿；材料计算不直接改库存。接口、事务和数量口径见[材料需求实现](../docs/90-archive/acceptance/erp/材料需求实现与验收.md)。
 
-财务模块通过 `FinanceSourcePort` 读取采购/销售已确认收发事实，人工登记金额并经异人复核形成应收/应付；不写 WMS 数量账。演示口径、初始化与异常边界见[金额依据与往来确认](../docs/erp/金额依据与往来确认实现与验收.md)。
+财务模块通过 `FinanceSourcePort` 读取采购/销售已确认收发事实，人工登记金额并经异人复核形成应收/应付；不写 WMS 数量账。演示口径、初始化与异常边界见[金额依据与往来确认](../docs/90-archive/acceptance/erp/金额依据与往来确认实现与验收.md)。
 
 ## 共享基础设施测试
 
@@ -37,7 +37,7 @@
 
 ## 后端质量门禁
 
-PR 与 main 推送通过 CI 的 `Backend verify` 执行同一 Maven 验证入口；运行环境为 Ubuntu 24.04 和 Java 25，临时基础设施由 Testcontainers 创建。失败诊断、超时及报告保留规则见 [CI 自动验收](../docs/project/CI自动验收.md)。
+PR 与 main 推送通过 CI 的 `Backend verify` 执行同一 Maven 验证入口；运行环境为 Ubuntu 24.04 和 Java 25，临时基础设施由 Testcontainers 创建。失败诊断、超时及报告保留规则见 [CI 自动验收](../docs/40-operations/ci.md)。
 
 从仓库根目录执行完整后端验证：
 
@@ -62,20 +62,20 @@ PR 与 main 推送通过 CI 的 `Backend verify` 执行同一 Maven 验证入口
 ## 会话与收货切片
 
 - `GET /api/auth/csrf` 获取令牌；`POST /api/auth/login` 使用表单账号密码与 CSRF；`GET /api/auth/me` 查询身份；`POST /api/auth/logout` 退出。登录后令牌轮换，客户端重新获取。
-- 账号持久化与固定角色分配见[用户与权限首版](../docs/project/IAM用户与权限首版.md)。配置仅用于首次初始化管理员与导入旧操作员，系统管理员不再获得业务全权限；使用会话、CSRF、账号版本和仓库范围控制。需要异人审核的操作不能由申请人自审，即使申请人是 ADMIN。
+- 账号持久化与固定角色分配见[用户与权限首版](../docs/90-archive/iterations/IAM用户与权限首版.md)。配置仅用于首次初始化管理员与导入旧操作员，系统管理员不再获得业务全权限；使用会话、CSRF、账号版本和仓库范围控制。需要异人审核的操作不能由申请人自审，即使申请人是 ADMIN。
 - `/api/master-data` 提供供应商、客户、物料、基本单位与组织维护、启停和审计；已引用物料单位和策略锁定。库位区域限定为收货暂存、待检或存储。
-- `mdop-purchasing` 提供需求/订单、分批到货与正式 WMS 衔接、收货/上架/退供事实核对和数量结案，见[采购 P3](../docs/erp/采购P3实现与验收.md)。
-- `mdop-sales` 提供客户订单、分批发货及实际出库数量结案，见[销售实现](../docs/erp/销售实现与验收.md)。
-- `mdop-manufacturing` 提供 [BOM 版本生命周期](../docs/erp/BOM版本实现与验收.md)及[生产需求、工单审核和安全取消](../docs/erp/生产订单实现与验收.md)，通过销售来源契约保护来源与额度；不直接操作库存，材料展开及正式执行后续接入。
+- `mdop-purchasing` 提供需求/订单、分批到货与正式 WMS 衔接、收货/上架/退供事实核对和数量结案，见[采购 P3](../docs/90-archive/acceptance/erp/采购P3实现与验收.md)。
+- `mdop-sales` 提供客户订单、分批发货及实际出库数量结案，见[销售实现](../docs/90-archive/acceptance/erp/销售实现与验收.md)。
+- `mdop-manufacturing` 提供 [BOM 版本生命周期](../docs/90-archive/acceptance/erp/BOM版本实现与验收.md)及[生产需求、工单审核和安全取消](../docs/90-archive/acceptance/erp/生产订单实现与验收.md)，通过销售来源契约保护来源与额度；不直接操作库存，材料展开及正式执行后续接入。
 - `/api/v1/wms/arrival-notices` 和 `/receipts` 按 WMS 设计提供任务、草稿与提交。保存草稿不产生库存；提交时锁定通知和收货单，条件更新累计数量，按固定库存维度顺序锁余额，原子写流水、操作记录和 Outbox。
 - `local`/`test` 下的 `/api/local/erp-arrivals` 模拟 ERP 发布到货消息，经 RabbitMQ 与 Inbox 幂等消费建单；真实 ERP 适配器尚未接入。
-- 数据库结构由 Flyway 管理，完整版本见[源码导航](../docs/reference/source-index.md#flyway-迁移)。日常数据库升级需单独安排，运行验收不代表已部署。
+- 数据库结构由 Flyway 管理，完整版本见[源码导航](../docs/10-architecture/source-index.md#flyway-迁移)。日常数据库升级需单独安排，运行验收不代表已部署。
 - 收货、通知、库存与流水的数量以十进制字符串返回；前端按文本输入和定点整数计算剩余量，保留 `DECIMAL(18,6)` 精度，不经 JavaScript Number 转换。
 - Outbox 与业务事务原子落库，后台发布至 RabbitMQ，支持失败重试、隔离及人工重放；发布成功与模拟外部端收到是两个不同的核验结果。外部系统可用性不纳入库存事务。
 
 集成测试验证草稿与提交分离、分批收货、超收、幂等、不可变收货、批次/库位、操作及仓库权限、并发竞争、真实数据库写失败回滚。故障注入仅在临时测试表上增加约束并在 finally 中移除；不会修改本地 Compose 数据库。
 
-数据库结构由 `db/migration/masterdata/V202607210001__create_mdm_warehouse.sql` 管理。完整业务边界、字段、接口和验收标准见 [I1.1 仓库主数据方案](../docs/project/I1.1仓库主数据方案.md)。
+数据库结构由 `db/migration/masterdata/V202607210001__create_mdm_warehouse.sql` 管理。完整业务边界、字段、接口和验收标准见 [I1.1 仓库主数据方案](../docs/90-archive/iterations/I1.1仓库主数据方案.md)。
 
 ## 最小安全基线
 
@@ -83,6 +83,6 @@ PR 与 main 推送通过 CI 的 `Backend verify` 执行同一 Maven 验证入口
 
 当前实现会话登录、退出、CSRF、持久化用户管理、固定角色分配、账号变更审计及仓库范围校验；账号变化使旧会话失效。完整组织权限、自定义角色、SSO 和 JWT 不在首版范围。`mdop-boot` 的测试覆盖未认证、无权限、越仓及异人审核等边界。
 
-采购入库、生产物料协同、成品出入库和库存运营的有限验收范围及本轮证据见 [WMS 公共流程验收清单](../docs/project/WMS公共流程验收清单.md)。
+采购入库、生产物料协同、成品出入库和库存运营的有限验收范围及本轮证据见 [WMS 公共流程验收清单](../docs/90-archive/acceptance/WMS公共流程验收清单.md)。
 
-模块职责和依赖规则以 [I0 工程基线方案](../docs/project/I0工程基线方案.md) 为准。
+模块职责和依赖规则以 [I0 工程基线方案](../docs/90-archive/iterations/I0工程基线方案.md) 为准。

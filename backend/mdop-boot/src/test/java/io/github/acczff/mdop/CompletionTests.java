@@ -176,7 +176,7 @@ class CompletionTests extends MaterialScenarioSupport {
         for (var check :
                 db.queryForList(
                         java.nio.file.Files.readString(
-                                java.nio.file.Path.of("../../scripts/audit-inventory.sql"))))
+                                java.nio.file.Path.of("../../scripts/checks/audit-inventory.sql"))))
             assertThat(((Number) check.values().toArray()[1]).longValue())
                     .as(check.toString())
                     .isZero();

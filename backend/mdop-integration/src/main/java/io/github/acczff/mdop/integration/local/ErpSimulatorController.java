@@ -1,7 +1,7 @@
 package io.github.acczff.mdop.integration.local;
 
-import io.github.acczff.mdop.wms.receiving.ReceivingModels.*;
-import io.github.acczff.mdop.wms.receiving.ReceivingService;
+import io.github.acczff.mdop.wms.receiving.application.ReceivingModels.*;
+import io.github.acczff.mdop.wms.receiving.application.ReceivingService;
 import jakarta.validation.Valid;
 import java.util.Map;
 import org.springframework.context.annotation.Profile;

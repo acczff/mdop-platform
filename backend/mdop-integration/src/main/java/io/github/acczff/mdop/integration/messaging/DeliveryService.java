@@ -2,8 +2,8 @@ package io.github.acczff.mdop.integration.messaging;
 
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
-import io.github.acczff.mdop.wms.receiving.ReceivingModels.ArrivalInput;
-import io.github.acczff.mdop.wms.receiving.ReceivingService;
+import io.github.acczff.mdop.wms.receiving.application.ReceivingModels.ArrivalInput;
+import io.github.acczff.mdop.wms.receiving.application.ReceivingService;
 import jakarta.validation.Validator;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

@@ -6,7 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import io.github.acczff.mdop.test.support.MdopInfrastructureTestBase;
-import io.github.acczff.mdop.wms.receiving.CorrectionService;
+import io.github.acczff.mdop.wms.receiving.application.CorrectionService;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.*;
