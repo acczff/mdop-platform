@@ -6,6 +6,7 @@ import static io.github.acczff.mdop.wms.receiving.application.ReceivingModels.*;
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
 import io.github.acczff.mdop.masterdata.catalog.CatalogService;
+import io.github.acczff.mdop.wms.inventory.ledger.InventoryLedger;
 import io.github.acczff.mdop.wms.receiving.ReceivingAccess;
 import io.github.acczff.mdop.wms.receiving.domain.ArrivalLockPort;
 import java.math.BigDecimal;
@@ -33,6 +34,7 @@ public class ReceivingService {
     private final ReceivingAccess access;
     private final ArrivalLockPort arrivalLock;
     private final ReceivingQueries queries;
+    private final InventoryLedger ledger;
 
     public ReceivingService(
             JdbcClient jdbc,
@@ -42,7 +44,8 @@ public class ReceivingService {
             ObjectMapper json,
             ReceivingAccess access,
             ArrivalLockPort arrivalLock,
-            ReceivingQueries queries) {
+            ReceivingQueries queries,
+            InventoryLedger ledger) {
         this.jdbc = jdbc;
         this.catalog = catalog;
         this.actor = actor;
@@ -51,6 +54,7 @@ public class ReceivingService {
         this.access = access;
         this.arrivalLock = arrivalLock;
         this.queries = queries;
+        this.ledger = ledger;
     }
 
     public ArrivalDetail simulateArrival(ArrivalInput input) {
@@ -252,39 +256,34 @@ public class ReceivingService {
 
     private void increaseStock(Arrival arrival, Item item) {
         String key = stockKey(arrival, item);
-        jdbc.sql(
-                        "INSERT INTO wms_inventory_balance(stock_key,warehouse_id,location_id,material_id,supplier_id,batch_no,date_code,production_date,expiry_date) VALUES (?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE stock_key=stock_key")
-                .params(
-                        key,
-                        arrival.warehouseId(),
-                        item.locationId(),
-                        item.materialId(),
-                        arrival.supplierId(),
-                        item.batchNo(),
-                        item.dateCode(),
-                        item.productionDate(),
-                        item.expiryDate())
-                .update();
         var balance =
-                queries.lockBalance(key)
-                        .orElseThrow(() -> new IllegalStateException("库存余额行在写入后不可见"));
-        BigDecimal after = balance.onHandQty().add(item.quantity());
-        if (after.compareTo(new BigDecimal("999999999999.999999")) > 0) throw invalid("库存数量超出支持范围");
-        jdbc.sql("UPDATE wms_inventory_balance SET on_hand_qty=? WHERE id=?")
-                .params(after, balance.id())
-                .update();
-        jdbc.sql(
-                        "INSERT INTO wms_inventory_transaction(receipt_id,receipt_item_id,balance_id,before_qty,change_qty,after_qty,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)")
-                .params(
-                        item.receiptId(),
-                        item.id(),
-                        balance.id(),
-                        balance.onHandQty(),
+                ledger.ensureAndLock(
+                        new InventoryLedger.BalanceSpec(
+                                key,
+                                arrival.warehouseId(),
+                                item.locationId(),
+                                item.materialId(),
+                                arrival.supplierId(),
+                                item.batchNo(),
+                                item.dateCode(),
+                                item.productionDate(),
+                                item.expiryDate(),
+                                "PENDING_INSPECTION",
+                                "ENTERPRISE",
+                                0L,
+                                "PURCHASE"));
+        long balanceId = ((Number) balance.get("id")).longValue();
+        ledger.postMovement(
+                InventoryLedger.MovementCommand.of(
+                        balanceId,
                         item.quantity(),
-                        after,
-                        actor.currentActor(),
-                        now())
-                .update();
+                        BigDecimal.ZERO,
+                        false,
+                        false,
+                        null,
+                        InventoryLedger.LedgerRef.receipt(item.receiptId(), item.id()),
+                        "CONFLICT",
+                        "库存不足"));
     }
 
     private void writeItems(long receiptId, Arrival arrival, List<ReceiptLine> lines) {

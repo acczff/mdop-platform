@@ -144,7 +144,7 @@ test("inventoryWriteViolations 放行唯一写入口", () => {
   const source = 'db.sql("UPDATE wms_inventory_balance SET on_hand_qty=?")';
   assert.deepEqual(
     inventoryWriteViolations(
-      "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/InventoryLedger.java",
+      "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/ledger/InventoryLedger.java",
       source,
     ),
     [],

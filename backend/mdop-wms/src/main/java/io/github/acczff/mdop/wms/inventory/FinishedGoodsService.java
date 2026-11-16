@@ -3,6 +3,7 @@ package io.github.acczff.mdop.wms.inventory;
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
 import io.github.acczff.mdop.masterdata.catalog.CatalogService;
+import io.github.acczff.mdop.wms.inventory.ledger.InventoryLedger;
 import io.github.acczff.mdop.wms.receiving.ReceivingAccess;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
@@ -41,6 +42,7 @@ public class FinishedGoodsService
     private final CurrentActorProvider actor;
     private final Clock clock;
     private final ObjectMapper json;
+    private final InventoryLedger ledger;
 
     public FinishedGoodsService(
             JdbcClient db,
@@ -48,13 +50,15 @@ public class FinishedGoodsService
             ReceivingAccess access,
             CurrentActorProvider actor,
             Clock clock,
-            ObjectMapper json) {
+            ObjectMapper json,
+            InventoryLedger ledger) {
         this.db = db;
         this.catalog = catalog;
         this.access = access;
         this.actor = actor;
         this.clock = clock;
         this.json = json;
+        this.ledger = ledger;
     }
 
     private static final String SELECT =
@@ -325,46 +329,36 @@ public class FinishedGoodsService
                                 quality,
                                 "ENTERPRISE",
                                 0L));
-        db.sql(
-                        "INSERT INTO wms_inventory_balance(stock_key,warehouse_id,location_id,material_id,supplier_id,batch_no,date_code,production_date,expiry_date,quality_status,origin_type) VALUES(?,?,?,?,NULL,?,?,?,?,?,'PRODUCTION') ON DUPLICATE KEY UPDATE stock_key=stock_key")
-                .params(
+        return ledger.ensureAndLock(
+                new InventoryLedger.BalanceSpec(
                         key,
                         n(d, "warehouse_id"),
                         location,
                         n(d, "material_id"),
-                        d.get("batch_no"),
-                        d.get("date_code"),
+                        null,
+                        (String) d.get("batch_no"),
+                        (String) d.get("date_code"),
                         date(d, "production_date"),
                         date(d, "expiry_date"),
-                        quality)
-                .update();
-        return db.sql("SELECT * FROM wms_inventory_balance WHERE stock_key=? FOR UPDATE")
-                .param(key)
-                .query()
-                .singleRow();
+                        quality,
+                        "ENTERPRISE",
+                        0L,
+                        "PRODUCTION"));
     }
 
     private void move(
             Map<String, Object> b, BigDecimal delta, boolean available, String type, long id) {
-        if (delta.signum() < 0) StockFreeze.requireUnfrozen(b);
-        BigDecimal before = (BigDecimal) b.get("on_hand_qty");
-        if (before.add(delta).signum() < 0) throw conflict("成品库存不足");
-        db.sql(
-                        "UPDATE wms_inventory_balance SET on_hand_qty=on_hand_qty+?,available_qty=IF(active_freeze_id IS NULL,available_qty+?,0) WHERE id=?")
-                .params(delta, available ? delta : BigDecimal.ZERO, n(b, "id"))
-                .update();
-        db.sql(
-                        "INSERT INTO wms_inventory_transaction(balance_id,before_qty,change_qty,after_qty,transaction_type,finished_receipt_id,created_by,created_at) VALUES(?,?,?,?,?,?,?,?)")
-                .params(
+        ledger.postMovement(
+                InventoryLedger.MovementCommand.of(
                         n(b, "id"),
-                        before,
                         delta,
-                        before.add(delta),
+                        available ? delta : BigDecimal.ZERO,
+                        true,
+                        delta.signum() < 0,
                         type,
-                        id,
-                        actor.currentActor(),
-                        now())
-                .update();
+                        InventoryLedger.LedgerRef.finishedReceipt(id),
+                        "FINISHED_GOODS_CONFLICT",
+                        "成品库存不足"));
     }
 
     private void event(Map<String, Object> d, String type, String quality) {

@@ -3,6 +3,7 @@ package io.github.acczff.mdop.wms.inventory;
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
 import io.github.acczff.mdop.masterdata.catalog.CatalogService;
+import io.github.acczff.mdop.wms.inventory.ledger.InventoryLedger;
 import io.github.acczff.mdop.wms.receiving.ReceivingAccess;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
@@ -37,6 +38,7 @@ public class CrossTransferService {
     private final CurrentActorProvider actor;
     private final Clock clock;
     private final ObjectMapper json;
+    private final InventoryLedger ledger;
 
     public CrossTransferService(
             JdbcClient db,
@@ -44,13 +46,15 @@ public class CrossTransferService {
             CatalogService catalog,
             CurrentActorProvider actor,
             Clock clock,
-            ObjectMapper json) {
+            ObjectMapper json,
+            InventoryLedger ledger) {
         this.db = db;
         this.access = access;
         this.catalog = catalog;
         this.actor = actor;
         this.clock = clock;
         this.json = json;
+        this.ledger = ledger;
     }
 
     private static final String SELECT =
@@ -269,10 +273,6 @@ public class CrossTransferService {
         var destination = destination(d, source);
         if (d.get("target_balance_id") != null && n(d, "target_balance_id") != n(destination, "id"))
             throw conflict("目标库存维度已变化，请核对已有收货记录");
-        db.sql(
-                        "UPDATE wms_inventory_balance SET on_hand_qty=on_hand_qty+?,available_qty=IF(active_freeze_id IS NULL,available_qty+?,0) WHERE id=?")
-                .params(amount, amount, n(destination, "id"))
-                .update();
         record(id, "RECEIVE", in, digest);
         long actionId =
                 db.sql("SELECT id FROM wms_cross_transfer_action WHERE request_key=?")
@@ -288,7 +288,17 @@ public class CrossTransferService {
                         .param(actionId)
                         .query(Long.class)
                         .single();
-        ledger(destination, amount, id, "CROSS_IN", receiptId);
+        ledger.postMovement(
+                InventoryLedger.MovementCommand.of(
+                        n(destination, "id"),
+                        amount,
+                        amount,
+                        true,
+                        false,
+                        "CROSS_IN",
+                        InventoryLedger.LedgerRef.crossTransfer(id, receiptId),
+                        "CROSS_TRANSFER_CONFLICT",
+                        "库存不足"));
         boolean complete = remaining.signum() == 0;
         db.sql(
                         "UPDATE wms_cross_transfer SET received_qty=?,target_balance_id=?,status=?,received_by=?,received_at=? WHERE id=?")
@@ -305,14 +315,14 @@ public class CrossTransferService {
 
     private void reservation(Map<String, Object> d, Map<String, Object> b, String type) {
         BigDecimal qty = q(d, "quantity"), delta = type.equals("RESERVE") ? qty : qty.negate();
-        db.sql(
-                        "UPDATE wms_inventory_balance SET reserved_qty=reserved_qty+?,available_qty=IF(active_freeze_id IS NULL,available_qty+?,0),on_hand_qty=on_hand_qty+?,reservation_version=reservation_version+1 WHERE id=?")
-                .params(
+        ledger.applyReservation(
+                new InventoryLedger.ReservationCommand(
+                        n(b, "id"),
                         delta,
                         type.equals("CONSUME") ? BigDecimal.ZERO : delta.negate(),
                         type.equals("CONSUME") ? qty.negate() : BigDecimal.ZERO,
-                        n(b, "id"))
-                .update();
+                        true,
+                        "CROSS_TRANSFER_CONFLICT"));
         db.sql(
                         "INSERT INTO wms_reservation_event(cross_transfer_id,balance_id,event_type,quantity,before_reserved,after_reserved,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)")
                 .params(
@@ -360,27 +370,21 @@ public class CrossTransferService {
                                 s.get("quality_status"),
                                 s.get("owner_type"),
                                 n(s, "owner_id")));
-        db.sql(
-                        """
-            INSERT INTO wms_inventory_balance(stock_key,warehouse_id,location_id,material_id,supplier_id,batch_no,date_code,
-            production_date,expiry_date,quality_status,owner_type,owner_id,origin_type) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE stock_key=stock_key
-            """)
-                .params(
+        return ledger.ensureAndLock(
+                new InventoryLedger.BalanceSpec(
                         key,
                         warehouse,
                         location,
-                        s.get("material_id"),
-                        s.get("supplier_id"),
-                        s.get("batch_no"),
-                        s.get("date_code"),
+                        n(s, "material_id"),
+                        s.get("supplier_id") == null ? null : n(s, "supplier_id"),
+                        (String) s.get("batch_no"),
+                        (String) s.get("date_code"),
                         date(s, "production_date"),
                         date(s, "expiry_date"),
-                        s.get("quality_status"),
-                        s.get("owner_type"),
-                        s.get("owner_id"),
-                        s.get("origin_type"))
-                .update();
-        return one("SELECT * FROM wms_inventory_balance WHERE stock_key=? FOR UPDATE", key);
+                        (String) s.get("quality_status"),
+                        (String) s.get("owner_type"),
+                        n(s, "owner_id"),
+                        (String) s.get("origin_type")));
     }
 
     private void record(long id, String type, Action in, String digest) {

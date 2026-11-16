@@ -3,6 +3,7 @@ package io.github.acczff.mdop.wms.inventory;
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
 import io.github.acczff.mdop.masterdata.catalog.CatalogService;
+import io.github.acczff.mdop.wms.inventory.ledger.InventoryLedger;
 import io.github.acczff.mdop.wms.receiving.ReceivingAccess;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
@@ -48,6 +49,7 @@ public class SalesService {
     private final CurrentActorProvider actor;
     private final Clock clock;
     private final ObjectMapper json;
+    private final InventoryLedger ledger;
 
     public SalesService(
             JdbcClient db,
@@ -55,13 +57,15 @@ public class SalesService {
             CatalogService catalog,
             CurrentActorProvider actor,
             Clock clock,
-            ObjectMapper json) {
+            ObjectMapper json,
+            InventoryLedger ledger) {
         this.db = db;
         this.access = access;
         this.catalog = catalog;
         this.actor = actor;
         this.clock = clock;
         this.json = json;
+        this.ledger = ledger;
     }
 
     private static final String SELECT =
@@ -301,10 +305,9 @@ public class SalesService {
         if (q(b, "reserved_qty").add(delta).signum() < 0) throw conflict("预占库存不足");
         var available = type.equals("CONSUME") ? BigDecimal.ZERO : delta.negate();
         var physical = type.equals("CONSUME") ? amount.negate() : BigDecimal.ZERO;
-        db.sql(
-                        "UPDATE wms_inventory_balance SET reserved_qty=reserved_qty+?,available_qty=IF(active_freeze_id IS NULL,available_qty+?,0),on_hand_qty=on_hand_qty+?,reservation_version=reservation_version+1 WHERE id=?")
-                .params(delta, available, physical, n(b, "id"))
-                .update();
+        ledger.applyReservation(
+                new InventoryLedger.ReservationCommand(
+                        n(b, "id"), delta, available, physical, true, "SALES_CONFLICT"));
         db.sql(
                         "INSERT INTO wms_reservation_event(sales_order_id,balance_id,event_type,quantity,before_reserved,after_reserved,created_by,created_at) VALUES(?,?,?,?,?,?,?,?)")
                 .params(

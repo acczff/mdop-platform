@@ -2,6 +2,7 @@ package io.github.acczff.mdop.wms.inventory;
 
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
+import io.github.acczff.mdop.wms.inventory.ledger.InventoryLedger;
 import io.github.acczff.mdop.wms.receiving.ReceivingAccess;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
@@ -29,18 +30,21 @@ public class FreezeService {
     private final CurrentActorProvider actor;
     private final Clock clock;
     private final ObjectMapper json;
+    private final InventoryLedger ledger;
 
     public FreezeService(
             JdbcClient db,
             ReceivingAccess access,
             CurrentActorProvider actor,
             Clock clock,
-            ObjectMapper json) {
+            ObjectMapper json,
+            InventoryLedger ledger) {
         this.db = db;
         this.access = access;
         this.actor = actor;
         this.clock = clock;
         this.json = json;
+        this.ledger = ledger;
     }
 
     private static final String SELECT =
@@ -127,10 +131,7 @@ public class FreezeService {
                         .param(in.idempotencyKey())
                         .query(Long.class)
                         .single();
-        db.sql(
-                        "UPDATE wms_inventory_balance SET active_freeze_id=?,available_qty=0,reservation_version=reservation_version+1 WHERE id=?")
-                .params(id, in.balanceId())
-                .update();
+        ledger.freeze(in.balanceId(), id);
         return detail(id);
     }
 
@@ -157,10 +158,7 @@ public class FreezeService {
                                 .subtract(q(b, "reserved_qty"))
                                 .subtract(q(b, "production_qty"))
                         : BigDecimal.ZERO;
-        db.sql(
-                        "UPDATE wms_inventory_balance SET active_freeze_id=NULL,available_qty=?,reservation_version=reservation_version+1 WHERE id=?")
-                .params(available, n(f, "balance_id"))
-                .update();
+        ledger.unfreeze(n(f, "balance_id"), available);
         db.sql(
                         """
             UPDATE wms_stock_freeze SET status='RELEASED',release_key=?,release_hash=?,release_reason=?,released_by=?,released_at=?,

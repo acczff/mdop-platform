@@ -2,6 +2,7 @@ package io.github.acczff.mdop.wms.inventory;
 
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
+import io.github.acczff.mdop.wms.inventory.ledger.InventoryLedger;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
@@ -61,6 +62,7 @@ public class ProductionService {
     private final CurrentActorProvider actor;
     private final Clock clock;
     private final ObjectMapper json;
+    private final InventoryLedger ledger;
 
     public ProductionService(
             JdbcClient db,
@@ -68,13 +70,15 @@ public class ProductionService {
             ProductionEvents feedback,
             CurrentActorProvider actor,
             Clock clock,
-            ObjectMapper json) {
+            ObjectMapper json,
+            InventoryLedger ledger) {
         this.db = db;
         this.issues = issues;
         this.feedback = feedback;
         this.actor = actor;
         this.clock = clock;
         this.json = json;
+        this.ledger = ledger;
     }
 
     @Transactional(readOnly = true)
@@ -273,41 +277,39 @@ public class ProductionService {
                                 quality,
                                 b.get("owner_type"),
                                 n(b, "owner_id")));
-        db.sql(
-                        "INSERT INTO wms_inventory_balance(stock_key,warehouse_id,location_id,material_id,supplier_id,batch_no,date_code,production_date,expiry_date,quality_status,owner_type,owner_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE stock_key=stock_key")
-                .params(
-                        key,
-                        warehouse,
-                        location,
-                        b.get("material_id"),
-                        b.get("supplier_id"),
-                        b.get("batch_no"),
-                        b.get("date_code"),
-                        date(b, "production_date"),
-                        date(b, "expiry_date"),
-                        quality,
-                        b.get("owner_type"),
-                        b.get("owner_id"))
-                .update();
         var target =
-                db.sql("SELECT * FROM wms_inventory_balance WHERE stock_key=? FOR UPDATE")
-                        .param(key)
-                        .query()
-                        .singleRow();
+                ledger.ensureAndLock(
+                        new InventoryLedger.BalanceSpec(
+                                key,
+                                warehouse,
+                                location,
+                                n(b, "material_id"),
+                                b.get("supplier_id") == null ? null : n(b, "supplier_id"),
+                                (String) b.get("batch_no"),
+                                (String) b.get("date_code"),
+                                date(b, "production_date"),
+                                date(b, "expiry_date"),
+                                quality,
+                                (String) b.get("owner_type"),
+                                n(b, "owner_id"),
+                                (String) b.get("origin_type")));
         BigDecimal amount = q(p, "quantity");
         spend(b, amount);
-        db.sql(
-                        "UPDATE wms_inventory_balance SET on_hand_qty=on_hand_qty+?,available_qty=IF(active_freeze_id IS NULL,available_qty+?,0) WHERE id=?")
-                .params(
+        ledger.postMovement(
+                InventoryLedger.MovementCommand.of(
+                        n(target, "id"),
                         amount,
                         "QUALIFIED".equals(quality) ? amount : BigDecimal.ZERO,
-                        n(target, "id"))
-                .update();
+                        true,
+                        false,
+                        "PROD_RETURN_IN",
+                        InventoryLedger.LedgerRef.production(null, id),
+                        "PRODUCTION_CONFLICT",
+                        "库存不足"));
         db.sql("UPDATE wms_material_issue SET returned_qty=returned_qty+? WHERE id=?")
                 .params(amount, n(d, "id"))
                 .update();
         ledger(b, amount.negate(), "PROD_RETURN_OUT", null, id);
-        ledger(target, amount, "PROD_RETURN_IN", null, id);
         db.sql(
                         "UPDATE wms_production_return SET status='RETURNED',target_balance_id=?,closed_by=?,closed_at=? WHERE id=?")
                 .params(n(target, "id"), actor.currentActor(), now(), id)
@@ -381,10 +383,18 @@ public class ProductionService {
 
     private void spend(Map<String, Object> b, BigDecimal amount) {
         if (q(b, "production_qty").compareTo(amount) < 0) throw conflict("线边归属库存不足，请核对库存");
-        db.sql(
-                        "UPDATE wms_inventory_balance SET on_hand_qty=on_hand_qty-?,production_qty=production_qty-? WHERE id=?")
-                .params(amount, amount, n(b, "id"))
-                .update();
+        ledger.postMovement(
+                new InventoryLedger.MovementCommand(
+                        n(b, "id"),
+                        amount.negate(),
+                        BigDecimal.ZERO,
+                        false,
+                        amount.negate(),
+                        false,
+                        null,
+                        null,
+                        "PRODUCTION_CONFLICT",
+                        "线边归属库存不足，请核对库存"));
     }
 
     private void ledger(

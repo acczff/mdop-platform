@@ -3,6 +3,7 @@ package io.github.acczff.mdop.wms.inventory;
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
 import io.github.acczff.mdop.masterdata.catalog.CatalogService;
+import io.github.acczff.mdop.wms.inventory.ledger.InventoryLedger;
 import io.github.acczff.mdop.wms.receiving.ReceivingAccess;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -21,18 +22,21 @@ public class CountService {
     private final CatalogService catalog;
     private final CurrentActorProvider actor;
     private final Clock clock;
+    private final InventoryLedger ledger;
 
     public CountService(
             JdbcClient db,
             ReceivingAccess access,
             CatalogService catalog,
             CurrentActorProvider actor,
-            Clock clock) {
+            Clock clock,
+            InventoryLedger ledger) {
         this.db = db;
         this.access = access;
         this.catalog = catalog;
         this.actor = actor;
         this.clock = clock;
+        this.ledger = ledger;
     }
 
     private static final String SELECT =
@@ -224,27 +228,8 @@ public class CountService {
                 || qty(b, "on_hand_qty").compareTo(qty(c, "snapshot_qty")) != 0
                 || qty(b, "available_qty").compareTo(qty(c, "snapshot_available")) != 0)
             throw conflict("盘点期间库存已变化，请取消原单并重新盘点");
-        BigDecimal after = qty(c, "counted_qty"), delta = after.subtract(qty(c, "snapshot_qty"));
-        if (delta.signum() != 0) {
-            db.sql("UPDATE wms_inventory_balance SET on_hand_qty=?,available_qty=? WHERE id=?")
-                    .params(after, after, balanceId)
-                    .update();
-            db.sql(
-                            """
-                INSERT INTO wms_inventory_transaction(balance_id,before_qty,change_qty,after_qty,created_by,created_at,transaction_type,count_id)
-                VALUES(?,?,?,?,?,?,?,?)
-                """)
-                    .params(
-                            balanceId,
-                            c.get("snapshot_qty"),
-                            delta,
-                            after,
-                            actor.currentActor(),
-                            now(),
-                            delta.signum() > 0 ? "COUNT_GAIN" : "COUNT_LOSS",
-                            id)
-                    .update();
-        }
+        BigDecimal after = qty(c, "counted_qty");
+        ledger.postCount(balanceId, after, id);
         db.sql(
                         "UPDATE wms_stock_count SET status='APPROVED',reviewed_by=?,reviewed_at=? WHERE id=?")
                 .params(actor.currentActor(), now(), id)

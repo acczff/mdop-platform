@@ -5,6 +5,7 @@ import static io.github.acczff.mdop.wms.receiving.application.CorrectionModels.*
 
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
+import io.github.acczff.mdop.wms.inventory.ledger.InventoryLedger;
 import io.github.acczff.mdop.wms.receiving.ReceivingAccess;
 import io.github.acczff.mdop.wms.receiving.domain.ArrivalLockPort;
 import java.math.BigDecimal;
@@ -28,6 +29,7 @@ public class CorrectionService {
     private final CurrentActorProvider actor;
     private final Clock clock;
     private final ObjectMapper json;
+    private final InventoryLedger ledger;
 
     public CorrectionService(
             JdbcClient db,
@@ -35,13 +37,15 @@ public class CorrectionService {
             ArrivalLockPort arrivalLock,
             CurrentActorProvider actor,
             Clock clock,
-            ObjectMapper json) {
+            ObjectMapper json,
+            InventoryLedger ledger) {
         this.db = db;
         this.access = access;
         this.arrivalLock = arrivalLock;
         this.actor = actor;
         this.clock = clock;
         this.json = json;
+        this.ledger = ledger;
     }
 
     private BusinessException conflict(String code, String detail) {
@@ -264,27 +268,25 @@ public class CorrectionService {
                     || ((BigDecimal) balance.get("available_qty")).signum() != 0
                     || before.compareTo(qty) < 0)
                 throw conflict("STOCK_NOT_REVERSIBLE", "库存已变化，不能直接冲正");
-            db.sql("UPDATE wms_inventory_balance SET on_hand_qty=on_hand_qty-? WHERE id=?")
-                    .params(qty, balanceId)
-                    .update();
             if (db.sql(
                                     "UPDATE wms_arrival_notice_item SET received_qty=received_qty-? WHERE id=? AND received_qty>=?")
                             .params(qty, original.get("arrival_item_id"), qty)
                             .update()
                     != 1) throw conflict("ARRIVAL_COUNT_CONFLICT", "累计收货数量异常");
-            db.sql(
-                            "INSERT INTO wms_inventory_transaction(receipt_id,receipt_item_id,balance_id,before_qty,change_qty,after_qty,created_by,created_at,transaction_type,reversed_transaction_id) VALUES (?,?,?,?,?,?,?,?,'REVERSAL',?)")
-                    .params(
-                            receiptId,
-                            original.get("receipt_item_id"),
+            ledger.postMovement(
+                    InventoryLedger.MovementCommand.of(
                             balanceId,
-                            before,
                             qty.negate(),
-                            before.subtract(qty),
-                            actor.currentActor(),
-                            now(),
-                            original.get("id"))
-                    .update();
+                            BigDecimal.ZERO,
+                            false,
+                            true,
+                            "REVERSAL",
+                            InventoryLedger.LedgerRef.reversal(
+                                    receiptId,
+                                    ((Number) original.get("receipt_item_id")).longValue(),
+                                    ((Number) original.get("id")).longValue()),
+                            "STOCK_NOT_REVERSIBLE",
+                            "库存已变化，不能直接冲正"));
         }
         db.sql("UPDATE wms_receipt SET correction_status='REVERSED',version=version+1 WHERE id=?")
                 .param(receiptId)

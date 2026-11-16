@@ -3,6 +3,7 @@ package io.github.acczff.mdop.wms.inventory;
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
 import io.github.acczff.mdop.masterdata.catalog.CatalogService;
+import io.github.acczff.mdop.wms.inventory.ledger.InventoryLedger;
 import io.github.acczff.mdop.wms.receiving.ReceivingAccess;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
@@ -35,6 +36,7 @@ public class TransferService {
     private final CurrentActorProvider actor;
     private final Clock clock;
     private final ObjectMapper json;
+    private final InventoryLedger ledger;
 
     public TransferService(
             JdbcClient db,
@@ -42,13 +44,15 @@ public class TransferService {
             CatalogService catalog,
             CurrentActorProvider actor,
             Clock clock,
-            ObjectMapper json) {
+            ObjectMapper json,
+            InventoryLedger ledger) {
         this.db = db;
         this.access = access;
         this.catalog = catalog;
         this.actor = actor;
         this.clock = clock;
         this.json = json;
+        this.ledger = ledger;
     }
 
     private static final String SELECT =
@@ -157,32 +161,24 @@ public class TransferService {
                                 source.get("quality_status"),
                                 source.get("owner_type"),
                                 number(source, "owner_id")));
-        db.sql(
-                        """
-            INSERT INTO wms_inventory_balance(stock_key,warehouse_id,location_id,material_id,supplier_id,
-            batch_no,date_code,production_date,expiry_date,quality_status,owner_type,owner_id,origin_type)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE stock_key=stock_key
-            """)
-                .params(
-                        stockKey,
-                        warehouse,
-                        input.targetLocationId(),
-                        source.get("material_id"),
-                        source.get("supplier_id"),
-                        source.get("batch_no"),
-                        source.get("date_code"),
-                        date(source, "production_date"),
-                        expiry,
-                        source.get("quality_status"),
-                        source.get("owner_type"),
-                        source.get("owner_id"),
-                        source.get("origin_type"))
-                .update();
         var destination =
-                db.sql("SELECT * FROM wms_inventory_balance WHERE stock_key=? FOR UPDATE")
-                        .param(stockKey)
-                        .query()
-                        .singleRow();
+                ledger.ensureAndLock(
+                        new InventoryLedger.BalanceSpec(
+                                stockKey,
+                                warehouse,
+                                input.targetLocationId(),
+                                number(source, "material_id"),
+                                source.get("supplier_id") == null
+                                        ? null
+                                        : number(source, "supplier_id"),
+                                (String) source.get("batch_no"),
+                                (String) source.get("date_code"),
+                                date(source, "production_date"),
+                                expiry,
+                                (String) source.get("quality_status"),
+                                (String) source.get("owner_type"),
+                                number(source, "owner_id"),
+                                (String) source.get("origin_type")));
         db.sql(
                         """
             INSERT INTO wms_stock_transfer(warehouse_id,source_balance_id,target_balance_id,quantity,reason,
@@ -210,28 +206,18 @@ public class TransferService {
     }
 
     private void change(Map<String, Object> balance, BigDecimal delta, long transfer, String type) {
-        BigDecimal before = (BigDecimal) balance.get("on_hand_qty");
-        BigDecimal after = before.add(delta);
         long id = number(balance, "id");
-        db.sql(
-                        "UPDATE wms_inventory_balance SET on_hand_qty=?,available_qty=IF(active_freeze_id IS NULL,available_qty+?,0) WHERE id=?")
-                .params(after, delta, id)
-                .update();
-        db.sql(
-                        """
-            INSERT INTO wms_inventory_transaction(balance_id,before_qty,change_qty,after_qty,created_by,
-            created_at,transaction_type,transfer_id) VALUES (?,?,?,?,?,?,?,?)
-            """)
-                .params(
+        ledger.postMovement(
+                InventoryLedger.MovementCommand.of(
                         id,
-                        before,
                         delta,
-                        after,
-                        actor.currentActor(),
-                        Timestamp.from(clock.instant()),
+                        delta,
+                        true,
+                        false,
                         type,
-                        transfer)
-                .update();
+                        InventoryLedger.LedgerRef.transfer(transfer),
+                        "TRANSFER_CONFLICT",
+                        "库存不足"));
     }
 
     private Map<String, Object> balance(long id, boolean lock) {

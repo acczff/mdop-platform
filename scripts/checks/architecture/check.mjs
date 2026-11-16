@@ -159,7 +159,7 @@ export function layerViolations(module, file, source) {
  * {@code mdop-backend} 会被误判为模块自身，导致自身 artifactId 被当成依赖。
  */
 /** 唯一允许直接写库存余额表的实现。P0 收口完成后，其余写入必须改为经该入口。 */
-export const BALANCE_WRITE_ALLOWLIST = ["/wms/inventory/InventoryLedger.java"];
+export const BALANCE_WRITE_ALLOWLIST = ["/wms/inventory/ledger/InventoryLedger.java"];
 
 const BALANCE_WRITE_SQL =
   /\b(INSERT\s+INTO|REPLACE\s+INTO|UPDATE|DELETE\s+FROM)\s+`?wms_inventory_balance`?/gi;

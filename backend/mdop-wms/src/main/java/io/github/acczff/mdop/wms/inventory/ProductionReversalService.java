@@ -2,6 +2,7 @@ package io.github.acczff.mdop.wms.inventory;
 
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
+import io.github.acczff.mdop.wms.inventory.ledger.InventoryLedger;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -26,18 +27,21 @@ public class ProductionReversalService {
     private final ProductionEvents events;
     private final CurrentActorProvider actor;
     private final Clock clock;
+    private final InventoryLedger ledger;
 
     public ProductionReversalService(
             JdbcClient db,
             IssueService issues,
             ProductionEvents events,
             CurrentActorProvider actor,
-            Clock clock) {
+            Clock clock,
+            InventoryLedger ledger) {
         this.db = db;
         this.issues = issues;
         this.events = events;
         this.actor = actor;
         this.clock = clock;
+        this.ledger = ledger;
     }
 
     private static final String SELECT =
@@ -173,12 +177,18 @@ public class ProductionReversalService {
                 BigDecimal available =
                         "QUALIFIED".equals(p.get("quality_status")) ? qty : BigDecimal.ZERO;
                 if (q(target, "available_qty").compareTo(available) < 0) throw conflict("可冲正库存不足");
-                db.sql(
-                                "UPDATE wms_inventory_balance SET on_hand_qty=on_hand_qty-?,available_qty=available_qty-? WHERE id=?")
-                        .params(qty, available, n(target, "id"))
-                        .update();
+                ledger.postMovement(
+                        InventoryLedger.MovementCommand.of(
+                                n(target, "id"),
+                                qty.negate(),
+                                available.negate(),
+                                false,
+                                false,
+                                "PRR_REMOVE",
+                                InventoryLedger.LedgerRef.productionReversal(id, n(original, "id")),
+                                "PRODUCTION_REVERSAL_CONFLICT",
+                                "可冲正库存不足"));
                 restore(line, qty);
-                ledger(target, qty.negate(), "PRR_REMOVE", id, n(original, "id"));
                 var out =
                         find(
                                 "SELECT * FROM wms_inventory_transaction WHERE production_return_id=? AND transaction_type='PROD_RETURN_OUT'",
@@ -204,10 +214,18 @@ public class ProductionReversalService {
     }
 
     private void restore(Map<String, Object> b, BigDecimal qty) {
-        db.sql(
-                        "UPDATE wms_inventory_balance SET on_hand_qty=on_hand_qty+?,production_qty=production_qty+? WHERE id=?")
-                .params(qty, qty, n(b, "id"))
-                .update();
+        ledger.postMovement(
+                new InventoryLedger.MovementCommand(
+                        n(b, "id"),
+                        qty,
+                        BigDecimal.ZERO,
+                        false,
+                        qty,
+                        false,
+                        null,
+                        null,
+                        "PRODUCTION_REVERSAL_CONFLICT",
+                        "库存不足"));
     }
 
     private void ledger(

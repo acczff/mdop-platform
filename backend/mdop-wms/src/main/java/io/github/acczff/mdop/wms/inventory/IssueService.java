@@ -5,6 +5,7 @@ import io.github.acczff.mdop.common.audit.CurrentActorProvider;
 import io.github.acczff.mdop.common.manufacturing.ProductionMaterialGuard;
 import io.github.acczff.mdop.common.manufacturing.ProductionMaterialPort;
 import io.github.acczff.mdop.masterdata.catalog.CatalogService;
+import io.github.acczff.mdop.wms.inventory.ledger.InventoryLedger;
 import io.github.acczff.mdop.wms.receiving.ReceivingAccess;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
@@ -43,6 +44,7 @@ public class IssueService implements ProductionMaterialPort {
     private final ObjectMapper json;
     private final ProductionEvents feedback;
     private final ProductionMaterialGuard manufacturing;
+    private final InventoryLedger ledger;
 
     public IssueService(
             JdbcClient db,
@@ -52,7 +54,8 @@ public class IssueService implements ProductionMaterialPort {
             Clock clock,
             ObjectMapper json,
             ProductionEvents feedback,
-            ProductionMaterialGuard manufacturing) {
+            ProductionMaterialGuard manufacturing,
+            InventoryLedger ledger) {
         this.db = db;
         this.access = access;
         this.catalog = catalog;
@@ -61,6 +64,7 @@ public class IssueService implements ProductionMaterialPort {
         this.json = json;
         this.feedback = feedback;
         this.manufacturing = manufacturing;
+        this.ledger = ledger;
     }
 
     private static final String SELECT =
@@ -296,10 +300,14 @@ public class IssueService implements ProductionMaterialPort {
         eligibleStock(b);
         targetLocation(input.targetLocationId(), n(d, "target_warehouse_id"));
         if (q(b, "available_qty").compareTo(q(d, "quantity")) < 0) throw conflict("可用库存不足，无法整单预占");
-        db.sql(
-                        "UPDATE wms_inventory_balance SET available_qty=available_qty-?,reserved_qty=reserved_qty+?,reservation_version=reservation_version+1 WHERE id=?")
-                .params(q(d, "quantity"), q(d, "quantity"), input.balanceId())
-                .update();
+        ledger.applyReservation(
+                new InventoryLedger.ReservationCommand(
+                        input.balanceId(),
+                        q(d, "quantity"),
+                        q(d, "quantity").negate(),
+                        BigDecimal.ZERO,
+                        false,
+                        "ISSUE_CONFLICT"));
         event(d, b, "RESERVE", q(d, "quantity"));
         db.sql(
                         "UPDATE wms_material_issue SET status='RESERVED',source_balance_id=?,target_location_id=?,reserved_by=?,reserved_at=? WHERE id=?")
@@ -322,10 +330,14 @@ public class IssueService implements ProductionMaterialPort {
         if (!Set.of("OPEN", "RESERVED").contains(d.get("status"))) throw conflict("已发料单不能取消");
         if ("RESERVED".equals(d.get("status"))) {
             var b = balance(n(d, "source_balance_id"), true);
-            db.sql(
-                            "UPDATE wms_inventory_balance SET available_qty=IF(active_freeze_id IS NULL,available_qty+?,0),reserved_qty=reserved_qty-?,reservation_version=reservation_version+1 WHERE id=?")
-                    .params(q(d, "quantity"), q(d, "quantity"), n(b, "id"))
-                    .update();
+            ledger.applyReservation(
+                    new InventoryLedger.ReservationCommand(
+                            n(b, "id"),
+                            q(d, "quantity").negate(),
+                            q(d, "quantity"),
+                            BigDecimal.ZERO,
+                            true,
+                            "ISSUE_CONFLICT"));
             event(d, b, "RELEASE", q(d, "quantity").negate());
         }
         db.sql(
@@ -358,42 +370,45 @@ public class IssueService implements ProductionMaterialPort {
                                 source.get("quality_status"),
                                 source.get("owner_type"),
                                 n(source, "owner_id")));
-        db.sql(
-                        """
-            INSERT INTO wms_inventory_balance(stock_key,warehouse_id,location_id,material_id,supplier_id,batch_no,date_code,production_date,expiry_date,quality_status,owner_type,owner_id)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE stock_key=stock_key
-            """)
-                .params(
-                        stockKey,
-                        targetWarehouse,
-                        location,
-                        source.get("material_id"),
-                        source.get("supplier_id"),
-                        source.get("batch_no"),
-                        source.get("date_code"),
-                        date(source, "production_date"),
-                        date(source, "expiry_date"),
-                        source.get("quality_status"),
-                        source.get("owner_type"),
-                        source.get("owner_id"))
-                .update();
         var target =
-                db.sql("SELECT * FROM wms_inventory_balance WHERE stock_key=? FOR UPDATE")
-                        .param(stockKey)
-                        .query()
-                        .singleRow();
+                ledger.ensureAndLock(
+                        new InventoryLedger.BalanceSpec(
+                                stockKey,
+                                targetWarehouse,
+                                location,
+                                n(source, "material_id"),
+                                source.get("supplier_id") == null ? null : n(source, "supplier_id"),
+                                (String) source.get("batch_no"),
+                                (String) source.get("date_code"),
+                                date(source, "production_date"),
+                                date(source, "expiry_date"),
+                                (String) source.get("quality_status"),
+                                (String) source.get("owner_type"),
+                                n(source, "owner_id"),
+                                (String) source.get("origin_type")));
         BigDecimal amount = q(d, "quantity");
-        db.sql(
-                        "UPDATE wms_inventory_balance SET on_hand_qty=on_hand_qty-?,reserved_qty=reserved_qty-?,reservation_version=reservation_version+1 WHERE id=?")
-                .params(amount, amount, n(source, "id"))
-                .update();
-        db.sql(
-                        "UPDATE wms_inventory_balance SET on_hand_qty=on_hand_qty+?,production_qty=production_qty+? WHERE id=?")
-                .params(amount, amount, n(target, "id"))
-                .update();
+        ledger.applyReservation(
+                new InventoryLedger.ReservationCommand(
+                        n(source, "id"),
+                        amount.negate(),
+                        BigDecimal.ZERO,
+                        amount.negate(),
+                        false,
+                        "ISSUE_CONFLICT"));
+        ledger.postMovement(
+                new InventoryLedger.MovementCommand(
+                        n(target, "id"),
+                        amount,
+                        BigDecimal.ZERO,
+                        false,
+                        amount,
+                        false,
+                        "ISSUE_IN",
+                        InventoryLedger.LedgerRef.issue(id),
+                        "ISSUE_CONFLICT",
+                        "库存不足"));
         event(d, source, "CONSUME", amount.negate());
         ledger(id, source, amount.negate(), "ISSUE_OUT");
-        ledger(id, target, amount, "ISSUE_IN");
         db.sql(
                         "UPDATE wms_material_issue SET status='ISSUED',target_balance_id=?,closed_by=?,closed_at=? WHERE id=?")
                 .params(n(target, "id"), actor.currentActor(), now(), id)
