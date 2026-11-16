@@ -1,4 +1,15 @@
+server:
+  # 与前端开发代理默认目标一致；mdop.ps1 仍可用 --server.port 覆盖
+  port: ${MDOP_BACKEND_PORT:8081}
+
 spring:
+  # IDEA 直接启动时没有 mdop.ps1 注入环境变量，这里按工作目录候选加载 .env.local。
+  # optional: 缺失时静默跳过；CI 与容器环境仍以真实环境变量为准。
+  config:
+    import:
+      - optional:file:../../deploy/env/.env.local[.properties]
+      - optional:file:../deploy/env/.env.local[.properties]
+      - optional:file:deploy/env/.env.local[.properties]
   rabbitmq:
     host: 127.0.0.1
     port: ${MDOP_RABBITMQ_AMQP_PORT}
@@ -15,6 +26,9 @@ logging:
     io.github.acczff.mdop: DEBUG
 
 mdop:
+  auth:
+    # 仅本地开发允许短口令；test 与 prod 仍按默认 12 位校验
+    password-min-length: 5
   messaging:
     enabled: true
 

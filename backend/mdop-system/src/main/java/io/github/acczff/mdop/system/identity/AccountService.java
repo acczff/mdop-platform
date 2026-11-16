@@ -8,6 +8,7 @@ import io.github.acczff.mdop.security.AccountPrincipal;
 import io.github.acczff.mdop.security.OperatorProperties;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -22,16 +23,19 @@ public class AccountService implements AccountDirectory {
     private final PasswordEncoder encoder;
     private final CurrentActorProvider actors;
     private final WarehouseDirectory warehouses;
+    private final int passwordMinLength;
 
     public AccountService(
             JdbcTemplate db,
             PasswordEncoder encoder,
             CurrentActorProvider actors,
-            WarehouseDirectory warehouses) {
+            WarehouseDirectory warehouses,
+            @Value("${mdop.auth.password-min-length:12}") int passwordMinLength) {
         this.db = db;
         this.encoder = encoder;
         this.actors = actors;
         this.warehouses = warehouses;
+        this.passwordMinLength = passwordMinLength;
     }
 
     public record Account(
@@ -170,11 +174,11 @@ public class AccountService implements AccountDirectory {
             throw new BusinessException(401, "SESSION_CHANGED", "账号权限已变化，请重新登录");
     }
 
-    private static void validatePassword(String password) {
+    private void validatePassword(String password) {
         if (password == null
-                || password.length() < 12
+                || password.length() < passwordMinLength
                 || password.getBytes(StandardCharsets.UTF_8).length > 72)
-            throw PermissionCatalog.invalid("密码至少12位，UTF-8编码不超过72字节");
+            throw PermissionCatalog.invalid("密码至少" + passwordMinLength + "位，UTF-8编码不超过72字节");
     }
 
     private static void validateUsername(String username) {
@@ -251,6 +255,12 @@ public class AccountService implements AccountDirectory {
         if (Boolean.TRUE.equals(
                 db.queryForObject("SELECT initialized FROM iam_guard WHERE id=1", Boolean.class)))
             return;
+        if (password == null || password.isBlank())
+            throw new BusinessException(
+                    500,
+                    "BOOTSTRAP_PASSWORD_MISSING",
+                    "首次初始化需要管理员口令：请在 deploy/env/.env.local 设置 MDOP_ADMIN_PASSWORD（至少 12 位），"
+                            + "或在运行配置中传入 -Dmdop.auth.password=...");
         insert(
                 username,
                 username,

@@ -19,8 +19,8 @@ public class MdopSecurityConfiguration {
     }
 
     @Bean
-    SecurityFilterChain mdopSecurityFilterChain(HttpSecurity http, AccountDirectory accounts)
-            throws Exception {
+    SecurityFilterChain mdopSecurityFilterChain(
+            HttpSecurity http, AccountDirectory accounts, LoginThrottle throttle) throws Exception {
         http.authorizeHttpRequests(
                         authorize ->
                                 authorize
@@ -44,11 +44,15 @@ public class MdopSecurityConfiguration {
                         login ->
                                 login.loginProcessingUrl("/api/auth/login")
                                         .successHandler(
-                                                (request, response, authentication) ->
-                                                        response.setStatus(204))
+                                                (request, response, authentication) -> {
+                                                    throttle.success(LoginThrottle.key(request));
+                                                    response.setStatus(204);
+                                                })
                                         .failureHandler(
-                                                (request, response, exception) ->
-                                                        response.sendError(401)))
+                                                (request, response, exception) -> {
+                                                    throttle.failure(LoginThrottle.key(request));
+                                                    response.sendError(401);
+                                                }))
                 .logout(
                         logout ->
                                 logout.logoutUrl("/api/auth/logout")
@@ -58,6 +62,10 @@ public class MdopSecurityConfiguration {
                                                 (request, response, authentication) ->
                                                         response.setStatus(204)));
 
+        http.addFilterBefore(
+                new LoginThrottleFilter(throttle),
+                org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
+                        .class);
         http.addFilterBefore(
                 new AccountSessionFilter(accounts),
                 org.springframework.security.web.access.intercept.AuthorizationFilter.class);

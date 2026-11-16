@@ -73,4 +73,31 @@ class SessionTests extends MdopInfrastructureTestBase {
         assertThat(session.isInvalid()).isTrue();
         mvc.perform(get("/api/auth/me")).andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void repeatedLoginFailuresAreThrottled() throws Exception {
+        var initial = mvc.perform(get("/api/auth/csrf")).andExpect(status().isOk()).andReturn();
+        var session = (MockHttpSession) initial.getRequest().getSession();
+        var token = json.readTree(initial.getResponse().getContentAsString());
+        for (int attempt = 1; attempt <= 5; attempt++) {
+            mvc.perform(
+                            post("/api/auth/login")
+                                    .session(session)
+                                    .header(
+                                            token.get("headerName").asText(),
+                                            token.get("token").asText())
+                                    .param("username", "throttle-probe")
+                                    .param("password", "wrong-" + attempt))
+                    .andExpect(status().isUnauthorized());
+        }
+        mvc.perform(
+                        post("/api/auth/login")
+                                .session(session)
+                                .header(
+                                        token.get("headerName").asText(),
+                                        token.get("token").asText())
+                                .param("username", "throttle-probe")
+                                .param("password", "wrong-again"))
+                .andExpect(status().isTooManyRequests());
+    }
 }

@@ -1,3 +1,10 @@
+# 生产部署默认在 TLS 终止之后，会话 Cookie 强制只经 HTTPS 传输。
+server:
+  servlet:
+    session:
+      cookie:
+        secure: true
+
 logging:
   level:
     io.github.acczff.mdop: INFO
