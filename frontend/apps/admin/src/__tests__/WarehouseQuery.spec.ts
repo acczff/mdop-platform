@@ -1,11 +1,11 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import InventoryView from '../views/InventoryView.vue'
-import SalesView from '../views/SalesView.vue'
-import FinishedGoodsView from '../views/FinishedGoodsView.vue'
-import CountsView from '../views/CountsView.vue'
-import { request } from '../api'
-vi.mock('../api', () => ({ request: vi.fn() }))
+import InventoryView from '@/modules/inventory/views/InventoryView.vue'
+import SalesView from '@/modules/sales/views/SalesView.vue'
+import FinishedGoodsView from '@/modules/manufacturing/views/FinishedGoodsView.vue'
+import CountsView from '@/modules/inventory/views/CountsView.vue'
+import { request } from '@/shared/api'
+vi.mock('@/shared/api', () => ({ request: vi.fn() }))
 vi.mock('vue-router', () => ({ useRoute: () => ({ query: {} }) }))
 afterEach(() => vi.resetAllMocks())
 it('production reversal ledger must display its original transaction reference', async () => {

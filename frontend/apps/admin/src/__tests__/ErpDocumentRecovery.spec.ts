@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import PurchasingView from '../views/PurchasingView.vue'
-import SalesOrdersView from '../views/SalesOrdersView.vue'
-import { ApiError, request } from '../api'
+import PurchasingView from '@/modules/purchasing/views/PurchasingView.vue'
+import SalesOrdersView from '@/modules/sales/views/SalesOrdersView.vue'
+import { ApiError, request } from '@/shared/api'
 
-vi.mock('../api', async (original) => ({
-  ...(await original<typeof import('../api')>()),
+vi.mock('@/shared/api', async (original) => ({
+  ...(await original<typeof import('@/shared/api')>()),
   request: vi.fn(),
 }))
 afterEach(() => {

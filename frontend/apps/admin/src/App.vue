@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
-import { ApiError, request, refreshCsrf, type Session } from './api'
+import { ApiError, request, refreshCsrf, type Session } from '@/shared/api'
 import './style.css'
-import WorkspaceShell from './components/WorkspaceShell.vue'
+import WorkspaceShell from '@/shared/components/WorkspaceShell.vue'
 const session = ref<Session | null>(null)
 const loading = ref(true)
 const busy = ref(false)
