@@ -2,7 +2,24 @@
 
 本目录提供 MDOP 仓库级操作脚本。Windows 用户从仓库根目录通过 `mdop.cmd` 调用，不需要直接执行 `scripts/mdop.ps1`。
 
-文档工具 `node scripts/docs/check.mjs` 校验所有纳入 Git 的 Markdown 相对链接、标题锚点及源码导航同步；`--write-index` 更新模块、页面、控制器和迁移清单。工具回归为 `node --test scripts/docs/check.test.mjs`，CI 使用 `Documentation verify`，失败会阻止发布候选。它不检查外部网站或证明接口行为。
+## 目录结构
+
+| 路径 | 作用 |
+|---|---|
+| `mdop.ps1`、`pnpm.cmd` | 入口：启停/验证主脚本，以及前端包管理包装 |
+| `checks/docs/` | 文档相对链接、标题锚点、源码导航校验 |
+| `checks/architecture/` | 模块边界与分层规则、存量例外基线 |
+| `checks/audit-inventory.sql` | 只读库存对账（47 项） |
+| `docker/` | Docker 启动前检查、自测、陈旧 socket 恢复 |
+| `release/` | 发布候选打包、数据库备份与空库恢复 |
+
+命名约定：库脚本与自测成对出现（`check.mjs` + `check.test.mjs`、`startup-checks.ps1` + `startup-checks.test.ps1`），自测导入库脚本而不复制逻辑。入口脚本保留在目录根部，避免 `mdop.cmd` 与文档中的命令失效。
+
+文档工具 `node scripts/checks/docs/check.mjs` 校验所有纳入 Git 的 Markdown 相对链接、标题锚点及源码导航同步；`--write-index` 更新模块、页面、控制器和迁移清单。工具回归为 `node --test scripts/checks/docs/check.test.mjs`，CI 使用 `Documentation verify`，失败会阻止发布候选。它不检查外部网站或证明接口行为。
+
+架构边界检查 `node scripts/checks/architecture/check.mjs` 执行六类规则：跨模块 import 必须在 pom 中显式声明、控制器不得直接依赖其它模块的 Service、迁移只能改本模块前缀的表、迁移命名格式、已分层模块的层间依赖方向（`api` 与 `application` 不引用 `infrastructure`，`domain` 不依赖 Spring/JDBC）、库存余额只能经 `InventoryLedger` 写入（`BALANCE_WRITE`）。存量例外冻结在 `scripts/checks/architecture/baseline.json`，每条必须写明原因；修复后检查会提示删除对应条目。`--report` 打印全部命中，`--write-baseline` 重建基线。规则回归为 `node --test scripts/checks/architecture/check.test.mjs`，CI 在 `Documentation verify` 中执行。
+
+库存切片测试 `InventorySliceTests`（4 项：余额按仓库隔离与限量、余额维度唯一、加锁的仓库范围校验、通知缺失静默返回）只启动 MySQL 与 Flyway，随 `Backend verify` 执行。新增直写 `wms_inventory_balance` 会被 `BALANCE_WRITE` 规则拦截；迁移一条写入就从 `baseline.json` 删除对应条目。
 
 `release/release.mjs` 负责 CI 组件标记、候选包组合与完整性校验；`release/database.mjs` 提供停写后的数据库备份校验和仅空目标恢复。它们不调用 `mdop start`，不自动升级日常数据库；参数和失败处理见[发布包操作手册](../deploy/release/RUNBOOK.md)。工具回归使用 `node --test scripts/release/*.test.mjs`，CI 的 `Release candidate` 检查自动执行。
 
@@ -52,7 +69,7 @@
 
 ## `start` 启动范围
 
-`start` 启动后端时会应用目标库中尚未执行的迁移，不能将 Git 合并理解为已经部署。当前代码与历史主干的迁移区别见[版本记录](../docs/project/status.md)；已有库升级先按 [部署与恢复流程](../deploy/README.md#11-wms-主干升级与恢复)备份验证，本轮未自动启动日常环境。
+`start` 启动后端时会应用目标库中尚未执行的迁移，不能将 Git 合并理解为已经部署。当前代码与历史主干的迁移区别见[版本记录](../docs/40-operations/status.md)；已有库升级先按 [部署与恢复流程](../deploy/README.md#11-wms-主干升级与恢复)备份验证，本轮未自动启动日常环境。
 
 `start` 按以下顺序执行：
 
@@ -91,16 +108,16 @@
 
 ## 常见问题
 
-`scripts/audit-inventory.sql` 为只读库存对账入口，当前包含 47 项检查，覆盖余额/流水、质量可用量、预占、生产归属、销售、调拨在途/分批收货及冻结状态。应在已确认的目标数据库执行，全部差异为零后再结合业务验收判断，不以单次健康响应代替完整验收。
+`scripts/checks/audit-inventory.sql` 为只读库存对账入口，当前包含 47 项检查，覆盖余额/流水、质量可用量、预占、生产归属、销售、调拨在途/分批收货及冻结状态。应在已确认的目标数据库执行，全部差异为零后再结合业务验收判断，不以单次健康响应代替完整验收。
 
-销售反馈按来源检查：`ERP_SIMULATOR` 已出库必须恰好一条模拟反馈；`MDOP_SALES` 正式来源不应发送模拟反馈，履约通过 ERP 详情中的 WMS 事实和结案快照核对。脚本要求使用匹配当前应用的数据库迁移；不要将新版 SQL 用于尚未升级的旧库。采购/销售联合验收及恢复记录见 [R1 验收报告](../docs/project/R1采购销售联合验收.md)。
+销售反馈按来源检查：`ERP_SIMULATOR` 已出库必须恰好一条模拟反馈；`MDOP_SALES` 正式来源不应发送模拟反馈，履约通过 ERP 详情中的 WMS 事实和结案快照核对。脚本要求使用匹配当前应用的数据库迁移；不要将新版 SQL 用于尚未升级的旧库。采购/销售联合验收及恢复记录见 [R1 验收报告](../docs/90-archive/acceptance/R1采购销售联合验收.md)。
 
 - 提示端口被占用：先查明 `8080` 或 `5173` 的监听程序，不要结束未知进程。
 - 提示 Docker Engine 不可用：启动 Docker Desktop，并检查 `docker version` 与 `docker context show`。
 - Windows Docker 启动异常：先在开始菜单打开 Docker Desktop，再检查 `docker info` 是否返回服务端版本和 `OSType: linux`。只有客户端版本或命令退出码为零，不足以证明引擎已就绪。
 - 若桌面提示安装登记缺失，或 WSL 挂载 `docker_data.vhdx` 报 `ERROR_PATH_NOT_FOUND`，但从某个应用终端查看文件却存在，先核对是否受 [MSIX 文件和注册表重定向](https://learn.microsoft.com/en-us/windows/msix/desktop/desktop-to-uwp-behind-the-scenes)影响。不要从 Codex 等打包应用的子进程安装、修复或启动 Docker；这可能使配置和磁盘落入应用私有 `LocalCache`，普通桌面进程和 WSL 无法通过同一路径访问。应从正常 Windows 用户会话检查安装登记、实际磁盘路径和 WSL `BasePath`，停止 Docker 后备份并校验磁盘，再修复安装和迁移路径。启动脚本会在读写 Docker 配置前拒绝打包进程环境；不会自动迁移或重置数据。
-- 安装与数据路径已确认正常，仅遇到 `sailor-ingest.sock` 等陈旧 socket 报错时，可在**从开始菜单单独打开的 PowerShell** 中执行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-docker-desktop.ps1 -RecoverStaleSockets -NoDashboard`。脚本固定正确的启动工作目录；引擎已就绪时复用，不重启。只有 Docker 进程与 WSL 均已停止、运行目录仅含零字节 socket 文件时，才将目录原样改名保留后重建；不处理容器、镜像、数据卷和 WSL 磁盘。其他文件或正在运行的进程会阻止恢复。该脚本不能修复安装缺失或磁盘路径错误，不应将这些问题统称为 Docker 上游缺陷。
-- 启动检查的 Windows 回归测试：`powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\docker-startup-checks.test.ps1`。测试使用临时模拟 CLI，覆盖空响应、仅客户端信息、缺失服务端版本、错误输出、超时及正常响应，不启动 Docker。
+- 安装与数据路径已确认正常，仅遇到 `sailor-ingest.sock` 等陈旧 socket 报错时，可在**从开始菜单单独打开的 PowerShell** 中执行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\docker\start-desktop.ps1 -RecoverStaleSockets -NoDashboard`。脚本固定正确的启动工作目录；引擎已就绪时复用，不重启。只有 Docker 进程与 WSL 均已停止、运行目录仅含零字节 socket 文件时，才将目录原样改名保留后重建；不处理容器、镜像、数据卷和 WSL 磁盘。其他文件或正在运行的进程会阻止恢复。该脚本不能修复安装缺失或磁盘路径错误，不应将这些问题统称为 Docker 上游缺陷。
+- 启动检查的 Windows 回归测试：`powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\docker\startup-checks.test.ps1`。测试使用临时模拟 CLI，覆盖空响应、仅客户端信息、缺失服务端版本、错误输出、超时及正常响应，不启动 Docker。
 - 应用未能就绪：查看错误信息列出的 `logs/local/` 日志文件。
 - 提示已有应用正在运行：先执行 `.\mdop.cmd status`，确认后使用 `.\mdop.cmd stop`。
 - 仅需操作基础设施时：使用 [deploy/README.md](../deploy/README.md) 中的底层 Compose 命令。

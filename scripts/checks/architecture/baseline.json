@@ -1,0 +1,180 @@
+{
+  "note": "只登记存量例外，每条必须写明原因。修复后运行 node scripts/checks/architecture/check.mjs 会提示删除对应条目。",
+  "exceptions": [
+    {
+      "rule": "APPLICATION_LAYER",
+      "subject": "backend/mdop-master-data/src/main/java/io/github/acczff/mdop/masterdata/warehouse/application/WarehouseService.java",
+      "detail": "应用层直接依赖基础设施实现 warehouse.infrastructure.WarehouseRepository，应改为依赖领域端口",
+      "file": "backend/mdop-master-data/src/main/java/io/github/acczff/mdop/masterdata/warehouse/application/WarehouseService.java",
+      "reason": "主数据仓库基于 Spring Data JPA，接口按框架约定置于 infrastructure；收敛需引入领域端口，排入后续切片"
+    },
+    {
+      "rule": "APPLICATION_LAYER",
+      "subject": "backend/mdop-master-data/src/main/java/io/github/acczff/mdop/masterdata/warehouse/application/WarehouseService.java",
+      "detail": "应用层直接依赖基础设施实现 warehouse.infrastructure.WarehouseSpecifications，应改为依赖领域端口",
+      "file": "backend/mdop-master-data/src/main/java/io/github/acczff/mdop/masterdata/warehouse/application/WarehouseService.java",
+      "reason": "主数据仓库基于 Spring Data JPA，接口按框架约定置于 infrastructure；收敛需引入领域端口，排入后续切片"
+    },
+    {
+      "rule": "BALANCE_WRITE",
+      "subject": "writes=1",
+      "detail": "库存余额必须经 InventoryLedger 写入；本文件直接写表 1 处",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/CountService.java",
+      "reason": "P0-0 冻结：库存写入收口前允许存量直写；新增文件或新增语句会因 subject 变化被拦截，每迁移一条从基线删除"
+    },
+    {
+      "rule": "BALANCE_WRITE",
+      "subject": "writes=3",
+      "detail": "库存余额必须经 InventoryLedger 写入；本文件直接写表 3 处",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/CrossTransferService.java",
+      "reason": "P0-0 冻结：库存写入收口前允许存量直写；新增文件或新增语句会因 subject 变化被拦截，每迁移一条从基线删除"
+    },
+    {
+      "rule": "BALANCE_WRITE",
+      "subject": "writes=2",
+      "detail": "库存余额必须经 InventoryLedger 写入；本文件直接写表 2 处",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/FinishedGoodsService.java",
+      "reason": "P0-0 冻结：库存写入收口前允许存量直写；新增文件或新增语句会因 subject 变化被拦截，每迁移一条从基线删除"
+    },
+    {
+      "rule": "BALANCE_WRITE",
+      "subject": "writes=2",
+      "detail": "库存余额必须经 InventoryLedger 写入；本文件直接写表 2 处",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/FreezeService.java",
+      "reason": "P0-0 冻结：库存写入收口前允许存量直写；新增文件或新增语句会因 subject 变化被拦截，每迁移一条从基线删除"
+    },
+    {
+      "rule": "BALANCE_WRITE",
+      "subject": "writes=5",
+      "detail": "库存余额必须经 InventoryLedger 写入；本文件直接写表 5 处",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/IssueService.java",
+      "reason": "P0-0 冻结：库存写入收口前允许存量直写；新增文件或新增语句会因 subject 变化被拦截，每迁移一条从基线删除"
+    },
+    {
+      "rule": "BALANCE_WRITE",
+      "subject": "writes=2",
+      "detail": "库存余额必须经 InventoryLedger 写入；本文件直接写表 2 处",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/ProductionReversalService.java",
+      "reason": "P0-0 冻结：库存写入收口前允许存量直写；新增文件或新增语句会因 subject 变化被拦截，每迁移一条从基线删除"
+    },
+    {
+      "rule": "BALANCE_WRITE",
+      "subject": "writes=3",
+      "detail": "库存余额必须经 InventoryLedger 写入；本文件直接写表 3 处",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/ProductionService.java",
+      "reason": "P0-0 冻结：库存写入收口前允许存量直写；新增文件或新增语句会因 subject 变化被拦截，每迁移一条从基线删除"
+    },
+    {
+      "rule": "BALANCE_WRITE",
+      "subject": "writes=1",
+      "detail": "库存余额必须经 InventoryLedger 写入；本文件直接写表 1 处",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/SalesService.java",
+      "reason": "P0-0 冻结：库存写入收口前允许存量直写；新增文件或新增语句会因 subject 变化被拦截，每迁移一条从基线删除"
+    },
+    {
+      "rule": "BALANCE_WRITE",
+      "subject": "writes=2",
+      "detail": "库存余额必须经 InventoryLedger 写入；本文件直接写表 2 处",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/TransferService.java",
+      "reason": "P0-0 冻结：库存写入收口前允许存量直写；新增文件或新增语句会因 subject 变化被拦截，每迁移一条从基线删除"
+    },
+    {
+      "rule": "BALANCE_WRITE",
+      "subject": "writes=1",
+      "detail": "库存余额必须经 InventoryLedger 写入；本文件直接写表 1 处",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/receiving/application/CorrectionService.java",
+      "reason": "P0-0 冻结：库存写入收口前允许存量直写；新增文件或新增语句会因 subject 变化被拦截，每迁移一条从基线删除"
+    },
+    {
+      "rule": "BALANCE_WRITE",
+      "subject": "writes=1",
+      "detail": "库存余额必须经 InventoryLedger 写入；本文件直接写表 1 处",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/receiving/application/PurchaseReturnService.java",
+      "reason": "P0-0 冻结：库存写入收口前允许存量直写；新增文件或新增语句会因 subject 变化被拦截，每迁移一条从基线删除"
+    },
+    {
+      "rule": "BALANCE_WRITE",
+      "subject": "writes=2",
+      "detail": "库存余额必须经 InventoryLedger 写入；本文件直接写表 2 处",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/receiving/application/QualityService.java",
+      "reason": "P0-0 冻结：库存写入收口前允许存量直写；新增文件或新增语句会因 subject 变化被拦截，每迁移一条从基线删除"
+    },
+    {
+      "rule": "BALANCE_WRITE",
+      "subject": "writes=2",
+      "detail": "库存余额必须经 InventoryLedger 写入；本文件直接写表 2 处",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/receiving/application/ReceivingService.java",
+      "reason": "P0-0 冻结：库存写入收口前允许存量直写；新增文件或新增语句会因 subject 变化被拦截，每迁移一条从基线删除"
+    },
+    {
+      "rule": "CONTROLLER_LEAK",
+      "subject": "backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/local/ErpSimulatorController.java → mdop-wms",
+      "detail": "控制器直接依赖其它模块的 Service，应改走 common 契约",
+      "file": "backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/local/ErpSimulatorController.java",
+      "reason": "集成层的模拟与 MES/ERP 反馈入口按设计直接调用 WMS 用例；待 WMS 暴露 common 端口后收敛"
+    },
+    {
+      "rule": "CONTROLLER_LEAK",
+      "subject": "backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/FinishedFeedbackController.java → mdop-wms",
+      "detail": "控制器直接依赖其它模块的 Service，应改走 common 契约",
+      "file": "backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/FinishedFeedbackController.java",
+      "reason": "集成层的模拟与 MES/ERP 反馈入口按设计直接调用 WMS 用例；待 WMS 暴露 common 端口后收敛"
+    },
+    {
+      "rule": "CONTROLLER_LEAK",
+      "subject": "backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/IssueFeedbackController.java → mdop-wms",
+      "detail": "控制器直接依赖其它模块的 Service，应改走 common 契约",
+      "file": "backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/IssueFeedbackController.java",
+      "reason": "集成层的模拟与 MES/ERP 反馈入口按设计直接调用 WMS 用例；待 WMS 暴露 common 端口后收敛"
+    },
+    {
+      "rule": "CONTROLLER_LEAK",
+      "subject": "backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/SalesFeedbackController.java → mdop-wms",
+      "detail": "控制器直接依赖其它模块的 Service，应改走 common 契约",
+      "file": "backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/SalesFeedbackController.java",
+      "reason": "集成层的模拟与 MES/ERP 反馈入口按设计直接调用 WMS 用例；待 WMS 暴露 common 端口后收敛"
+    },
+    {
+      "rule": "DDL_OWNERSHIP",
+      "subject": "mdop-integration → wms_outbox",
+      "detail": "backend/mdop-integration/src/main/resources/db/migration/integration/V202610050003__reliable_messaging.sql 修改了不属于本模块前缀的表",
+      "file": "backend/mdop-integration/src/main/resources/db/migration/integration/V202610050003__reliable_messaging.sql",
+      "reason": "历史迁移为生产/消息模块扩展了 WMS 或采购的表；此处冻结存量，新迁移不得再跨前缀"
+    },
+    {
+      "rule": "DDL_OWNERSHIP",
+      "subject": "mdop-manufacturing → pur_document",
+      "detail": "backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610090011__material_planning.sql 修改了不属于本模块前缀的表",
+      "file": "backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610090011__material_planning.sql",
+      "reason": "历史迁移为生产/消息模块扩展了 WMS 或采购的表；此处冻结存量，新迁移不得再跨前缀"
+    },
+    {
+      "rule": "DDL_OWNERSHIP",
+      "subject": "mdop-manufacturing → wms_material_issue",
+      "detail": "backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610110001__production_material_execution.sql 修改了不属于本模块前缀的表",
+      "file": "backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610110001__production_material_execution.sql",
+      "reason": "历史迁移为生产/消息模块扩展了 WMS 或采购的表；此处冻结存量，新迁移不得再跨前缀"
+    },
+    {
+      "rule": "DDL_OWNERSHIP",
+      "subject": "mdop-manufacturing → wms_production_consumption",
+      "detail": "backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610110001__production_material_execution.sql 修改了不属于本模块前缀的表",
+      "file": "backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610110001__production_material_execution.sql",
+      "reason": "历史迁移为生产/消息模块扩展了 WMS 或采购的表；此处冻结存量，新迁移不得再跨前缀"
+    },
+    {
+      "rule": "DDL_OWNERSHIP",
+      "subject": "mdop-manufacturing → wms_production_return",
+      "detail": "backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610110001__production_material_execution.sql 修改了不属于本模块前缀的表",
+      "file": "backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610110001__production_material_execution.sql",
+      "reason": "历史迁移为生产/消息模块扩展了 WMS 或采购的表；此处冻结存量，新迁移不得再跨前缀"
+    },
+    {
+      "rule": "DDL_OWNERSHIP",
+      "subject": "mdop-manufacturing → wms_finished_receipt",
+      "detail": "backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610110002__production_completion.sql 修改了不属于本模块前缀的表",
+      "file": "backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610110002__production_completion.sql",
+      "reason": "历史迁移为生产/消息模块扩展了 WMS 或采购的表；此处冻结存量，新迁移不得再跨前缀"
+    }
+  ]
+}

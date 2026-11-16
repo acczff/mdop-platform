@@ -37,8 +37,12 @@ jobs:
           package-manager-cache: false
       - name: Verify documentation tooling and repository links
         run: |
-          node --test scripts/docs/check.test.mjs
-          node scripts/docs/check.mjs
+          node --test scripts/checks/docs/check.test.mjs
+          node scripts/checks/docs/check.mjs
+      - name: Verify module boundaries
+        run: |
+          node --test scripts/checks/architecture/check.test.mjs
+          node scripts/checks/architecture/check.mjs
 
   backend:
     name: Backend verify

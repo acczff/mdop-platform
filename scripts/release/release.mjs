@@ -133,7 +133,7 @@ export function assemble(root, backend, frontend, output, build) {
     "deploy/release/application-release.yml": "config/application-release.yml",
     "deploy/release/nginx.conf": "config/nginx.conf",
     "deploy/release/RUNBOOK.md": "RUNBOOK.md",
-    "scripts/audit-inventory.sql": "tools/audit-inventory.sql",
+    "scripts/checks/audit-inventory.sql": "tools/audit-inventory.sql",
     "scripts/release/release.mjs": "tools/release.mjs",
     "scripts/release/database.mjs": "tools/database.mjs",
   };

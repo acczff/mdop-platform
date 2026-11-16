@@ -45,6 +45,9 @@ tmp/
 *.tmp
 *.bak
 
+# WorkBuddy local workspace data (session memory, caches)
+.workbuddy/
+
 # Operating systems
 .DS_Store
 Thumbs.db

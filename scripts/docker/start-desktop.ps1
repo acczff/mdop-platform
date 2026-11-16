@@ -5,7 +5,7 @@ param(
     [ValidateRange(10, 180)] [int] $TimeoutSeconds = 60
 )
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'docker-startup-checks.ps1')
+. (Join-Path $PSScriptRoot 'startup-checks.ps1')
 # Must run before any registry lookup, AppData write, or child process launch.
 Assert-UnpackagedDockerStartup
 $install = Get-ItemProperty 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Docker Desktop' -ErrorAction SilentlyContinue

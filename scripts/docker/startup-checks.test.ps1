@@ -1,6 +1,6 @@
 # Run with Windows PowerShell 5.1. Does not start or stop Docker or modify its files.
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'docker-startup-checks.ps1')
+. (Join-Path $PSScriptRoot 'startup-checks.ps1')
 $fixture = Join-Path ([IO.Path]::GetTempPath()) ('mdop-docker-probe-' + [guid]::NewGuid().ToString('N') + '.exe')
 $previousMode = $env:MDOP_DOCKER_PROBE_TEST
 try {

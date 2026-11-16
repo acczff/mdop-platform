@@ -22,7 +22,7 @@ function fixture(t) {
     "deploy/release/application-release.yml",
     "deploy/release/nginx.conf",
     "deploy/release/RUNBOOK.md",
-    "scripts/audit-inventory.sql",
+    "scripts/checks/audit-inventory.sql",
     "scripts/release/release.mjs",
     "scripts/release/database.mjs",
     "backend/module/src/main/resources/db/migration/system/V1__test.sql",

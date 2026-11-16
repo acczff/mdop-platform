@@ -106,9 +106,9 @@ export function sourceIndex(root, files) {
   const out = [
     "# 源码导航（自动生成）",
     "",
-    "> 由 `node scripts/docs/check.mjs --write-index` 生成。只列当前源码中的模块依赖、页面、控制器入口与迁移；接口字段及授权以控制器、请求模型和服务校验为准。",
+    "> 由 `node scripts/checks/docs/check.mjs --write-index` 生成。只列当前源码中的模块依赖、页面、控制器入口与迁移；接口字段及授权以控制器、请求模型和服务校验为准。",
     "",
-    "返回 [文档中心](../README.md) · [架构与代码阅读](architecture.md) · [接口约定](api.md)",
+    "返回 [文档中心](../README.md) · [架构与代码阅读](code-reading.md) · [接口约定](api-contract.md)",
     "",
     "## 后端模块依赖",
     "",
@@ -194,13 +194,13 @@ if (
 ) {
   const root = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
-    "../..",
+    "../../..",
   );
   let files = repositoryFiles(root);
-  const index = "docs/reference/source-index.md";
+  const index = "docs/10-architecture/source-index.md";
   const expected = sourceIndex(root, files);
   if (process.argv.includes("--write-index")) {
-    fs.mkdirSync(path.join(root, "docs/reference"), { recursive: true });
+    fs.mkdirSync(path.join(root, "docs/10-architecture"), { recursive: true });
     fs.writeFileSync(path.join(root, index), expected);
     files = repositoryFiles(root);
   }
@@ -211,7 +211,7 @@ if (
       expected
   )
     errors.push(
-      "Source index is stale: node scripts/docs/check.mjs --write-index",
+      "Source index is stale: node scripts/checks/docs/check.mjs --write-index",
     );
   if (errors.length) {
     console.error(errors.join("\n"));
