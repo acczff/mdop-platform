@@ -189,6 +189,43 @@ export function inventoryWriteViolations(file, source) {
   ];
 }
 
+/** 查找表名所属的模块；未匹配任何已知前缀返回 null。 */
+export function tableOwner(table) {
+  const normalized = table.toLowerCase();
+  for (const [owner, prefixes] of Object.entries(OWNED_TABLE_PREFIXES)) {
+    if (prefixes.some((prefix) => normalized.startsWith(prefix))) return owner;
+  }
+  return null;
+}
+
+const STRING_LITERAL = /"""[\s\S]*?"""|"(?:\\.|[^"\\\r\n])*"/g;
+const DML_TABLE_REF = /\b(?:FROM|JOIN|INTO|UPDATE|TABLE)\s+`?([a-z0-9_]+)`?/gi;
+
+/** 主代码 SQL 字符串字面量不得读写其它模块拥有前缀的表。 */
+export function dmlOwnershipViolations(module, file, source) {
+  if (!OWNED_TABLE_PREFIXES[module] && module !== "mdop-security") return [];
+  const code = source
+    .replaceAll(/\/\*[\s\S]*?\*\//g, "")
+    .replaceAll(/(^|[^:])\/\/.*$/gm, "$1");
+  const seen = new Set();
+  const result = [];
+  for (const literal of code.matchAll(STRING_LITERAL)) {
+    for (const match of literal[0].matchAll(DML_TABLE_REF)) {
+      const table = match[1].toLowerCase();
+      const owner = tableOwner(table);
+      if (!owner || owner === module) continue;
+      if (seen.has(table)) continue;
+      seen.add(table);
+      result.push({
+        rule: "DML_OWNERSHIP",
+        subject: `${module} → ${table}`,
+        detail: `${file} 的 SQL 引用了属于 ${owner} 的表 ${table}`,
+      });
+    }
+  }
+  return result;
+}
+
 export function declaredDependencies(pomXml) {
   const withoutParent = pomXml.replace(/<parent>[\s\S]*?<\/parent>/, "");
   const self = /<artifactId>([^<]+)<\/artifactId>/.exec(withoutParent)?.[1];
@@ -246,6 +283,7 @@ export function collect(root = ROOT) {
         ...controllerLeaks(module, relative, source),
         ...layerViolations(module, relative, source),
         ...inventoryWriteViolations(relative, source),
+        ...dmlOwnershipViolations(module, relative, source),
       ];
       for (const item of found) {
         if (item.rule !== "IMPORT") {

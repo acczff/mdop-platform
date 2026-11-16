@@ -84,6 +84,314 @@
       "detail": "backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610110002__production_completion.sql 修改了不属于本模块前缀的表",
       "file": "backend/mdop-manufacturing/src/main/resources/db/migration/manufacturing/V202610110002__production_completion.sql",
       "reason": "历史迁移为生产/消息模块扩展了 WMS 或采购的表；此处冻结存量，新迁移不得再跨前缀"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-integration → wms_outbox",
+      "detail": "backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/DeliveryService.java 的 SQL 引用了属于 mdop-wms 的表 wms_outbox",
+      "file": "backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/DeliveryService.java",
+      "reason": "集成投递与反馈控制器直接读写 WMS 发件箱表，待消息契约抽象后收敛"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-integration → wms_outbox",
+      "detail": "backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/FinishedFeedbackController.java 的 SQL 引用了属于 mdop-wms 的表 wms_outbox",
+      "file": "backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/FinishedFeedbackController.java",
+      "reason": "集成投递与反馈控制器直接读写 WMS 发件箱表，待消息契约抽象后收敛"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-integration → wms_outbox",
+      "detail": "backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/IssueFeedbackController.java 的 SQL 引用了属于 mdop-wms 的表 wms_outbox",
+      "file": "backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/IssueFeedbackController.java",
+      "reason": "集成投递与反馈控制器直接读写 WMS 发件箱表，待消息契约抽象后收敛"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-integration → wms_outbox",
+      "detail": "backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/SalesFeedbackController.java 的 SQL 引用了属于 mdop-wms 的表 wms_outbox",
+      "file": "backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/SalesFeedbackController.java",
+      "reason": "集成投递与反馈控制器直接读写 WMS 发件箱表，待消息契约抽象后收敛"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-manufacturing → mdm_warehouse",
+      "detail": "backend/mdop-manufacturing/src/main/java/io/github/acczff/mdop/manufacturing/application/CompletionService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_warehouse",
+      "file": "backend/mdop-manufacturing/src/main/java/io/github/acczff/mdop/manufacturing/application/CompletionService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-manufacturing → mdm_warehouse",
+      "detail": "backend/mdop-manufacturing/src/main/java/io/github/acczff/mdop/manufacturing/application/MaterialPlanService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_warehouse",
+      "file": "backend/mdop-manufacturing/src/main/java/io/github/acczff/mdop/manufacturing/application/MaterialPlanService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-manufacturing → mdm_warehouse",
+      "detail": "backend/mdop-manufacturing/src/main/java/io/github/acczff/mdop/manufacturing/application/ProductionClosureService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_warehouse",
+      "file": "backend/mdop-manufacturing/src/main/java/io/github/acczff/mdop/manufacturing/application/ProductionClosureService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-manufacturing → mdm_production_site",
+      "detail": "backend/mdop-manufacturing/src/main/java/io/github/acczff/mdop/manufacturing/application/ProductionOrderService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_production_site",
+      "file": "backend/mdop-manufacturing/src/main/java/io/github/acczff/mdop/manufacturing/application/ProductionOrderService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-manufacturing → mdm_warehouse",
+      "detail": "backend/mdop-manufacturing/src/main/java/io/github/acczff/mdop/manufacturing/application/ProductionOrderService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_warehouse",
+      "file": "backend/mdop-manufacturing/src/main/java/io/github/acczff/mdop/manufacturing/application/ProductionOrderService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-purchasing → mdm_location",
+      "detail": "backend/mdop-purchasing/src/main/java/io/github/acczff/mdop/purchasing/application/PurchaseService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_location",
+      "file": "backend/mdop-purchasing/src/main/java/io/github/acczff/mdop/purchasing/application/PurchaseService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-purchasing → mdm_warehouse",
+      "detail": "backend/mdop-purchasing/src/main/java/io/github/acczff/mdop/purchasing/application/PurchaseService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_warehouse",
+      "file": "backend/mdop-purchasing/src/main/java/io/github/acczff/mdop/purchasing/application/PurchaseService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-sales → mdm_warehouse",
+      "detail": "backend/mdop-sales/src/main/java/io/github/acczff/mdop/sales/application/SalesOrderService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_warehouse",
+      "file": "backend/mdop-sales/src/main/java/io/github/acczff/mdop/sales/application/SalesOrderService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_location",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/CountService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_location",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/CountService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_material",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/CountService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_material",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/CountService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_warehouse",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/CountService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_warehouse",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/CountService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_location",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/CrossTransferService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_location",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/CrossTransferService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_material",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/CrossTransferService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_material",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/CrossTransferService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_warehouse",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/CrossTransferService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_warehouse",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/CrossTransferService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_location",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/FinishedGoodsService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_location",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/FinishedGoodsService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_warehouse",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/FinishedGoodsService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_warehouse",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/FinishedGoodsService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mfg_completion",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/FinishedGoodsService.java 的 SQL 引用了属于 mdop-manufacturing 的表 mfg_completion",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/FinishedGoodsService.java",
+      "reason": "成品入库暂直接关联生产完工表，待生产契约端口补齐后收敛"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_location",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/FreezeService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_location",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/FreezeService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_material",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/FreezeService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_material",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/FreezeService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_warehouse",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/FreezeService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_warehouse",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/FreezeService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_location",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/InventoryService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_location",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/InventoryService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_material",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/InventoryService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_material",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/InventoryService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_supplier",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/InventoryService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_supplier",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/InventoryService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_warehouse",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/InventoryService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_warehouse",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/InventoryService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_location",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/IssueService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_location",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/IssueService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_material",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/IssueService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_material",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/IssueService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_warehouse",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/IssueService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_warehouse",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/IssueService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_location",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/MaterialStockReferenceAdapter.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_location",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/MaterialStockReferenceAdapter.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_location",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/ProductionService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_location",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/ProductionService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_warehouse",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/SalesDispatchService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_warehouse",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/SalesDispatchService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_location",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/SalesService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_location",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/SalesService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_warehouse",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/SalesService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_warehouse",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/SalesService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_location",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/TransferService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_location",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/TransferService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_material",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/TransferService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_material",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/TransferService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_warehouse",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/TransferService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_warehouse",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/TransferService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_location",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/receiving/application/PurchaseReturnService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_location",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/receiving/application/PurchaseReturnService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_warehouse",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/receiving/application/PurchaseReturnService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_warehouse",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/receiving/application/PurchaseReturnService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_location",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/receiving/application/QualityService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_location",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/receiving/application/QualityService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_warehouse",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/receiving/application/QualityService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_warehouse",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/receiving/application/QualityService.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
+      "subject": "mdop-wms → mdm_warehouse",
+      "detail": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/receiving/infrastructure/JdbcArrivalLock.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_warehouse",
+      "file": "backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/receiving/infrastructure/JdbcArrivalLock.java",
+      "reason": "存量主数据表只读关联/行锁：待后续收敛为主数据端口或仓库目录查询"
     }
   ]
 }
