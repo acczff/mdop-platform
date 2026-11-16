@@ -10,16 +10,20 @@
 |---|---|---|
 | mdop-boot | mdop-common、mdop-finance、mdop-manufacturing、mdop-sales、mdop-purchasing、mdop-security、mdop-system、mdop-master-data、mdop-wms、mdop-integration、mdop-test-support (test) | [pom.xml](../../backend/mdop-boot/pom.xml) |
 | mdop-common | 无 | [pom.xml](../../backend/mdop-common/pom.xml) |
-| mdop-finance | mdop-security、mdop-common | [pom.xml](../../backend/mdop-finance/pom.xml) |
-| mdop-integration | mdop-common、mdop-wms | [pom.xml](../../backend/mdop-integration/pom.xml) |
-| mdop-manufacturing | mdop-master-data、mdop-security、mdop-common | [pom.xml](../../backend/mdop-manufacturing/pom.xml) |
+| mdop-finance-api | mdop-common | [pom.xml](../../backend/mdop-finance-api/pom.xml) |
+| mdop-finance | mdop-security、mdop-common、mdop-finance-api | [pom.xml](../../backend/mdop-finance/pom.xml) |
+| mdop-integration | mdop-common、mdop-purchasing-api、mdop-sales-api、mdop-wms | [pom.xml](../../backend/mdop-integration/pom.xml) |
+| mdop-manufacturing-api | mdop-common | [pom.xml](../../backend/mdop-manufacturing-api/pom.xml) |
+| mdop-manufacturing | mdop-master-data、mdop-security、mdop-common、mdop-manufacturing-api | [pom.xml](../../backend/mdop-manufacturing/pom.xml) |
 | mdop-master-data | mdop-common、mdop-security | [pom.xml](../../backend/mdop-master-data/pom.xml) |
-| mdop-purchasing | mdop-master-data、mdop-security、mdop-common | [pom.xml](../../backend/mdop-purchasing/pom.xml) |
-| mdop-sales | mdop-master-data、mdop-security、mdop-common | [pom.xml](../../backend/mdop-sales/pom.xml) |
+| mdop-purchasing-api | mdop-common | [pom.xml](../../backend/mdop-purchasing-api/pom.xml) |
+| mdop-purchasing | mdop-master-data、mdop-security、mdop-common、mdop-purchasing-api、mdop-finance-api、mdop-manufacturing-api | [pom.xml](../../backend/mdop-purchasing/pom.xml) |
+| mdop-sales-api | mdop-common | [pom.xml](../../backend/mdop-sales-api/pom.xml) |
+| mdop-sales | mdop-master-data、mdop-security、mdop-common、mdop-sales-api、mdop-finance-api、mdop-manufacturing-api | [pom.xml](../../backend/mdop-sales/pom.xml) |
 | mdop-security | mdop-common | [pom.xml](../../backend/mdop-security/pom.xml) |
 | mdop-system | mdop-common、mdop-security | [pom.xml](../../backend/mdop-system/pom.xml) |
 | mdop-test-support | mdop-common | [pom.xml](../../backend/mdop-test-support/pom.xml) |
-| mdop-wms | mdop-common、mdop-security、mdop-master-data | [pom.xml](../../backend/mdop-wms/pom.xml) |
+| mdop-wms | mdop-common、mdop-purchasing-api、mdop-sales-api、mdop-manufacturing-api、mdop-security、mdop-master-data | [pom.xml](../../backend/mdop-wms/pom.xml) |
 
 ## 管理端页面
 
@@ -75,20 +79,20 @@
 | [SalesOrderController.java](../../backend/mdop-sales/src/main/java/io/github/acczff/mdop/sales/api/SalesOrderController.java) | `/api/v1/sales/documents` | 7 | — |
 | [SessionController.java](../../backend/mdop-security/src/main/java/io/github/acczff/mdop/security/SessionController.java) | `GET /api/auth/csrf`<br>`GET /api/auth/me` | 2 | — |
 | [AccountController.java](../../backend/mdop-system/src/main/java/io/github/acczff/mdop/system/identity/AccountController.java) | `GET /api/iam/options`<br>`GET /api/iam/users`<br>`GET /api/iam/users/{id}/audit`<br>`POST /api/iam/users`<br>`POST /api/iam/users/{id}/access`<br>`POST /api/iam/users/{id}/status`<br>`POST /api/iam/users/{id}/password`<br>`POST /api/auth/password` | 8 | — |
-| [CountController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/CountController.java) | `/api/v1/wms/counts` | 6 | — |
-| [CrossTransferController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/CrossTransferController.java) | `/api/v1/wms/cross-transfers` | 10 | — |
-| [FinishedGoodsController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/FinishedGoodsController.java) | `/api/v1/wms/finished-receipts` | 4 | — |
-| [FreezeController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/FreezeController.java) | `/api/v1/wms/freezes` | 4 | — |
-| [InventoryController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/InventoryController.java) | `/api/v1/wms/stock` | 3 | — |
-| [IssueController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/IssueController.java) | `/api/v1/wms/issues` | 6 | — |
-| [LocalFinishedGoodsController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/LocalFinishedGoodsController.java) | `/api/local/finished-receipts` | 3 | local,test |
-| [LocalMesController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/LocalMesController.java) | `/api/local/mes-demands` | 2 | local,test |
-| [LocalProductionController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/LocalProductionController.java) | `/api/local/mes-production` | 3 | local,test |
-| [LocalSalesController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/LocalSalesController.java) | `/api/local/sales-orders` | 2 | local,test |
-| [ProductionController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/ProductionController.java) | `/api/v1/wms/production` | 6 | — |
-| [ProductionReversalController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/ProductionReversalController.java) | `/api/v1/wms/production-reversals` | 5 | — |
-| [SalesController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/SalesController.java) | `/api/v1/wms/sales-orders` | 9 | — |
-| [TransferController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/TransferController.java) | `/api/v1/wms/transfers` | 3 | — |
+| [CountController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/count/api/CountController.java) | `/api/v1/wms/counts` | 6 | — |
+| [CrossTransferController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/crosstransfer/api/CrossTransferController.java) | `/api/v1/wms/cross-transfers` | 10 | — |
+| [FinishedGoodsController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/finished/api/FinishedGoodsController.java) | `/api/v1/wms/finished-receipts` | 4 | — |
+| [LocalFinishedGoodsController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/finished/api/LocalFinishedGoodsController.java) | `/api/local/finished-receipts` | 3 | local,test |
+| [FreezeController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/freeze/api/FreezeController.java) | `/api/v1/wms/freezes` | 4 | — |
+| [IssueController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/issue/api/IssueController.java) | `/api/v1/wms/issues` | 6 | — |
+| [LocalMesController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/issue/api/LocalMesController.java) | `/api/local/mes-demands` | 2 | local,test |
+| [LocalProductionController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/production/api/LocalProductionController.java) | `/api/local/mes-production` | 3 | local,test |
+| [ProductionController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/production/api/ProductionController.java) | `/api/v1/wms/production` | 6 | — |
+| [InventoryController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/query/api/InventoryController.java) | `/api/v1/wms/stock` | 3 | — |
+| [ProductionReversalController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/reversal/api/ProductionReversalController.java) | `/api/v1/wms/production-reversals` | 5 | — |
+| [LocalSalesController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/sales/api/LocalSalesController.java) | `/api/local/sales-orders` | 2 | local,test |
+| [SalesController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/sales/api/SalesController.java) | `/api/v1/wms/sales-orders` | 9 | — |
+| [TransferController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/inventory/transfer/api/TransferController.java) | `/api/v1/wms/transfers` | 3 | — |
 | [CorrectionController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/receiving/api/CorrectionController.java) | `/api/v1/wms/corrections` | 5 | — |
 | [LocalQualityController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/receiving/api/LocalQualityController.java) | `/api/local/qms-results` | 1 | local,test |
 | [PurchaseReturnController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/receiving/api/PurchaseReturnController.java) | `/api/v1/wms/purchase-returns` | 7 | — |
