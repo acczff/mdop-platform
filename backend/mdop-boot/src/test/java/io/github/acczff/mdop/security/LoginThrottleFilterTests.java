@@ -14,7 +14,7 @@ class LoginThrottleFilterTests {
     private static final String ADDRESS = "10.0.0.9";
 
     private static LoginThrottle lockedThrottle() {
-        LoginThrottle throttle = new LoginThrottle(1, 15, 15, Clock.systemUTC());
+        LoginThrottle throttle = new InMemoryLoginThrottle(1, 15, 15, Clock.systemUTC());
         throttle.failure(USER + "|" + ADDRESS);
         return throttle;
     }
@@ -43,7 +43,7 @@ class LoginThrottleFilterTests {
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
 
-        new LoginThrottleFilter(new LoginThrottle(5, 15, 15, Clock.systemUTC()))
+        new LoginThrottleFilter(new InMemoryLoginThrottle(5, 15, 15, Clock.systemUTC()))
                 .doFilter(loginRequest(), response, chain);
 
         assertThat(response.getStatus()).isEqualTo(200);

@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/integration/messages")
-@PreAuthorize("hasRole('ADMIN') or hasAuthority('integration:simulate')")
+@PreAuthorize("hasRole('ADMIN') or hasAuthority('integration:messages:manage')")
 public class DeliveryController {
     private final DeliveryService service;
 

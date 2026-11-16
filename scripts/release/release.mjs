@@ -61,6 +61,14 @@ function copy(source, destination) {
   fs.copyFileSync(source, destination);
 }
 
+export function resolveVersion(packageVersion, refName = process.env.GITHUB_REF_NAME) {
+  const match =
+    typeof refName === "string"
+      ? /^v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/.exec(refName.trim())
+      : null;
+  return match ? match[1] : packageVersion;
+}
+
 function metadata(root) {
   const git = (...args) =>
     execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
@@ -69,10 +77,19 @@ function metadata(root) {
   const buildCommit = git("rev-parse", "HEAD");
   const sourceCommit = process.env.MDOP_SOURCE_COMMIT || buildCommit;
   if (!/^[0-9a-f]{40}$/.test(sourceCommit)) fail("Invalid source commit");
+  const packageVersion = read(path.join(root, "frontend/package.json")).version;
+  let refName = process.env.GITHUB_REF_NAME;
+  if (!refName) {
+    try {
+      refName = git("describe", "--tags", "--exact-match", "HEAD");
+    } catch {
+      refName = "";
+    }
+  }
   return {
     buildCommit,
     sourceCommit,
-    version: read(path.join(root, "frontend/package.json")).version,
+    version: resolveVersion(packageVersion, refName),
     backendVersion: fs
       .readFileSync(path.join(root, "backend/mdop-boot/pom.xml"), "utf8")
       .match(/<parent>[\s\S]*?<version>([^<]+)<\/version>/)[1],

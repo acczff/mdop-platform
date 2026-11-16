@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import io.github.acczff.mdop.security.OperatorProperties;
 import io.github.acczff.mdop.system.identity.AccountService;
 import io.github.acczff.mdop.test.support.MdopInfrastructureTestBase;
+import jakarta.servlet.http.Cookie;
 import java.util.*;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,7 +16,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.*;
@@ -33,7 +33,7 @@ class AccountTests extends MdopInfrastructureTestBase {
     @Autowired ObjectMapper json;
     @Autowired JdbcTemplate db;
     @Autowired AccountService accounts;
-    MockHttpSession admin;
+    Cookie admin;
     final String password = "Account-Test-Password-2026!";
 
     @BeforeEach
@@ -41,7 +41,7 @@ class AccountTests extends MdopInfrastructureTestBase {
         admin = login("testadmin", "test-only-password-12345", 204);
     }
 
-    MockHttpSession login(String username, String password, int status) throws Exception {
+    Cookie login(String username, String password, int status) throws Exception {
         var result =
                 mvc.perform(
                                 post("/api/auth/login")
@@ -50,14 +50,15 @@ class AccountTests extends MdopInfrastructureTestBase {
                                         .param("password", password))
                         .andExpect(status().is(status))
                         .andReturn();
-        return (MockHttpSession) result.getRequest().getSession(false);
+        Cookie cookie = result.getResponse().getCookie("SESSION");
+        return cookie != null ? cookie : result.getResponse().getCookie("JSESSIONID");
     }
 
-    JsonNode post(String path, Object body, MockHttpSession session, int status) throws Exception {
+    JsonNode post(String path, Object body, Cookie session, int status) throws Exception {
         var result =
                 mvc.perform(
                                 post(path)
-                                        .session(session)
+                                        .cookie(session)
                                         .with(csrf())
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(json.writeValueAsBytes(body)))
@@ -111,12 +112,12 @@ class AccountTests extends MdopInfrastructureTestBase {
 
     @Test
     void systemManagementAndBusinessAreSeparated() throws Exception {
-        mvc.perform(get("/api/iam/users").session(admin)).andExpect(status().isOk());
-        mvc.perform(get("/api/v1/wms/stock?warehouseId=1").session(admin))
+        mvc.perform(get("/api/iam/users").cookie(admin)).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/wms/stock?warehouseId=1").cookie(admin))
                 .andExpect(status().isForbidden());
         var u = create("READER");
         var s = login(u.get("username").asText(), password, 204);
-        mvc.perform(get("/api/iam/users").session(s)).andExpect(status().isForbidden());
+        mvc.perform(get("/api/iam/users").cookie(s)).andExpect(status().isForbidden());
         post("/api/master-data/suppliers", Map.of("code", "DENIED", "name", "越权"), s, 403);
         mvc.perform(get("/api/iam/users")).andExpect(status().isUnauthorized());
     }
@@ -195,13 +196,13 @@ class AccountTests extends MdopInfrastructureTestBase {
                 admin,
                 200);
         login(name, password, 401);
-        mvc.perform(get("/api/auth/me").session(s)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/auth/me").cookie(s)).andExpect(status().isUnauthorized());
         post(
                 path(u, "status"),
                 Map.of("version", 1, "enabled", true, "reason", "重新启用"),
                 admin,
                 200);
-        mvc.perform(get("/api/auth/me").session(another)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/auth/me").cookie(another)).andExpect(status().isUnauthorized());
         login(name, password, 204);
     }
 
@@ -228,7 +229,7 @@ class AccountTests extends MdopInfrastructureTestBase {
                         "岗位调整"),
                 admin,
                 200);
-        mvc.perform(get("/api/auth/me").session(s)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/auth/me").cookie(s)).andExpect(status().isUnauthorized());
         var next = login(name, password, 204);
         post("/api/master-data/suppliers", Map.of("code", "DENIED2", "name", "越权"), next, 403);
     }
@@ -245,12 +246,12 @@ class AccountTests extends MdopInfrastructureTestBase {
                 Map.of("version", 0, "password", next, "reason", "本人申请重置"),
                 admin,
                 204);
-        mvc.perform(get("/api/auth/me").session(s)).andExpect(status().isUnauthorized());
-        mvc.perform(get("/api/auth/me").session(s2)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/auth/me").cookie(s)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/auth/me").cookie(s2)).andExpect(status().isUnauthorized());
         login(name, password, 401);
         login(name, next, 204);
         var audit =
-                mvc.perform(get(path(u, "audit")).session(admin))
+                mvc.perform(get(path(u, "audit")).cookie(admin))
                         .andExpect(status().isOk())
                         .andReturn()
                         .getResponse()
@@ -280,7 +281,7 @@ class AccountTests extends MdopInfrastructureTestBase {
                 Map.of("oldPassword", password, "newPassword", "New-Password-2026!"),
                 s,
                 204);
-        assertThat(s.isInvalid()).isTrue();
+        mvc.perform(get("/api/auth/me").cookie(s)).andExpect(status().isUnauthorized());
         login(name, password, 401);
         login(name, "New-Password-2026!", 204);
     }
@@ -291,7 +292,7 @@ class AccountTests extends MdopInfrastructureTestBase {
         var body = Map.of("version", 0, "enabled", false, "reason", "停用");
         mvc.perform(
                         post(path(u, "status"))
-                                .session(admin)
+                                .cookie(admin)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(json.writeValueAsBytes(body)))
                 .andExpect(status().isForbidden());
@@ -358,7 +359,7 @@ class AccountTests extends MdopInfrastructureTestBase {
                                     start.await();
                                     return mvc.perform(
                                                     post(path(u, "status"))
-                                                            .session(session)
+                                                            .cookie(session)
                                                             .with(csrf())
                                                             .contentType(MediaType.APPLICATION_JSON)
                                                             .content(

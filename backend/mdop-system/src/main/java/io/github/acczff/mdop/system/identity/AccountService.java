@@ -6,8 +6,10 @@ import io.github.acczff.mdop.common.security.WarehouseDirectory;
 import io.github.acczff.mdop.security.AccountDirectory;
 import io.github.acczff.mdop.security.AccountPrincipal;
 import io.github.acczff.mdop.security.OperatorProperties;
+import io.github.acczff.mdop.security.SessionInvalidator;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -23,6 +25,7 @@ public class AccountService implements AccountDirectory {
     private final PasswordEncoder encoder;
     private final CurrentActorProvider actors;
     private final WarehouseDirectory warehouses;
+    private final SessionInvalidator sessionInvalidator;
     private final int passwordMinLength;
 
     public AccountService(
@@ -30,11 +33,13 @@ public class AccountService implements AccountDirectory {
             PasswordEncoder encoder,
             CurrentActorProvider actors,
             WarehouseDirectory warehouses,
+            ObjectProvider<SessionInvalidator> sessionInvalidators,
             @Value("${mdop.auth.password-min-length:12}") int passwordMinLength) {
         this.db = db;
         this.encoder = encoder;
         this.actors = actors;
         this.warehouses = warehouses;
+        this.sessionInvalidator = sessionInvalidators.getIfAvailable(() -> username -> {});
         this.passwordMinLength = passwordMinLength;
     }
 
@@ -334,6 +339,7 @@ public class AccountService implements AccountDirectory {
         protectLastAdmin(before, before.enabled(), roles);
         grants(id, roles, permissions);
         db.update("UPDATE iam_user SET version=version+1 WHERE id=?", id);
+        sessionInvalidator.invalidateByUsername(before.username());
         audit(id, "ACCESS_CHANGE", actors.currentActor(), reason, before);
         return account(id);
     }
@@ -347,6 +353,7 @@ public class AccountService implements AccountDirectory {
         if (before.enabled() == enabled)
             throw new BusinessException(409, "UNCHANGED_STATUS", "账号状态未变化");
         db.update("UPDATE iam_user SET enabled=?,version=version+1 WHERE id=?", enabled, id);
+        sessionInvalidator.invalidateByUsername(before.username());
         audit(id, enabled ? "ENABLE" : "DISABLE", actors.currentActor(), reason, before);
         return account(id);
     }
@@ -361,6 +368,7 @@ public class AccountService implements AccountDirectory {
                 "UPDATE iam_user SET password_hash=?,version=version+1 WHERE id=?",
                 encoder.encode(password),
                 id);
+        sessionInvalidator.invalidateByUsername(before.username());
         audit(id, "PASSWORD_RESET", actors.currentActor(), reason, before);
     }
 

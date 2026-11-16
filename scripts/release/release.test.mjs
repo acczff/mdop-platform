@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { createHash } from "node:crypto";
-import { stamp, assemble, verify } from "./release.mjs";
+import { stamp, assemble, verify, resolveVersion } from "./release.mjs";
 import { verifySnapshot, backup, restore } from "./database.mjs";
 
 function fixture(t) {
@@ -146,4 +146,10 @@ test("database operations require explicit stop-write and empty-target assertion
     /Stop application writes/,
   );
   await assert.rejects(restore("", "", "", "", false), /empty database/);
+});
+test("resolveVersion extracts semantic version from v* tags and falls back to package version", () => {
+  assert.equal(resolveVersion("0.1.0", "v1.2.3"), "1.2.3");
+  assert.equal(resolveVersion("0.1.0", "v1.2.3-rc.1"), "1.2.3-rc.1");
+  assert.equal(resolveVersion("0.1.0", "main"), "0.1.0");
+  assert.equal(resolveVersion("0.1.0", ""), "0.1.0");
 });

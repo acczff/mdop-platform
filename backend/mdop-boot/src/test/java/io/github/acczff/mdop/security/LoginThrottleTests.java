@@ -16,7 +16,7 @@ class LoginThrottleTests {
     @Test
     void blocksAfterConfiguredFailuresAndClearsOnSuccess() {
         MutableClock clock = new MutableClock();
-        LoginThrottle throttle = new LoginThrottle(5, 15, 15, clock);
+        LoginThrottle throttle = new InMemoryLoginThrottle(5, 15, 15, clock);
 
         for (int attempt = 0; attempt < 4; attempt++) {
             throttle.failure(KEY);
@@ -33,7 +33,7 @@ class LoginThrottleTests {
     @Test
     void failureWindowExpiresWithoutLock() {
         MutableClock clock = new MutableClock();
-        LoginThrottle throttle = new LoginThrottle(3, 15, 15, clock);
+        LoginThrottle throttle = new InMemoryLoginThrottle(3, 15, 15, clock);
 
         throttle.failure(KEY);
         throttle.failure(KEY);
@@ -46,7 +46,7 @@ class LoginThrottleTests {
     @Test
     void lockReleasesAfterConfiguredMinutes() {
         MutableClock clock = new MutableClock();
-        LoginThrottle throttle = new LoginThrottle(2, 15, 10, clock);
+        LoginThrottle throttle = new InMemoryLoginThrottle(2, 15, 10, clock);
 
         throttle.failure(KEY);
         throttle.failure(KEY);
@@ -61,7 +61,7 @@ class LoginThrottleTests {
 
     @Test
     void differentSourceAddressIsTrackedSeparately() {
-        LoginThrottle throttle = new LoginThrottle(1, 15, 15, new MutableClock());
+        LoginThrottle throttle = new InMemoryLoginThrottle(1, 15, 15, new MutableClock());
 
         throttle.failure("testadmin|10.0.0.1");
 

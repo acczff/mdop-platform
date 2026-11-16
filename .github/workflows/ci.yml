@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches: [main]
+    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -199,6 +200,11 @@ jobs:
           path: tmp/release/frontend
       - name: Assemble matching verified components
         run: node scripts/release/release.mjs assemble . tmp/release/backend tmp/release/frontend tmp/release/candidate
+      - name: Build container images from verified bundle
+        run: |
+          docker build -f deploy/docker/backend.Dockerfile -t mdop-backend:ci .
+          docker build -f deploy/docker/frontend.Dockerfile -t mdop-frontend:ci .
+          docker compose --env-file deploy/env/.env.example -f deploy/compose/compose.release.yml config --quiet
       - name: Preserve candidate bundle
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

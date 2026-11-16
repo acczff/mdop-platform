@@ -1,0 +1,144 @@
+name: mdop-release
+
+services:
+  mysql:
+    image: ${MDOP_MYSQL_IMAGE:-mysql:8.4.10}
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      MYSQL_DATABASE: ${MDOP_MYSQL_DATABASE:?未设置 MDOP_MYSQL_DATABASE}
+      MYSQL_USER: ${MDOP_MYSQL_USER:?未设置 MDOP_MYSQL_USER}
+      MYSQL_PASSWORD: ${MDOP_MYSQL_PASSWORD:?未设置 MDOP_MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MDOP_MYSQL_ROOT_PASSWORD:?未设置 MDOP_MYSQL_ROOT_PASSWORD}
+      TZ: ${MDOP_TIME_ZONE:-Asia/Shanghai}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - MYSQL_PWD="$${MYSQL_PASSWORD}" mysqladmin ping -h 127.0.0.1 -u"$${MYSQL_USER}" --silent
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - mdop-release-net
+
+  rabbitmq:
+    image: ${MDOP_RABBITMQ_IMAGE:-rabbitmq:4.3.2-management}
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      RABBITMQ_DEFAULT_USER: ${MDOP_RABBITMQ_USER:?未设置 MDOP_RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${MDOP_RABBITMQ_PASSWORD:?未设置 MDOP_RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_VHOST: ${MDOP_RABBITMQ_VHOST:-mdop}
+      TZ: ${MDOP_TIME_ZONE:-Asia/Shanghai}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test:
+        - CMD
+        - rabbitmq-diagnostics
+        - "-q"
+        - ping
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - mdop-release-net
+
+  redis:
+    image: ${MDOP_REDIS_IMAGE:-redis:8.2.7}
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      REDISCLI_AUTH: ${MDOP_REDIS_PASSWORD:?未设置 MDOP_REDIS_PASSWORD}
+      TZ: ${MDOP_TIME_ZONE:-Asia/Shanghai}
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --requirepass
+      - ${MDOP_REDIS_PASSWORD:?未设置 MDOP_REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - mdop-release-net
+
+  backend:
+    image: ${MDOP_BACKEND_IMAGE:-mdop-backend:local}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/backend.Dockerfile
+    restart: unless-stopped
+    stop_grace_period: 30s
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      MDOP_JDBC_URL: "jdbc:mysql://mysql:3306/${MDOP_MYSQL_DATABASE:?未设置 MDOP_MYSQL_DATABASE}"
+      MDOP_DB_USER: ${MDOP_MYSQL_USER:?未设置 MDOP_MYSQL_USER}
+      MDOP_DB_PASSWORD: ${MDOP_MYSQL_PASSWORD:?未设置 MDOP_MYSQL_PASSWORD}
+      MDOP_RABBITMQ_HOST: rabbitmq
+      MDOP_RABBITMQ_PORT: 5672
+      MDOP_RABBITMQ_USER: ${MDOP_RABBITMQ_USER:?未设置 MDOP_RABBITMQ_USER}
+      MDOP_RABBITMQ_PASSWORD: ${MDOP_RABBITMQ_PASSWORD:?未设置 MDOP_RABBITMQ_PASSWORD}
+      MDOP_RABBITMQ_VHOST: ${MDOP_RABBITMQ_VHOST:-mdop}
+      MDOP_REDIS_HOST: redis
+      MDOP_REDIS_PORT: 6379
+      MDOP_REDIS_PASSWORD: ${MDOP_REDIS_PASSWORD:?未设置 MDOP_REDIS_PASSWORD}
+      MDOP_BACKEND_ADDRESS: 0.0.0.0
+      MDOP_BACKEND_PORT: 8081
+      MDOP_MANAGEMENT_ADDRESS: 127.0.0.1
+      MDOP_MANAGEMENT_PORT: 8091
+      MDOP_COOKIE_SECURE: ${MDOP_COOKIE_SECURE:-true}
+      MDOP_MESSAGING_ENABLED: ${MDOP_MESSAGING_ENABLED:-true}
+      MDOP_ADMIN_USERNAME: ${MDOP_ADMIN_USERNAME:?未设置 MDOP_ADMIN_USERNAME}
+      MDOP_ADMIN_PASSWORD: ${MDOP_ADMIN_PASSWORD:?未设置 MDOP_ADMIN_PASSWORD}
+      MDOP_TIME_ZONE: ${MDOP_TIME_ZONE:-Asia/Shanghai}
+    networks:
+      - mdop-release-net
+
+  frontend:
+    image: ${MDOP_FRONTEND_IMAGE:-mdop-frontend:local}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/frontend.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      MDOP_BACKEND_UPSTREAM: backend:8081
+    ports:
+      - "127.0.0.1:${MDOP_FRONTEND_PORT:-8088}:80"
+    networks:
+      - mdop-release-net
+
+volumes:
+  mysql-data:
+  rabbitmq-data:
+  redis-data:
+
+networks:
+  mdop-release-net:
+    driver: bridge

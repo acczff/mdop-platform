@@ -4,10 +4,13 @@ import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
 import io.github.acczff.mdop.wms.receiving.application.ReceivingModels.ArrivalInput;
 import io.github.acczff.mdop.wms.receiving.application.ReceivingService;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.validation.Validator;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.*;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -40,6 +43,7 @@ public class DeliveryService {
     private final EventPublisher publisher;
     private final CurrentActorProvider actor;
     private final TransactionTemplate tx;
+    private final MeterRegistry meters;
 
     public DeliveryService(
             JdbcClient db,
@@ -49,6 +53,19 @@ public class DeliveryService {
             EventPublisher publisher,
             CurrentActorProvider actor,
             PlatformTransactionManager manager) {
+        this(db, json, validator, receiving, publisher, actor, manager, null);
+    }
+
+    @Autowired
+    public DeliveryService(
+            JdbcClient db,
+            ObjectMapper json,
+            Validator validator,
+            ReceivingService receiving,
+            EventPublisher publisher,
+            CurrentActorProvider actor,
+            PlatformTransactionManager manager,
+            ObjectProvider<MeterRegistry> meters) {
         this.db = db;
         this.json = json;
         this.validator = validator;
@@ -56,6 +73,7 @@ public class DeliveryService {
         this.publisher = publisher;
         this.actor = actor;
         this.tx = new TransactionTemplate(manager);
+        this.meters = meters == null ? null : meters.getIfAvailable();
     }
 
     public ArrivalInput validateArrival(EventEnvelope event) {
@@ -278,8 +296,16 @@ public class DeliveryService {
                                             claim.token(),
                                             direction.working)
                                     .update();
-                    if (changed == 1)
+                    if (changed == 1) {
                         log(direction, claim.messageId(), "FAILED", "system:delivery", code);
+                        if (meters != null) {
+                            meters.counter(
+                                            "mdop.messaging.delivery.failures",
+                                            "direction",
+                                            direction.name())
+                                    .increment();
+                        }
+                    }
                 });
     }
 
