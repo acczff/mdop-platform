@@ -1,6 +1,6 @@
 package io.github.acczff.mdop.integration.sales;
 
-import io.github.acczff.mdop.common.sales.SalesShippingPort;
+import io.github.acczff.mdop.salesapi.SalesShippingPort;
 import io.github.acczff.mdop.wms.inventory.sales.application.SalesDispatchService;
 import org.springframework.stereotype.Component;
 

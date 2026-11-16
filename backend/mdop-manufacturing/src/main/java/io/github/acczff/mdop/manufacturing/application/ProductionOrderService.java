@@ -5,7 +5,7 @@ import static io.github.acczff.mdop.manufacturing.application.ProductionOrderMod
 
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
-import io.github.acczff.mdop.common.manufacturing.*;
+import io.github.acczff.mdop.manufacturingapi.*;
 import io.github.acczff.mdop.masterdata.catalog.CatalogService;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -31,7 +31,7 @@ public class ProductionOrderService implements ProductionDemandUsage {
     private final Clock clock;
     private final ObjectMapper json;
     private final ProductionPurchasePort purchasing;
-    private final io.github.acczff.mdop.common.manufacturing.ProductionMaterialPort materials;
+    private final io.github.acczff.mdop.manufacturingapi.ProductionMaterialPort materials;
 
     public ProductionOrderService(
             JdbcClient db,
@@ -42,7 +42,7 @@ public class ProductionOrderService implements ProductionDemandUsage {
             Clock clock,
             ObjectMapper json,
             ProductionPurchasePort purchasing,
-            io.github.acczff.mdop.common.manufacturing.ProductionMaterialPort materials) {
+            io.github.acczff.mdop.manufacturingapi.ProductionMaterialPort materials) {
         this.db = db;
         this.catalog = catalog;
         this.boms = boms;

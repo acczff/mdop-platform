@@ -1,4 +1,4 @@
-package io.github.acczff.mdop.common.finance;
+package io.github.acczff.mdop.financeapi;
 
 import java.util.List;
 

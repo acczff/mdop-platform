@@ -1,7 +1,7 @@
 package io.github.acczff.mdop.purchasing.infrastructure;
 
-import io.github.acczff.mdop.common.finance.FinanceSourcePort;
-import io.github.acczff.mdop.common.purchasing.PurchaseReceivingPort;
+import io.github.acczff.mdop.financeapi.FinanceSourcePort;
+import io.github.acczff.mdop.purchasingapi.PurchaseReceivingPort;
 import java.math.BigDecimal;
 import java.util.*;
 import org.springframework.jdbc.core.simple.JdbcClient;

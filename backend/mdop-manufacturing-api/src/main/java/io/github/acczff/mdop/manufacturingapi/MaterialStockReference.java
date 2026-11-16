@@ -1,4 +1,4 @@
-package io.github.acczff.mdop.common.manufacturing;
+package io.github.acczff.mdop.manufacturingapi;
 
 import java.util.List;
 import java.util.Map;

@@ -2,7 +2,7 @@ package io.github.acczff.mdop.manufacturing.application;
 
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
-import io.github.acczff.mdop.common.manufacturing.*;
+import io.github.acczff.mdop.manufacturingapi.*;
 import jakarta.validation.constraints.*;
 import java.math.*;
 import java.sql.Timestamp;

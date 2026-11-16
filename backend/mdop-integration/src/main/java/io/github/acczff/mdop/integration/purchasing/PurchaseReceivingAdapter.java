@@ -1,6 +1,6 @@
 package io.github.acczff.mdop.integration.purchasing;
 
-import io.github.acczff.mdop.common.purchasing.PurchaseReceivingPort;
+import io.github.acczff.mdop.purchasingapi.PurchaseReceivingPort;
 import io.github.acczff.mdop.wms.receiving.application.PurchaseArrivalService;
 import org.springframework.stereotype.Component;
 

@@ -1,6 +1,6 @@
 package io.github.acczff.mdop.purchasing.application;
 
-import io.github.acczff.mdop.common.purchasing.PurchaseReceivingPort;
+import io.github.acczff.mdop.purchasingapi.PurchaseReceivingPort;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

@@ -19,7 +19,7 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 @Transactional(isolation = Isolation.READ_COMMITTED)
 public class FinishedGoodsService
-        implements io.github.acczff.mdop.common.manufacturing.ProductionCompletionPort {
+        implements io.github.acczff.mdop.manufacturingapi.ProductionCompletionPort {
     public record Demand(
             @NotBlank @Pattern(regexp = "[A-Za-z0-9_-]{1,64}") String demandNo,
             @NotBlank @Size(max = 64) String workOrderNo,
@@ -103,14 +103,12 @@ public class FinishedGoodsService
     }
 
     public Map<String, Object> create(Demand in) {
-        io.github.acczff.mdop.common.manufacturing.ProductionNumbers.requireLegacy(
-                in.workOrderNo());
+        io.github.acczff.mdop.manufacturingapi.ProductionNumbers.requireLegacy(in.workOrderNo());
         return createDemand(in, null);
     }
 
     @Override
-    public long create(
-            io.github.acczff.mdop.common.manufacturing.ProductionCompletionPort.Input in) {
+    public long create(io.github.acczff.mdop.manufacturingapi.ProductionCompletionPort.Input in) {
         return n(
                 createDemand(
                         new Demand(
@@ -148,7 +146,7 @@ public class FinishedGoodsService
 
     private Map<String, Object> createDemand(
             Demand in,
-            io.github.acczff.mdop.common.manufacturing.ProductionCompletionPort.Input formal) {
+            io.github.acczff.mdop.manufacturingapi.ProductionCompletionPort.Input formal) {
         lockWarehouse(in.warehouseId());
         String code = in.dateCode() == null ? "" : in.dateCode().trim();
         String hash =

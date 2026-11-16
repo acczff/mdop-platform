@@ -2,8 +2,8 @@ package io.github.acczff.mdop.wms.inventory.issue.application;
 
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
-import io.github.acczff.mdop.common.manufacturing.ProductionMaterialGuard;
-import io.github.acczff.mdop.common.manufacturing.ProductionMaterialPort;
+import io.github.acczff.mdop.manufacturingapi.ProductionMaterialGuard;
+import io.github.acczff.mdop.manufacturingapi.ProductionMaterialPort;
 import io.github.acczff.mdop.masterdata.catalog.CatalogService;
 import io.github.acczff.mdop.wms.inventory.ledger.InventoryLedger;
 import io.github.acczff.mdop.wms.inventory.ledger.StockFreeze;
@@ -123,8 +123,7 @@ public class IssueService implements ProductionMaterialPort {
     }
 
     public Map<String, Object> create(Demand input) {
-        io.github.acczff.mdop.common.manufacturing.ProductionNumbers.requireLegacy(
-                input.workOrderNo());
+        io.github.acczff.mdop.manufacturingapi.ProductionNumbers.requireLegacy(input.workOrderNo());
         return createDemand(input, null, null);
     }
 

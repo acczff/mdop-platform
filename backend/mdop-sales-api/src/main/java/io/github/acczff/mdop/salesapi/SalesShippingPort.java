@@ -1,4 +1,4 @@
-package io.github.acczff.mdop.common.sales;
+package io.github.acczff.mdop.salesapi;
 
 import java.math.BigDecimal;
 

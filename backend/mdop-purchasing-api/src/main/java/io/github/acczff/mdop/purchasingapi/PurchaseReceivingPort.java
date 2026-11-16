@@ -1,4 +1,4 @@
-package io.github.acczff.mdop.common.purchasing;
+package io.github.acczff.mdop.purchasingapi;
 
 import java.math.BigDecimal;
 import java.util.List;

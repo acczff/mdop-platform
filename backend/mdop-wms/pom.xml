@@ -26,6 +26,21 @@
 
     <dependency>
       <groupId>io.github.acczff.mdop</groupId>
+      <artifactId>mdop-purchasing-api</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.github.acczff.mdop</groupId>
+      <artifactId>mdop-sales-api</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.github.acczff.mdop</groupId>
+      <artifactId>mdop-manufacturing-api</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.github.acczff.mdop</groupId>
       <artifactId>mdop-security</artifactId>
     </dependency>
 

@@ -1,6 +1,6 @@
 package io.github.acczff.mdop.wms.inventory.sales.application;
 
-import static io.github.acczff.mdop.common.sales.SalesShippingPort.*;
+import static io.github.acczff.mdop.salesapi.SalesShippingPort.*;
 
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;

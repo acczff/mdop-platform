@@ -4,7 +4,7 @@ import static io.github.acczff.mdop.common.BusinessText.required;
 
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
-import io.github.acczff.mdop.common.manufacturing.ProductionCompletionPort;
+import io.github.acczff.mdop.manufacturingapi.ProductionCompletionPort;
 import io.github.acczff.mdop.masterdata.catalog.CatalogService;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;

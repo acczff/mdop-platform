@@ -1,6 +1,6 @@
 package io.github.acczff.mdop.wms.inventory.query.infrastructure;
 
-import io.github.acczff.mdop.common.manufacturing.MaterialStockReference;
+import io.github.acczff.mdop.manufacturingapi.MaterialStockReference;
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.*;

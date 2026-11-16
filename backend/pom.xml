@@ -22,6 +22,10 @@
 
   <modules>
     <module>mdop-common</module>
+    <module>mdop-finance-api</module>
+    <module>mdop-purchasing-api</module>
+    <module>mdop-sales-api</module>
+    <module>mdop-manufacturing-api</module>
     <module>mdop-security</module>
     <module>mdop-system</module>
     <module>mdop-master-data</module>
@@ -63,6 +67,26 @@
       <dependency>
         <groupId>${project.groupId}</groupId>
         <artifactId>mdop-common</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>mdop-finance-api</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>mdop-purchasing-api</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>mdop-sales-api</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>mdop-manufacturing-api</artifactId>
         <version>${project.version}</version>
       </dependency>
 

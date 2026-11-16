@@ -2,8 +2,8 @@ package io.github.acczff.mdop.finance.api;
 
 import static io.github.acczff.mdop.finance.application.FinanceModels.*;
 
-import io.github.acczff.mdop.common.finance.FinanceSourcePort;
 import io.github.acczff.mdop.finance.application.FinanceService;
+import io.github.acczff.mdop.financeapi.FinanceSourcePort;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.util.*;
