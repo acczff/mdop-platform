@@ -1,60 +1,62 @@
 # 文档中心
 
-从本页进入当前使用说明。`project/I*` 是迭代设计和历史验收，`wms/WMS全链路设计.md` 与总体蓝图还包含长期目标；不得把它们全部视为已实现。代码、主干交付、环境部署的区别见[版本与验证记录](project/status.md)。
+> 单一入口见 [INDEX.md](INDEX.md)（按意图与生命周期）；本页是全部文档的**主题目录**，包含历史与验收记录，便于按业务查找。
+
+从本页进入当前使用说明。`90-archive/` 是迭代设计与历史验收，`20-domains/wms/01-WMS全链路设计.md` 与总体蓝图还包含长期目标；不得把它们全部视为已实现。代码、主干交付、环境部署的区别见[版本与验证记录](40-operations/status.md)。
 
 ## 按目标阅读
 
 | 我想要 | 入口 |
 |---|---|
 | 了解项目、能力与边界 | [项目首页](../README.md) |
-| 从空环境启动、创建账号 | [快速开始](guides/quickstart.md) |
-| 跑通收货并检查基本异常 | [WMS 业务演练](guides/wms-walkthrough.md) |
-| 理解列表、详情和业务编号 | [数据展示与业务标识](guides/data-presentation.md) |
-| 了解业务界面风格与验收范围 | [简洁商务设计与采购原型](design/README.md)（采购、销售、生产和库存页面） |
-| 找代码、理解事务与模块依赖 | [架构与代码阅读](reference/architecture.md)、[自动生成的源码导航](reference/source-index.md) |
-| 调接口、处理错误与重试 | [HTTP 接口约定](reference/api.md) |
-| 查配置、启动和排障 | [快速开始](guides/quickstart.md)、[脚本说明](../scripts/README.md)、[部署说明](../deploy/README.md) |
-| 运行回归、下载候选包 | [贡献指南](../CONTRIBUTING.md)、[CI 自动验收](project/CI自动验收.md) |
-| 升级、备份和恢复 | [发布包手册](../deploy/release/RUNBOOK.md)、[恢复演练记录](project/发布与恢复保障.md) |
-| 判断完成度和后续范围 | [公共流程验收清单](project/WMS公共流程验收清单.md)、[整理报告](project/repository-review.md) |
-| 查看 ERP 建设范围与顺序 | [ERP 总体建设范围](project/ERP总体建设范围.md)、[首轮采购销售履约](project/下一阶段业务规划.md)、[采购首个实施切片](project/采购履约实施切片.md)；当前财务切片见下方 R3 说明 |
-| 按基本功能执行 ERP 开发 | [七部分执行规格](erp/README.md)：工作包、状态/数据规则、基本异常、验收与工厂差异边界 |
+| 从空环境启动、创建账号 | [快速开始](00-start/quickstart.md) |
+| 跑通收货并检查基本异常 | [WMS 业务演练](00-start/wms-walkthrough.md) |
+| 理解列表、详情和业务编号 | [数据展示与业务标识](30-development/data-presentation.md) |
+| 了解业务界面风格与验收范围 | [简洁商务设计与采购原型](30-development/design-language.md)（采购、销售、生产和库存页面） |
+| 找代码、理解事务与模块依赖 | [架构与代码阅读](10-architecture/code-reading.md)、[自动生成的源码导航](10-architecture/source-index.md) |
+| 调接口、处理错误与重试 | [HTTP 接口约定](10-architecture/api-contract.md) |
+| 查配置、启动和排障 | [快速开始](00-start/quickstart.md)、[脚本说明](../scripts/README.md)、[部署说明](../deploy/README.md) |
+| 运行回归、下载候选包 | [贡献指南](../CONTRIBUTING.md)、[CI 自动验收](40-operations/ci.md) |
+| 升级、备份和恢复 | [发布包手册](../deploy/release/RUNBOOK.md)、[恢复演练记录](40-operations/release-recovery.md) |
+| 判断完成度和后续范围 | [公共流程验收清单](90-archive/acceptance/WMS公共流程验收清单.md)、[整理报告](90-archive/planning/整理报告.md) |
+| 查看 ERP 建设范围与顺序 | [ERP 总体建设范围](90-archive/planning/ERP总体建设范围.md)、[首轮采购销售履约](90-archive/planning/下一阶段业务规划.md)、[采购首个实施切片](90-archive/planning/采购履约实施切片.md)；当前财务切片见下方 R3 说明 |
+| 按基本功能执行 ERP 开发 | [七部分执行规格](20-domains/erp/README.md)：工作包、状态/数据规则、基本异常、验收与工厂差异边界 |
 
 ## 业务设计与验收
 
 | 主题 | 设计与实现说明 |
 |---|---|
-| 仓库及收货基础资料 | [仓库主数据](project/I1.1仓库主数据方案.md) |
-| ERP 主数据基础 | [MD-01—MD-04 实现与验收](erp/主数据实现与验收.md)：客户/供应商、物料、单位、组织，启停/引用锁/历史快照 |
-| ERP 采购 | [P1：需求与订单](erp/采购P1实现与验收.md)、[P2：分批到货与 WMS](erp/采购P2实现与验收.md)：含操作演练、异常与候选交付边界；[P3：数量履约与结案](erp/采购P3实现与验收.md) |
-| ERP 销售 | [S1—S3：客户订单至实际出库](erp/销售实现与验收.md)：分批安排、撤回、实际数量核对与结案；不含客户退货、应收收款 |
-| ERP 首轮联合验收 | [R1 采购销售联合验收](project/R1采购销售联合验收.md)：ERP-01—10、新空库演练、基本异常、对账缺口修复和同版本恢复 |
-| ERP 生产依据 | [BOM 版本实现与验收](erp/BOM版本实现与验收.md)：草稿、发布、复制、停用、计量快照及循环保护 |
-| ERP 生产授权 | [生产订单实现与验收](erp/生产订单实现与验收.md)：最小地点、手工/销售需求、固定 BOM、异人审核和取消；材料执行后续接入 |
-| ERP 生产收尾 | [工单核对与结束](erp/工单核对与结束实现与验收.md)：未决采购、线边余料、材料差异、完工及成品上架核对，独立审核结束与不可变快照 |
-| ERP 生产联合验收 | [R2 生产采购销售联合验收](project/R2生产采购销售联合验收.md)：同一销售来源贯通采购补料、领退耗、独立完工和同批发货，核对历史快照及备份恢复 |
-| ERP 财务首个切片 | [金额依据与往来确认](erp/金额依据与往来确认实现与验收.md)：演示初始化、人工金额依据、异人确认应收/应付；不含收付款、核销和成本 |
-| ERP 材料计划 | [材料需求实现与验收](erp/材料需求实现与验收.md)：单层展开、库存参考、关联采购、缺口核对及人工转采购需求草稿 |
-| 到货、收货及消息 | [消息接入与可靠反馈](project/I2-I4消息接入与可靠反馈.md)、[采购入库阶段验收](project/采购入库阶段验收.md) |
-| 收货差异、质检和退货 | [差异与冲正](project/I6收货差异与冲正.md)、[质检与上架](project/I7质检与上架.md)、[采购退货](project/I8不合格品采购退货.md) |
-| 库存运营 | [查询与追溯](project/I9库存查询与追溯.md)、[仓内移库](project/I10仓内移库.md)、[盘点](project/I11库存盘点.md)、[冻结与解冻](wms/库存冻结与解冻首版.md) |
-| 生产协同 | [领料](wms/生产领料首版.md)、[消耗与退料](wms/生产消耗与退料闭环.md)、[生产冲正与成品出入库](wms/生产冲正与成品出入库.md) |
-| 跨仓调拨 | [首版](wms/跨仓调拨首版.md)、[分批收货扩展](wms/跨仓调拨分批收货.md)；扩展文档覆盖首版的整单收货限制 |
-| 账号与权限 | [IAM 首版](project/IAM用户与权限首版.md) |
+| 仓库及收货基础资料 | [仓库主数据](90-archive/iterations/I1.1仓库主数据方案.md) |
+| ERP 主数据基础 | [MD-01—MD-04 实现与验收](90-archive/acceptance/erp/主数据实现与验收.md)：客户/供应商、物料、单位、组织，启停/引用锁/历史快照 |
+| ERP 采购 | [P1：需求与订单](90-archive/acceptance/erp/采购P1实现与验收.md)、[P2：分批到货与 WMS](90-archive/acceptance/erp/采购P2实现与验收.md)：含操作演练、异常与候选交付边界；[P3：数量履约与结案](90-archive/acceptance/erp/采购P3实现与验收.md) |
+| ERP 销售 | [S1—S3：客户订单至实际出库](90-archive/acceptance/erp/销售实现与验收.md)：分批安排、撤回、实际数量核对与结案；不含客户退货、应收收款 |
+| ERP 首轮联合验收 | [R1 采购销售联合验收](90-archive/acceptance/R1采购销售联合验收.md)：ERP-01—10、新空库演练、基本异常、对账缺口修复和同版本恢复 |
+| ERP 生产依据 | [BOM 版本实现与验收](90-archive/acceptance/erp/BOM版本实现与验收.md)：草稿、发布、复制、停用、计量快照及循环保护 |
+| ERP 生产授权 | [生产订单实现与验收](90-archive/acceptance/erp/生产订单实现与验收.md)：最小地点、手工/销售需求、固定 BOM、异人审核和取消；材料执行后续接入 |
+| ERP 生产收尾 | [工单核对与结束](90-archive/acceptance/erp/工单核对与结束实现与验收.md)：未决采购、线边余料、材料差异、完工及成品上架核对，独立审核结束与不可变快照 |
+| ERP 生产联合验收 | [R2 生产采购销售联合验收](90-archive/acceptance/R2生产采购销售联合验收.md)：同一销售来源贯通采购补料、领退耗、独立完工和同批发货，核对历史快照及备份恢复 |
+| ERP 财务首个切片 | [金额依据与往来确认](90-archive/acceptance/erp/金额依据与往来确认实现与验收.md)：演示初始化、人工金额依据、异人确认应收/应付；不含收付款、核销和成本 |
+| ERP 材料计划 | [材料需求实现与验收](90-archive/acceptance/erp/材料需求实现与验收.md)：单层展开、库存参考、关联采购、缺口核对及人工转采购需求草稿 |
+| 到货、收货及消息 | [消息接入与可靠反馈](90-archive/iterations/I2-I4消息接入与可靠反馈.md)、[采购入库阶段验收](90-archive/acceptance/采购入库阶段验收.md) |
+| 收货差异、质检和退货 | [差异与冲正](90-archive/iterations/I6收货差异与冲正.md)、[质检与上架](90-archive/iterations/I7质检与上架.md)、[采购退货](90-archive/iterations/I8不合格品采购退货.md) |
+| 库存运营 | [查询与追溯](90-archive/iterations/I9库存查询与追溯.md)、[仓内移库](90-archive/iterations/I10仓内移库.md)、[盘点](90-archive/iterations/I11库存盘点.md)、[冻结与解冻](20-domains/wms/02-库存冻结与解冻首版.md) |
+| 生产协同 | [领料](20-domains/wms/03-生产领料首版.md)、[消耗与退料](20-domains/wms/04-生产消耗与退料闭环.md)、[生产冲正与成品出入库](20-domains/wms/05-生产冲正与成品出入库.md) |
+| 跨仓调拨 | [首版](20-domains/wms/06-跨仓调拨首版.md)、[分批收货扩展](20-domains/wms/07-跨仓调拨分批收货.md)；扩展文档覆盖首版的整单收货限制 |
+| 账号与权限 | [IAM 首版](90-archive/iterations/IAM用户与权限首版.md) |
 
 ## 工程与长期设计
 
 - [后端](../backend/README.md)、[前端工作区](../frontend/README.md)、[管理端](../frontend/apps/admin/README.md)。
-- [I0 工程基线](project/I0工程基线方案.md)：保留初始设计与演进记录，实际目录以源码导航为准。
-- [Java 25 决策](adr/ADR-0001-采用Java25作为项目基线.md)。
-- [财务来源契约决策](adr/ADR-0002-财务通过只读契约引用收发事实.md)：金额与数量职责、同库契约及重新评估条件。
-- [总体蓝图](project/项目总体蓝图.md)、[WMS 全链路设计](wms/WMS全链路设计.md)：长期能力和当前执行范围须区分阅读。
-- [单系统设计模板](templates/单系统全链路模板.md)：供未来新范围复用，不是已交付系统。
+- [I0 工程基线](90-archive/iterations/I0工程基线方案.md)：保留初始设计与演进记录，实际目录以源码导航为准。
+- [Java 25 决策](50-decisions/ADR-0001-采用Java25作为项目基线.md)。
+- [财务来源契约决策](50-decisions/ADR-0002-财务通过只读契约引用收发事实.md)：金额与数量职责、同库契约及重新评估条件。
+- [总体蓝图](90-archive/planning/项目总体蓝图.md)、[WMS 全链路设计](20-domains/wms/01-WMS全链路设计.md)：长期能力和当前执行范围须区分阅读。
+- [单系统设计模板](30-development/system-template.md)：供未来新范围复用，不是已交付系统。
 
 ## 文档维护规则
 
 1. 首页仅写稳定定位、现有能力和入口；某次提交、测试数量、PR 状态写到版本记录，不散落成多个“当前状态”。
 2. 新功能同时更新业务说明、接口/源码导航、验收边界；已有迁移与历史验证证据不改写。
 3. 未实现、已实现未合并、已合并、已部署分别表达。没有证据时写“未验证”，不使用测试成功替代生产可用。
-4. 新页面或控制器加入后运行 `node scripts/docs/check.mjs --write-index`；提交前运行 `node scripts/docs/check.mjs`。该检查只核对仓库内链接、标题锚点和源码导航同步，不验证外部网站、接口行为或 Markdown 所有扩展语法。
+4. 新页面或控制器加入后运行 `node scripts/checks/docs/check.mjs --write-index`；提交前运行 `node scripts/checks/docs/check.mjs`。该检查只核对仓库内链接、标题锚点和源码导航同步，不验证外部网站、接口行为或 Markdown 所有扩展语法。
 5. 公共文档使用相对链接，不引用本机私有路径、临时日志、密码或不可公开的测试数据。测试证据摘要可保留本地路径文字，但不能作为读者必须打开的资料。

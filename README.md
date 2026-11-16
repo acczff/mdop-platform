@@ -4,34 +4,34 @@
 
 MDOP（Manufacturing Digital Operations Platform）使用 Java 25、Spring Boot 和 Vue 3，采用模块化单体架构。当前重点实现 WMS：从采购收货、质检上架，到生产领料、消耗退料、成品出入库和库存运营，保留权限、审计、库存流水及可靠消息。
 
-[快速开始](docs/guides/quickstart.md) · [业务演练](docs/guides/wms-walkthrough.md) · [文档中心](docs/README.md) · [架构与源码](docs/reference/architecture.md) · [贡献指南](CONTRIBUTING.md)
+[快速开始](docs/00-start/quickstart.md) · [业务演练](docs/00-start/wms-walkthrough.md) · [文档中心](docs/README.md) · [架构与源码](docs/10-architecture/code-reading.md) · [贡献指南](CONTRIBUTING.md)
 
 ## 适用范围与成熟度
 
-当前为 `0.1` 开发阶段，用于业务流程验证、工程实践和设计交流。本分支已建立 ERP 主数据、采购需求/订单至收货数量结案、销售客户订单至实际出库数量结案的候选实现。原 ERP 模拟来源仍兼容，MES/QMS 对接使用本地模拟输入或消费者，并非完整子系统。长期 MES、QMS、EAM、IoT、BI 愿景见[总体蓝图](docs/project/项目总体蓝图.md)，不应当作现有功能清单。
+当前为 `0.1` 开发阶段，用于业务流程验证、工程实践和设计交流。本分支已建立 ERP 主数据、采购需求/订单至收货数量结案、销售客户订单至实际出库数量结案的候选实现。原 ERP 模拟来源仍兼容，MES/QMS 对接使用本地模拟输入或消费者，并非完整子系统。长期 MES、QMS、EAM、IoT、BI 愿景见[总体蓝图](docs/90-archive/planning/项目总体蓝图.md)，不应当作现有功能清单。
 
-文档描述**所在分支的代码**。主干、待审 PR、测试证据与部署状态分别记录在[版本与验证记录](docs/project/status.md)；CI 成功不代表生产准入。许可证暂未选择，尚未授予开源复用许可；本轮不添加 LICENSE。
+文档描述**所在分支的代码**。主干、待审 PR、测试证据与部署状态分别记录在[版本与验证记录](docs/40-operations/status.md)；CI 成功不代表生产准入。许可证暂未选择，尚未授予开源复用许可；本轮不添加 LICENSE。
 
 ## 当前能力
 
 | 业务 | 已实现闭环 | 主要边界 |
 |---|---|---|
 | 基础资料 | 客户/供应商、物料、单位、单组织维护，版本/审计与启停，业务引用锁及单据快照 | 一物料一个基本单位；含最小生产地点，不含复杂换算及多组织 |
-| 采购需求与订单 | 手工需求、异人审核、整单转订单、分批到货、WMS 送达/撤回、来源和审计 | [P1](docs/erp/采购P1实现与验收.md) / [P2](docs/erp/采购P2实现与验收.md) / [P3 数量结案](docs/erp/采购P3实现与验收.md)；金额独立由财务确认，不含自动计税、付款、拆单或汇单 |
-| 销售订单 | 客户订单、异人审批、按行分批安排、正式 WMS 执行、实际已发核对与数量结案 | [S1—S3](docs/erp/销售实现与验收.md)；单客户单成品仓，单次 WMS 执行单批次整笔；金额独立由财务确认，不含客户退货 |
-| BOM 版本 | 草稿维护、发布、复制新版本、停用、组件/单位快照及循环保护 | [BOM 实现](docs/erp/BOM版本实现与验收.md)；单层资料闭环 |
-| 生产授权与执行 | 手工/销售需求、整量工单、固定 BOM、异人审核、材料需求/缺口、人工转采购、领料消耗退料、完工登记与复核、工单结束核对 | [生产订单](docs/erp/生产订单实现与验收.md) / [材料需求](docs/erp/材料需求实现与验收.md) / [领料消耗退料](docs/erp/工单领料消耗退料实现与验收.md) / [完工入库](docs/erp/完工复核与成品入库实现与验收.md) / [工单核对与结束](docs/erp/工单核对与结束实现与验收.md)；计算不预占，数量结束不代表成本结清 |
+| 采购需求与订单 | 手工需求、异人审核、整单转订单、分批到货、WMS 送达/撤回、来源和审计 | [P1](docs/90-archive/acceptance/erp/采购P1实现与验收.md) / [P2](docs/90-archive/acceptance/erp/采购P2实现与验收.md) / [P3 数量结案](docs/90-archive/acceptance/erp/采购P3实现与验收.md)；金额独立由财务确认，不含自动计税、付款、拆单或汇单 |
+| 销售订单 | 客户订单、异人审批、按行分批安排、正式 WMS 执行、实际已发核对与数量结案 | [S1—S3](docs/90-archive/acceptance/erp/销售实现与验收.md)；单客户单成品仓，单次 WMS 执行单批次整笔；金额独立由财务确认，不含客户退货 |
+| BOM 版本 | 草稿维护、发布、复制新版本、停用、组件/单位快照及循环保护 | [BOM 实现](docs/90-archive/acceptance/erp/BOM版本实现与验收.md)；单层资料闭环 |
+| 生产授权与执行 | 手工/销售需求、整量工单、固定 BOM、异人审核、材料需求/缺口、人工转采购、领料消耗退料、完工登记与复核、工单结束核对 | [生产订单](docs/90-archive/acceptance/erp/生产订单实现与验收.md) / [材料需求](docs/90-archive/acceptance/erp/材料需求实现与验收.md) / [领料消耗退料](docs/90-archive/acceptance/erp/工单领料消耗退料实现与验收.md) / [完工入库](docs/90-archive/acceptance/erp/完工复核与成品入库实现与验收.md) / [工单核对与结束](docs/90-archive/acceptance/erp/工单核对与结束实现与验收.md)；计算不预占，数量结束不代表成本结清 |
 | 采购入库 | 模拟到货、草稿、分批收货、质检、上架、差异与冲正、不合格采购退货 | 不含退款、财务、序列号、复检、部分上架 |
 | 生产物料协同 | 模拟 MES 需求、预占、发料到线边、实际消耗、余料退回、异人审批冲正 | 发料保留总库存，消耗才扣减；不实现 MES 排程/报工 |
 | 成品出入库 | 正式复核完工或模拟需求、实物收货、待检、模拟判定、上架；销售预占、拣货、复核、出库 | 不含客户退货、真实 MES/QMS 适配 |
 | 库存运营 | 库存及流水查询、同仓移库、快照盘点、冻结/异人解冻、跨仓分批实收 | 不含运输短少核销、调拨冲正、部分数量冻结 |
 | 用户与消息 | 数据库账号、固定角色、仓库范围、会话失效、审计；Inbox/Outbox、重放、模拟对账 | 不含多租户、组织树、SSO、自定义角色和动态审批流 |
-| 金额依据与往来 | 单组织人民币演示基线、人工登记已确认收发事实金额、异人复核确认应收/应付、来源与审计追溯 | [R3 首个切片](docs/erp/金额依据与往来确认实现与验收.md)；不自动计税或回填历史，不含收付款、核销、反向调整及成本 |
+| 金额依据与往来 | 单组织人民币演示基线、人工登记已确认收发事实金额、异人复核确认应收/应付、来源与审计追溯 | [R3 首个切片](docs/90-archive/acceptance/erp/金额依据与往来确认实现与验收.md)；不自动计税或回填历史，不含收付款、核销、反向调整及成本 |
 | 工程交付 | 回归 CI、同次构建候选包、文件校验、停写备份及空库恢复工具 | 不自动部署；隔离恢复演练不等于任意生产库升级保证 |
 
-公共流程及基本异常的逐项标准见 [WMS 验收清单](docs/project/WMS公共流程验收清单.md)。企业差异化规则按具体工作环境另行确认。
+公共流程及基本异常的逐项标准见 [WMS 验收清单](docs/90-archive/acceptance/WMS公共流程验收清单.md)。企业差异化规则按具体工作环境另行确认。
 
-列表与详情采用[数据展示与业务标识规范](docs/guides/data-presentation.md)：区分业务单号与内部引用、当前库存与累计执行、业务日期与操作时间；具体候选验收状态见版本记录。
+列表与详情采用[数据展示与业务标识规范](docs/30-development/data-presentation.md)：区分业务单号与内部引用、当前库存与累计执行、业务日期与操作时间；具体候选验收状态见版本记录。
 
 ## 工程特点
 
@@ -53,7 +53,7 @@ if (-not (Test-Path deploy/env/.env.local)) {
 }
 ```
 
-**启动前编辑** `deploy/env/.env.local`：填写本机 JDK/Node 目录、各服务独立密码、管理员初始化密码；保留模板后端端口 `8081`。路径和密码示例、初始化顺序与排障见[快速开始](docs/guides/quickstart.md)。
+**启动前编辑** `deploy/env/.env.local`：填写本机 JDK/Node 目录、各服务独立密码、管理员初始化密码；保留模板后端端口 `8081`。路径和密码示例、初始化顺序与排障见[快速开始](docs/00-start/quickstart.md)。
 
 ```powershell
 .\mdop.cmd start
@@ -82,10 +82,10 @@ Windows 一键启动由仓库脚本提供；Linux CI 使用 Maven Wrapper/Corepa
 | [docs](docs/README.md) | 入门、架构/接口、业务设计、验收记录、ADR 与长期规划 |
 | [.github](.github/workflows/ci.yml) | CI、Issue 与 PR 模板 |
 
-从 [源码导航](docs/reference/source-index.md) 查找页面、控制器及全部迁移；从 [代码阅读指南](docs/reference/architecture.md) 理解调用链与修改边界。
+从 [源码导航](docs/10-architecture/source-index.md) 查找页面、控制器及全部迁移；从 [代码阅读指南](docs/10-architecture/code-reading.md) 理解调用链与修改边界。
 
 ## 参与与反馈
 
 缺陷或建议请使用 [Issues](https://github.com/acczff/mdop-platform/issues)，注明提交版本和复现步骤。贡献流程、检查命令和中文提交格式见 [CONTRIBUTING.md](CONTRIBUTING.md)。安全问题按 [SECURITY.md](SECURITY.md) 私下报告，不公开凭据或可利用细节。
 
-先完善现有公共流程、文档与交付质量；运输短少核销等复杂业务暂缓。完整规划与现实差距见[项目整理报告](docs/project/repository-review.md)。
+先完善现有公共流程、文档与交付质量；运输短少核销等复杂业务暂缓。完整规划与现实差距见[项目整理报告](docs/90-archive/planning/整理报告.md)。

@@ -10,7 +10,7 @@ MDOP 前端使用 pnpm（高效的 Node.js 包管理器）工作区管理应用�
 - 管理端：Vue 3、TypeScript、Vue Router、Pinia、Vite 和 Vitest。
 - 质量工具：Prettier 3.9.5 和 ESLint 10.7.0。
 
-用户与固定角色分配、账号审计和本人改密的范围见[用户与权限首版](../docs/project/IAM用户与权限首版.md)。
+用户与固定角色分配、账号审计和本人改密的范围见[用户与权限首版](../docs/90-archive/iterations/IAM用户与权限首版.md)。
 
 ## 当前结构
 
@@ -27,7 +27,7 @@ frontend
 
 admin 应用的职责、源码结构和验证方式见 [apps/admin/README.md](apps/admin/README.md)。
 
-生产工单中的 `MaterialPlanPanel` 承载材料需求核对和采购建议确认，复用统一请求客户端并保留未知写入的原请求。业务口径及页面边界见[材料需求实现](../docs/erp/材料需求实现与验收.md)。
+生产工单中的 `MaterialPlanPanel` 承载材料需求核对和采购建议确认，复用统一请求客户端并保留未知写入的原请求。业务口径及页面边界见[材料需求实现](../docs/90-archive/acceptance/erp/材料需求实现与验收.md)。
 
 ## 首次准备
 
@@ -67,12 +67,12 @@ admin 应用的职责、源码结构和验证方式见 [apps/admin/README.md](ap
 
 ## 历史验证（2026-10-07）
 
-CI 的 `Frontend verify` 复用 `pnpm run verify`，先按锁文件安装依赖。`CI` 环境额外输出 `apps/admin/test-results/junit.xml`，生成报告不提交 Git；触发、失败日志及构建产物见 [CI 自动验收](../docs/project/CI自动验收.md)。下列数量为最近一次 WMS 验收记录，CI 结果以相应提交的实际运行结果为准。
+CI 的 `Frontend verify` 复用 `pnpm run verify`，先按锁文件安装依赖。`CI` 环境额外输出 `apps/admin/test-results/junit.xml`，生成报告不提交 Git；触发、失败日志及构建产物见 [CI 自动验收](../docs/40-operations/ci.md)。下列数量为最近一次 WMS 验收记录，CI 结果以相应提交的实际运行结果为准。
 
 - `pnpm.cmd run dev`：管理端业务页面已在隔离环境进行浏览器验收。
 - `pnpm.cmd run format:check`：Prettier 格式检查通过。
 - `pnpm.cmd run lint`：ESLint 静态检查通过，无警告或错误。
-- `pnpm.cmd run test`：19 个 Vitest 测试文件、68 个测试用例通过；详见 [WMS 公共流程验收清单](../docs/project/WMS公共流程验收清单.md)。
+- `pnpm.cmd run test`：19 个 Vitest 测试文件、68 个测试用例通过；详见 [WMS 公共流程验收清单](../docs/90-archive/acceptance/WMS公共流程验收清单.md)。
 - `pnpm.cmd run type-check`：TypeScript 与 Vue 类型检查通过。
 - `pnpm.cmd run build`：Vite 生产构建通过。
 - `pnpm.cmd run verify`：格式检查、静态检查、单元测试、类型检查和生产构建全部通过。
@@ -87,4 +87,4 @@ CI 的 `Frontend verify` 复用 `pnpm run verify`，先按锁文件安装依赖�
 - 已提供采购入库、生产物料协同、成品出入库、库存运营与消息管理。查询失败和不确定写入按页面处理；先刷新核对事实，有幂等键的操作保持原键与载荷，不能把所有写操作都视为可直接重试。
 - 完整 IAM、JWT 和真实外部系统接入尚未实现；前端不直接修改数据库，当前只验证本地模拟业务。
 
-当前分支已包含数据库账号、固定角色、账号审计和本人改密。最新带提交身份的验证数量见[版本记录](../docs/project/status.md)，完整页面清单见[源码导航](../docs/reference/source-index.md)。
+当前分支已包含数据库账号、固定角色、账号审计和本人改密。最新带提交身份的验证数量见[版本记录](../docs/40-operations/status.md)，完整页面清单见[源码导航](../docs/10-architecture/source-index.md)。

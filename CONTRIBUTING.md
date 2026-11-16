@@ -8,7 +8,7 @@
 4. 本地完成适用的格式化、测试和构建检查。
 5. 通过 Pull Request 合并，禁止直接向 `main` 提交日常功能。
 
-PR 创建和更新后，核对最新提交的 `Documentation verify`、`Backend verify`、`Frontend verify` 和 `Release candidate` 四项 CI 检查；失败时先查看步骤日志与诊断产物。绿色检查不替代业务审查，未配置分支保护时也不会自动阻止合并。具体触发、报告和边界见 [CI 自动验收](docs/project/CI自动验收.md)。
+PR 创建和更新后，核对最新提交的 `Documentation verify`、`Backend verify`、`Frontend verify` 和 `Release candidate` 四项 CI 检查；失败时先查看步骤日志与诊断产物。绿色检查不替代业务审查，未配置分支保护时也不会自动阻止合并。具体触发、报告和边界见 [CI 自动验收](docs/40-operations/ci.md)。
 
 推荐分支名：
 
@@ -26,20 +26,21 @@ PR 创建和更新后，核对最新提交的 `Documentation verify`、`Backend 
 
 ## 完成定义
 
-先按[快速开始](docs/guides/quickstart.md)准备工具链和依赖，从仓库根目录运行对应检查：
+先按[快速开始](docs/00-start/quickstart.md)准备工具链和依赖，从仓库根目录运行对应检查：
 
 | 改动 | 本地检查 |
 |---|---|
 | Java / SQL / 认证 / 消息 | `.\backend\mvnw.cmd -f backend/pom.xml verify`，当前终端使用 JDK 25，Docker 可连接 |
 | 前端 | `.\scripts\pnpm.cmd run verify`，Node 与 scripts 入口在当前 PATH |
-| 文档 / 路由 / 控制器 / 模块 / 迁移 | `node scripts/docs/check.mjs`；导航变化先 `node scripts/docs/check.mjs --write-index` |
-| 文档工具 | `node --test scripts/docs/check.test.mjs` |
+| 文档 / 路由 / 控制器 / 模块 / 迁移 | `node scripts/checks/docs/check.mjs`；导航变化先 `node scripts/checks/docs/check.mjs --write-index` |
+| 模块边界 / 分层 / 迁移归属 | `node scripts/checks/architecture/check.mjs`；规则回归 `node --test scripts/checks/architecture/check.test.mjs` |
+| 文档工具 | `node --test scripts/checks/docs/check.test.mjs` |
 | 发布 / 备份工具 | `node --test scripts/release/release.test.mjs` |
 | 全部业务 | `.\mdop.cmd verify`；文档和发布工具检查另行执行 |
 
 Linux CI 的 Maven 命令为 `./backend/mvnw -f backend/pom.xml verify`；前端在 `frontend` 目录使用锁定版本 pnpm 安装并执行 `verify`。不要提交运行日志、测试报告、备份、node_modules 或构建包。CI 当前对所有 PR 完整运行，不根据文件路径跳过。
 
-README 只保留稳定概览；功能范围更新所属业务文档，版本/测试证据更新[版本记录](docs/project/status.md)，文档分层规则见[文档中心](docs/README.md)。历史测试不改写成当前结果，已应用迁移不修改。
+README 只保留稳定概览；功能范围更新所属业务文档，版本/测试证据更新[版本记录](docs/40-operations/status.md)，文档分层规则见[文档中心](docs/README.md)。历史测试不改写成当前结果，已应用迁移不修改。
 
 每个变更至少满足：
 
