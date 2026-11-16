@@ -110,7 +110,7 @@ export const navigation = [
       {
         path: '/messages',
         name: '消息管理',
-        permission: 'integration:simulate',
+        permission: ['integration:messages:manage', 'integration:simulate'],
       },
     ],
   },

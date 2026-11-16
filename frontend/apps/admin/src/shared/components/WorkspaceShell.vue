@@ -23,12 +23,18 @@ const groups = computed(() =>
   navigation
     .map((group) => ({
       ...group,
-      items: group.items.filter(
-        (item) =>
-          props.authorities.includes(item.permission) ||
+      items: group.items.filter((item) => {
+        const required = Array.isArray(item.permission)
+          ? item.permission
+          : [item.permission]
+        return (
+          required.some((permission) =>
+            props.authorities.includes(permission),
+          ) ||
           (item.legacyAdmin !== false &&
-            props.authorities.includes('ROLE_ADMIN')),
-      ),
+            props.authorities.includes('ROLE_ADMIN'))
+        )
+      }),
     }))
     .filter((group) => group.items.length),
 )
