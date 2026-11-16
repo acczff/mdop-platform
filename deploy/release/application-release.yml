@@ -10,6 +10,11 @@ spring:
     username: ${MDOP_RABBITMQ_USER:unused}
     password: ${MDOP_RABBITMQ_PASSWORD:unused}
     virtual-host: ${MDOP_RABBITMQ_VHOST:/}
+  data:
+    redis:
+      host: ${MDOP_REDIS_HOST:127.0.0.1}
+      port: ${MDOP_REDIS_PORT:6379}
+      password: ${MDOP_REDIS_PASSWORD:}
 server:
   address: 127.0.0.1
   port: ${MDOP_BACKEND_PORT:8081}

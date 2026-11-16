@@ -15,8 +15,6 @@
 | 4 | 主数据层间直连 | `WarehouseService` 直接 import 2 个 `infrastructure` 类型（已入基线） | 下次改该模块时 | 引入领域端口，`JpaRepository` 留在 `infrastructure` 实现 |
 | 5 | 库存余额直写 | 13 个文件、27 条写入直接改 `wms_inventory_balance`，已由 `BALANCE_WRITE` 规则冻结 | 新增写入（规则直接拦截）或迁移单条路径时 | 经 `InventoryLedger` 写入；每迁一条从基线删除对应条目 |
 | 6 | 富服务 | `PurchaseService`、`ProductionClosureService`、`IssueService` 仍混有写语句、幂等、审计 | 该用例有实质改动时 | 按用例抽协作者，保留原事务入口；不整体重写 |
-| 7 | 限流状态在进程内 | `LoginThrottle` 用 `ConcurrentHashMap`，多实例各自计数 | 部署多实例或前置负载均衡 | 换 Redis 计数，键与窗口保持不变 |
-| 8 | 会话在进程内 | Servlet 会话未外置，重启即失效 | 需要多实例或无中断发布 | Spring Session + Redis |
 | 9 | 数据完整性错误泛化 | `DataIntegrityViolationException` 统一映射 409，不指出具体约束 | 排障成本成为问题时 | 按约束名映射错误码，保留通用兜底 |
 
 ## 使用方式

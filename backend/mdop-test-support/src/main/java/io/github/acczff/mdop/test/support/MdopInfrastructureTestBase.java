@@ -2,6 +2,8 @@ package io.github.acczff.mdop.test.support;
 
 import java.util.UUID;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -52,6 +54,16 @@ public abstract class MdopInfrastructureTestBase {
                     .withExposedPorts(REDIS_PORT)
                     .withEnv("REDISCLI_AUTH", REDIS_PASSWORD)
                     .withCommand("redis-server", "--requirepass", REDIS_PASSWORD);
+
+    /**
+     * 将 Testcontainers 启动的 Redis 连接到 Spring Data Redis / Spring Session。
+     */
+    @DynamicPropertySource
+    static void mdopRedisProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.data.redis.host", REDIS::getHost);
+        registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(REDIS_PORT));
+        registry.add("spring.data.redis.password", () -> REDIS_PASSWORD);
+    }
 
     /**
      * 生成仅在当前测试进程中使用的临时凭据，不读取本地环境配置。

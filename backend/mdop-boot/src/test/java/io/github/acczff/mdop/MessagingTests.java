@@ -568,6 +568,46 @@ class MessagingTests extends MdopInfrastructureTestBase {
                 .isEqualTo(2);
     }
 
+    @Test
+    void concurrentWorkersDoNotDoubleClaimSameOutboxMessage() throws Exception {
+        String id = UUID.randomUUID().toString();
+        db.update(
+                "INSERT INTO wms_outbox(message_id,event_type,event_version,source_system,occurred_at,trace_id,aggregate_type,aggregate_id,business_key,payload,status) VALUES (?,?,?,?,CURRENT_TIMESTAMP(6),?,?,?,?,?,'PENDING')",
+                id,
+                "PurchaseReceiptConfirmed",
+                1,
+                "WMS",
+                "trace-" + id,
+                "Receipt",
+                1L,
+                "biz-" + id,
+                "{}");
+        var gate = new java.util.concurrent.CountDownLatch(1);
+        DeliveryService.Claim first;
+        DeliveryService.Claim second;
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var f1 =
+                    pool.submit(
+                            () -> {
+                                gate.await();
+                                return delivery.claim(DeliveryService.Direction.OUTBOX);
+                            });
+            var f2 =
+                    pool.submit(
+                            () -> {
+                                gate.await();
+                                return delivery.claim(DeliveryService.Direction.OUTBOX);
+                            });
+            gate.countDown();
+            first = f1.get(15, java.util.concurrent.TimeUnit.SECONDS);
+            second = f2.get(15, java.util.concurrent.TimeUnit.SECONDS);
+        }
+        var claimed = java.util.stream.Stream.of(first, second).filter(Objects::nonNull).toList();
+        assertThat(claimed).hasSize(1);
+        assertThat(claimed.getFirst().messageId()).isEqualTo(id);
+        delivery.complete(DeliveryService.Direction.OUTBOX, claimed.getFirst());
+    }
+
     int count(String sql, Object... args) {
         return db.queryForObject(sql, Integer.class, args);
     }

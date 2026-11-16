@@ -5,12 +5,12 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import jakarta.servlet.http.Cookie;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import tools.jackson.databind.JsonNode;
@@ -41,8 +41,8 @@ class AccountWorkflowTests extends InventoryScenarioSupport {
                 201);
     }
 
-    MockHttpSession login(JsonNode account) throws Exception {
-        return (MockHttpSession)
+    Cookie login(JsonNode account) throws Exception {
+        var result =
                 mvc.perform(
                                 post("/api/auth/login")
                                         .with(csrf())
@@ -53,17 +53,16 @@ class AccountWorkflowTests extends InventoryScenarioSupport {
                                                         .toUpperCase(Locale.ROOT))
                                         .param("password", password))
                         .andExpect(status().isNoContent())
-                        .andReturn()
-                        .getRequest()
-                        .getSession(false);
+                        .andReturn();
+        Cookie cookie = result.getResponse().getCookie("SESSION");
+        return cookie != null ? cookie : result.getResponse().getCookie("JSESSIONID");
     }
 
-    JsonNode send(String path, Object body, MockHttpSession session, int expected)
-            throws Exception {
+    JsonNode send(String path, Object body, Cookie session, int expected) throws Exception {
         var result =
                 mvc.perform(
                                 post(path)
-                                        .session(session)
+                                        .cookie(session)
                                         .with(csrf())
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(json.writeValueAsBytes(body)))
@@ -104,7 +103,7 @@ class AccountWorkflowTests extends InventoryScenarioSupport {
                         "变更角色仍不能自审"),
                 user("manager").authorities(new SimpleGrantedAuthority("iam:manage")),
                 200);
-        mvc.perform(get("/api/auth/me").session(opSession)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/auth/me").cookie(opSession)).andExpect(status().isUnauthorized());
         send(
                 "/api/v1/wms/freezes/" + id + "/release",
                 Map.of("idempotencyKey", key(), "reason", "禁止本人自审"),
