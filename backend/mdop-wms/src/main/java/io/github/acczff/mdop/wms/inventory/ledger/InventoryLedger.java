@@ -2,7 +2,6 @@ package io.github.acczff.mdop.wms.inventory.ledger;
 
 import io.github.acczff.mdop.common.BusinessException;
 import io.github.acczff.mdop.common.audit.CurrentActorProvider;
-import io.github.acczff.mdop.wms.inventory.StockFreeze;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Clock;

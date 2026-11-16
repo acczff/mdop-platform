@@ -263,7 +263,7 @@ public class CorrectionService {
                             .query()
                             .singleRow();
             BigDecimal before = (BigDecimal) balance.get("on_hand_qty");
-            io.github.acczff.mdop.wms.inventory.StockFreeze.requireUnfrozen(balance);
+            io.github.acczff.mdop.wms.inventory.ledger.StockFreeze.requireUnfrozen(balance);
             if (!balance.get("quality_status").equals("PENDING_INSPECTION")
                     || ((BigDecimal) balance.get("available_qty")).signum() != 0
                     || before.compareTo(qty) < 0)

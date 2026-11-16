@@ -1,6 +1,6 @@
 package io.github.acczff.mdop.integration.messaging;
 
-import io.github.acczff.mdop.wms.inventory.IssueService;
+import io.github.acczff.mdop.wms.inventory.issue.application.IssueService;
 import jakarta.validation.constraints.Positive;
 import java.util.*;
 import org.springframework.jdbc.core.simple.JdbcClient;
