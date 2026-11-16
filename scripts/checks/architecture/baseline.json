@@ -115,6 +115,13 @@
     },
     {
       "rule": "DML_OWNERSHIP",
+      "subject": "mdop-integration → wms_outbox",
+      "detail": "backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/OutboxMetricsBinder.java 的 SQL 引用了属于 mdop-wms 的表 wms_outbox",
+      "file": "backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/OutboxMetricsBinder.java",
+      "reason": "集成可观测性指标绑定器直接只读统计 WMS 发件箱表，待消息契约抽象后收敛"
+    },
+    {
+      "rule": "DML_OWNERSHIP",
       "subject": "mdop-manufacturing → mdm_warehouse",
       "detail": "backend/mdop-manufacturing/src/main/java/io/github/acczff/mdop/manufacturing/application/CompletionService.java 的 SQL 引用了属于 mdop-master-data 的表 mdm_warehouse",
       "file": "backend/mdop-manufacturing/src/main/java/io/github/acczff/mdop/manufacturing/application/CompletionService.java",
