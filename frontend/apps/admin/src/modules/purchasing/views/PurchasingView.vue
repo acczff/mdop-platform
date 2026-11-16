@@ -1,151 +1,31 @@
 <script setup lang="ts">
-import RecordTabs from '@/shared/components/RecordTabs.vue'
-import ResultPager from '@/shared/components/ResultPager.vue'
-import RecordHeading from '@/shared/components/RecordHeading.vue'
-import OperationRecord from '@/shared/components/OperationRecord.vue'
-import OperationTimeNote from '@/shared/components/OperationTimeNote.vue'
-
-import { identity } from '@/shared/presentation'
-import {
-  businessDate,
-  quantity as displayQuantity,
-} from '@/shared/presentation'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ApiError, request, type Page } from '@/shared/api'
 import { type Warehouse } from '@/modules/masterdata/api'
-import { remaining, scaled } from '@/shared/quantity'
-import PurchaseFulfillmentPanel from '@/modules/purchasing/components/PurchaseFulfillmentPanel.vue'
-import type { Fulfillment, Closure } from '@/modules/purchasing/api'
+import { scaled } from '@/shared/quantity'
+import {
+  stateText,
+  type DirectoryEntry,
+  type Kind,
+  type PendingRequest,
+  type PurchaseDocument,
+  type PurchaseDraft,
+} from '../api'
+import PurchaseDocumentList from '../components/PurchaseDocumentList.vue'
+import PurchaseDocumentDetail from '../components/PurchaseDocumentDetail.vue'
+import PurchaseDocumentModal from '../components/PurchaseDocumentModal.vue'
 
 const props = defineProps<{ authorities: string[]; username: string }>()
-type Kind = 'REQUEST' | 'ORDER'
-interface Line {
-  id: number
-  source_line_id: number | null
-  material_id: number
-  material_code: string
-  material_name: string
-  unit: string
-  quantity: string
-}
-interface Document {
-  displayLocations?: { id: number; code: string; name: string }[]
-  id: number
-  document_no: string
-  kind: Kind
-  warehouse_id: number
-  warehouse_name: string
-  status: string
-  version: number
-  purpose: string
-  needed_date: string
-  supplier_id: number | null
-  supplier_name: string | null
-  request_id: number | null
-  original_order_id?: number | null
-  source_type?: string
-  production_order_no?: string | null
-  production_plan_line_id?: number | null
-  created_by: string
-  last_edited_by: string
-  submitted_by: string | null
-  lines: Line[]
-  history: {
-    id: number
-    action: string
-    reason: string
-    created_by: string
-    created_at: string
-    before_state: string | null
-    after_state: string
-  }[]
-  related: { id: number; document_no: string; status: string }[]
-  arrangements?: Arrangement[]
-  fulfillment?: Fulfillment
-  closure?: Closure | null
-  closureMatches?: boolean
-}
-interface Arrangement {
-  id: number
-  expected_date: string
-  status: string
-  last_error: string | null
-  wms_arrival_id: number | null
-  lines: {
-    id: number
-    order_line_id: number
-    material_code: string
-    quantity: string
-    wms_arrival_item_id: number | null
-  }[]
-  wms?: {
-    status: string
-    lines: { arrangementLineId: number; receivedQty: string }[]
-    receipts: { id: number; number: string; status: string }[]
-  }
-}
-interface Directory {
-  id: number
-  code: string
-  name: string
-  status: string
-  unit?: string
-}
-interface Pending {
-  url: string
-  method: string
-  body: string
-  warehouse: number
-}
+
 const base = '/api/v1/purchasing/documents'
-const statuses: Record<string, string> = {
-  DRAFT: '草稿',
-  SUBMITTED: '待审核',
-  APPROVED: '已批准',
-  REJECTED: '已驳回',
-  CONVERTED: '已转单',
-  CANCELLED: '已取消',
-  FULFILLING: '履约中',
-  CLOSED: '已结案',
-  PENDING: '待送达',
-  DELIVERED: '已送达',
-  WITHDRAWN: '已撤回',
-}
-const actions: Record<string, string> = {
-  submit: '提交审核',
-  approve: '批准',
-  reject: '驳回',
-  cancel: '取消',
-  convert: '转采购订单',
-  arrange: '安排到货',
-  deliver: '送达 WMS',
-  withdraw: '撤回安排',
-  close: '履约结案',
-}
-const auditNames: Record<string, string> = {
-  PRODUCTION: '生产采购建议',
-  CREATE: '建单',
-  EDIT: '编辑',
-  SUBMIT: '提交审核',
-  APPROVE: '批准',
-  REJECT: '驳回',
-  CANCEL: '取消',
-  CONVERT: '转采购订单',
-  RELEASE_ORDER: '释放订单占用',
-  ARRANGE: '安排到货',
-  DELIVER: '送达 WMS',
-  WITHDRAW: '撤回安排',
-  DELIVERY_FAILED: '送达失败',
-  CLOSE: '履约结案',
-}
 const kind = ref<Kind>('REQUEST'),
   warehouse = ref(0),
   page = ref(0)
 const warehouses = ref<Warehouse[]>([]),
-  materials = ref<Directory[]>([]),
-  suppliers = ref<Directory[]>([])
-const result = ref<{ items: Document[]; total: number }>(),
-  detail = ref<Document>()
+  materials = ref<DirectoryEntry[]>([]),
+  suppliers = ref<DirectoryEntry[]>([])
+const result = ref<{ items: PurchaseDocument[]; total: number }>(),
+  detail = ref<PurchaseDocument>()
 const ready = ref(false),
   loading = ref(false),
   busy = ref(false),
@@ -156,26 +36,67 @@ const ready = ref(false),
 const mode = ref(''),
   reason = ref(''),
   formError = ref('')
-const draft = ref({
+const draft = ref<PurchaseDraft>({
   purpose: '',
   neededDate: '',
   supplierId: 0,
   lines: [{ materialId: 0, quantity: '' }],
 })
 const storageKey = `mdop-purchasing-pending:${props.username}`
-const pending = ref<Pending>()
+const pending = ref<PendingRequest>()
 const detailTab = ref('overview')
 const detailLoading = ref(false)
 const detailRequestId = ref<number>()
 const pageRoot = ref<HTMLElement>()
 let listScrollTop = 0
-const detailTabs = computed(() => [
-  { id: 'overview' as const, label: '物料与履约' },
-  ...(detail.value?.kind === 'ORDER'
-    ? [{ id: 'arrangements' as const, label: '到货安排' }]
-    : []),
-  { id: 'history' as const, label: '操作记录' },
-])
+const arrangementId = ref(0)
+const originalOrderId = ref<number | null>(null)
+const arrangementLines = ref<{ orderLineId: number; quantity: string }[]>([])
+
+let generation = 0,
+  detailGeneration = 0
+
+const writable = computed(() => props.authorities.includes('purchasing:write'))
+const reviewable = computed(() =>
+  props.authorities.includes('purchasing:review'),
+)
+const canReceive = computed(() =>
+  props.authorities.includes('wms:arrival:read'),
+)
+const canReplenish = computed(
+  () =>
+    writable.value &&
+    detail.value?.kind === 'ORDER' &&
+    !!detail.value.fulfillment?.lines.some((l) => scaled(l.returned) > 0n),
+)
+const pendingPermission = computed(
+  () =>
+    !!pending.value &&
+    props.authorities.includes(`wms:warehouse:${pending.value.warehouse}`) &&
+    (/\/actions\/(approve|reject)$/.test(pending.value.url)
+      ? reviewable.value
+      : writable.value),
+)
+const blocked = computed(
+  () => locked.value || busy.value || !!pending.value || !!mode.value,
+)
+const canEdit = computed(
+  () =>
+    !!detail.value &&
+    ['DRAFT', 'REJECTED'].includes(detail.value.status) &&
+    writable.value,
+)
+const canReview = computed(
+  () =>
+    detail.value?.status === 'SUBMITTED' &&
+    reviewable.value &&
+    ![
+      detail.value.created_by,
+      detail.value.last_edited_by,
+      detail.value.submitted_by,
+    ].includes(props.username),
+)
+
 function returnToList() {
   if (blocked.value) return
   ++detailGeneration
@@ -192,72 +113,13 @@ function returnToList() {
       ?.focus({ preventScroll: true })
   })
 }
-function statusTone(value: string) {
-  if (['CLOSED', 'CONVERTED', 'DELIVERED'].includes(value)) return 'complete'
-  if (['APPROVED', 'FULFILLING'].includes(value)) return 'active'
-  if (['SUBMITTED', 'PENDING'].includes(value)) return 'waiting'
-  if (value === 'REJECTED') return 'rejected'
-  return 'neutral'
-}
-const arrangementId = ref(0)
-const originalOrderId = ref<number | null>(null)
-const canReplenish = computed(
-  () =>
-    writable.value &&
-    detail.value?.kind === 'ORDER' &&
-    detail.value.fulfillment?.lines.some((l) => scaled(l.returned) > 0n),
-)
-const arrangementLines = ref<{ orderLineId: number; quantity: string }[]>([])
-const canReceive = computed(() =>
-  props.authorities.includes('wms:arrival:read'),
-)
-function allocated(lineId: number) {
-  const value = (detail.value?.arrangements || [])
-    .filter((a) => a.status !== 'WITHDRAWN')
-    .flatMap((a) => a.lines)
-    .filter((l) => l.order_line_id === lineId)
-    .reduce((sum, l) => sum + scaled(l.quantity), 0n)
-  return `${value / 1000000n}.${(value % 1000000n).toString().padStart(6, '0')}`
-}
-let generation = 0,
-  detailGeneration = 0
-const writable = computed(() => props.authorities.includes('purchasing:write'))
-const reviewable = computed(() =>
-  props.authorities.includes('purchasing:review'),
-)
-const pendingPermission = computed(
-  () =>
-    !!pending.value &&
-    props.authorities.includes(`wms:warehouse:${pending.value.warehouse}`) &&
-    (/\/actions\/(approve|reject)$/.test(pending.value.url)
-      ? reviewable.value
-      : writable.value),
-)
-const blocked = computed(
-  () => locked.value || busy.value || !!pending.value || !!mode.value,
-)
-const canEdit = computed(
-  () =>
-    detail.value &&
-    ['DRAFT', 'REJECTED'].includes(detail.value.status) &&
-    writable.value,
-)
-const canReview = computed(
-  () =>
-    detail.value?.status === 'SUBMITTED' &&
-    reviewable.value &&
-    ![
-      detail.value.created_by,
-      detail.value.last_edited_by,
-      detail.value.submitted_by,
-    ].includes(props.username),
-)
-function remember(value?: Pending) {
-  // Persist the original payload before sending so a reload cannot silently generate a new key.
+
+function remember(value?: PendingRequest) {
   if (value) sessionStorage.setItem(storageKey, JSON.stringify(value))
   else sessionStorage.removeItem(storageKey)
   pending.value = value
 }
+
 async function load(next = 0) {
   if (busy.value || locked.value) return
   const token = ++generation
@@ -271,34 +133,32 @@ async function load(next = 0) {
   ready.value = false
   page.value = next
   try {
-    {
-      const all: Warehouse[] = []
-      for (let p = 1; ; p++) {
-        const data = await request<Page<Warehouse>>(
-          `/api/master-data/warehouses?page=${p}&size=100`,
-        )
-        all.push(
-          ...data.items.filter((w) =>
-            props.authorities.includes(`wms:warehouse:${w.id}`),
-          ),
-        )
-        if (p >= data.totalPages) break
-      }
-      const [m, s] = await Promise.all([
-        request<Directory[]>('/api/master-data/materials'),
-        request<Directory[]>('/api/master-data/suppliers'),
-      ])
-      if (token !== generation) return
-      warehouses.value = all
-      materials.value = m
-      suppliers.value = s
-      warehouse.value = all.some((w) => w.id === warehouse.value)
-        ? warehouse.value
-        : all[0]?.id || 0
-      ready.value = true
+    const all: Warehouse[] = []
+    for (let p = 1; ; p++) {
+      const data = await request<Page<Warehouse>>(
+        `/api/master-data/warehouses?page=${p}&size=100`,
+      )
+      all.push(
+        ...data.items.filter((w) =>
+          props.authorities.includes(`wms:warehouse:${w.id}`),
+        ),
+      )
+      if (p >= data.totalPages) break
     }
+    const [m, s] = await Promise.all([
+      request<DirectoryEntry[]>('/api/master-data/materials'),
+      request<DirectoryEntry[]>('/api/master-data/suppliers'),
+    ])
+    if (token !== generation) return
+    warehouses.value = all
+    materials.value = m
+    suppliers.value = s
+    warehouse.value = all.some((w) => w.id === warehouse.value)
+      ? warehouse.value
+      : all[0]?.id || 0
+    ready.value = true
     if (!warehouse.value) return
-    const data = await request<{ items: Document[]; total: number }>(
+    const data = await request<{ items: PurchaseDocument[]; total: number }>(
       `${base}?warehouseId=${warehouse.value}&kind=${kind.value}&page=${next}&size=20`,
     )
     if (token === generation) result.value = data
@@ -308,12 +168,14 @@ async function load(next = 0) {
     if (token === generation) loading.value = false
   }
 }
+
 function switchKind(value: Kind) {
   if (blocked.value) return
   kind.value = value
   notice.value = ''
   void load()
 }
+
 async function openDetail(id: number) {
   if (blocked.value) return
   if (!detail.value && !detailLoading.value && !detailError.value)
@@ -326,7 +188,7 @@ async function openDetail(id: number) {
   detail.value = undefined
   detailError.value = ''
   try {
-    const data = await request<Document>(`${base}/${id}`)
+    const data = await request<PurchaseDocument>(`${base}/${id}`)
     if (token === detailGeneration) {
       detail.value = data
       await nextTick()
@@ -341,6 +203,7 @@ async function openDetail(id: number) {
     if (token === detailGeneration) detailLoading.value = false
   }
 }
+
 function open(value: string, target = 0) {
   if (blocked.value || !result.value) return
   mode.value = value
@@ -371,41 +234,20 @@ function open(value: string, target = 0) {
             })) || [],
         }
 }
+
 function close() {
   if (busy.value || pending.value) return
   mode.value = ''
   formError.value = ''
 }
-function stateText(value: string) {
-  return statuses[value] || value
-}
-function describeSnapshot(raw: string | null) {
-  if (!raw) return '无前值'
-  try {
-    const d = JSON.parse(raw) as Document
-    return [
-      stateText(d.status),
-      d.purpose,
-      `${d.warehouse_name} · ${d.needed_date}`,
-      d.supplier_name,
-      d.original_order_id ? `补货原订单 #${d.original_order_id}` : '',
-      ...d.lines.map(
-        (l) =>
-          `${l.material_code} · ${l.material_name}：${l.quantity} ${l.unit}`,
-      ),
-      ...(d.arrangements || []).map(
-        (a) =>
-          `到货 #${a.id} · ${stateText(a.status)} · ${a.expected_date} · ${a.lines.map((l) => `${l.material_code} ${l.quantity}`).join('，')}${a.last_error ? ' · ' + a.last_error : ''}`,
-      ),
-    ]
-      .filter(Boolean)
-      .join('\n')
-  } catch {
-    return '快照暂时无法展示，请联系管理员核对。'
-  }
-}
-async function send() {
+
+async function send(payload: {
+  draft: PurchaseDraft
+  arrangementLines: { orderLineId: number; quantity: string }[]
+}) {
   if (locked.value || busy.value || pending.value) return
+  draft.value = payload.draft
+  arrangementLines.value = payload.arrangementLines
   const d = detail.value
   let url = base,
     method = 'POST',
@@ -462,6 +304,7 @@ async function send() {
   }
   await retry()
 }
+
 async function retry() {
   if (locked.value || busy.value || !pending.value || !pendingPermission.value)
     return
@@ -474,9 +317,9 @@ async function retry() {
   formError.value = ''
   notice.value = ''
   const original = pending.value
-  let saved: Document
+  let saved: PurchaseDocument
   try {
-    saved = await request<Document>(original.url, {
+    saved = await request<PurchaseDocument>(original.url, {
       method: original.method,
       body: original.body,
     })
@@ -523,6 +366,7 @@ async function retry() {
   }
   await openDetail(saved.id)
 }
+
 onMounted(() => {
   let stored: string | null
   try {
@@ -534,7 +378,7 @@ onMounted(() => {
   }
   if (stored) {
     try {
-      const parsed = JSON.parse(stored) as Pending
+      const parsed = JSON.parse(stored) as PendingRequest
       if (
         !parsed.url.startsWith(base) ||
         !['POST', 'PUT'].includes(parsed.method) ||
@@ -561,6 +405,7 @@ onMounted(() => {
     })
   } else void load()
 })
+
 onBeforeUnmount(() => {
   generation++
   detailGeneration++
@@ -589,130 +434,26 @@ onBeforeUnmount(() => {
         {{ busy ? '正在核对…' : '原样重试' }}
       </button>
     </div>
-    <section
+    <PurchaseDocumentList
       v-show="!detail && !detailLoading && !detailError"
-      class="panel purchase-list"
-      aria-label="采购单据列表"
-    >
-      <div class="tabs purchase-tabs">
-        <button
-          :class="{ active: kind === 'REQUEST' }"
-          :aria-pressed="kind === 'REQUEST'"
-          :disabled="blocked"
-          @click="switchKind('REQUEST')"
-        >
-          采购需求
-        </button>
-        <button
-          :class="{ active: kind === 'ORDER' }"
-          :aria-pressed="kind === 'ORDER'"
-          :disabled="blocked"
-          @click="switchKind('ORDER')"
-        >
-          采购订单
-        </button>
-      </div>
-      <div class="filters">
-        <label
-          >收货仓库<select
-            v-model="warehouse"
-            :disabled="blocked || loading"
-            @change="load()"
-          >
-            <option v-for="w in warehouses" :key="w.id" :value="w.id">
-              {{ w.name }}{{ w.status === 'DISABLED' ? '（停用）' : '' }}
-            </option>
-          </select></label
-        >
-        <button
-          :disabled="locked || busy || loading || !!mode"
-          @click="load(page)"
-        >
-          刷新
-        </button>
-        <button
-          v-if="writable && kind === 'REQUEST'"
-          class="primary create"
-          :disabled="
-            blocked ||
-            !result ||
-            warehouses.find((w) => w.id === warehouse)?.status !== 'ENABLED'
-          "
-          @click="open('create')"
-        >
-          新建需求
-        </button>
-      </div>
-      <p v-if="ready && !warehouse" class="hint empty">
-        暂无已授权仓库，请联系管理员分配仓库范围。
-      </p>
-      <div
-        class="table-wrap"
-        tabindex="0"
-        aria-label="采购单据列表，可横向滚动"
-      >
-        <table>
-          <thead>
-            <tr>
-              <th>单号 / 用途</th>
-              <th v-if="kind === 'ORDER'">供应商</th>
-              <th>{{ kind === 'ORDER' ? '约定到货日期' : '需要日期' }}</th>
-              <th>状态</th>
-              <th>创建账号</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="d in result?.items" :key="d.id">
-              <td>
-                <span class="document-number">{{ d.document_no }}</span
-                ><small>{{ d.purpose }}</small>
-              </td>
-              <td v-if="kind === 'ORDER'">{{ d.supplier_name }}</td>
-              <td>{{ businessDate(d.needed_date) }}</td>
-              <td>
-                <span
-                  class="purchase-status"
-                  :data-tone="statusTone(d.status)"
-                  >{{ stateText(d.status) }}</span
-                >
-              </td>
-              <td>{{ d.created_by }}</td>
-              <td>
-                <button
-                  class="text-action"
-                  :data-document="d.id"
-                  :disabled="blocked"
-                  @click="openDetail(d.id)"
-                >
-                  查看
-                </button>
-              </td>
-            </tr>
-            <tr v-if="!result?.items.length">
-              <td colspan="6" class="empty">
-                {{
-                  loading
-                    ? '正在加载…'
-                    : error
-                      ? '列表读取失败，请刷新重试'
-                      : result
-                        ? '暂无单据'
-                        : '资料未就绪，请刷新'
-                }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <ResultPager
-        v-if="result"
-        :total="result.total"
-        :page="page"
-        :disabled="blocked || loading"
-        @change="load"
-      />
-    </section>
+      v-model:warehouse="warehouse"
+      :kind="kind"
+      :warehouses="warehouses"
+      :page="page"
+      :result="result"
+      :ready="ready"
+      :loading="loading"
+      :blocked="blocked"
+      :locked="locked"
+      :busy="busy"
+      :has-modal="!!mode"
+      :writable="writable"
+      :error="error"
+      @switch-kind="switchKind"
+      @load="load"
+      @create="open('create')"
+      @open-detail="openDetail"
+    />
     <div v-if="detailLoading || detailError" class="detail-read-state panel">
       <button :disabled="blocked" @click="returnToList">返回列表</button>
       <p v-if="detailLoading" role="status">正在读取单据详情…</p>
@@ -726,550 +467,40 @@ onBeforeUnmount(() => {
         </button>
       </template>
     </div>
-    <section v-if="detail" class="panel detail">
-      <button class="back-to-list" :disabled="blocked" @click="returnToList">
-        ← 返回列表
-      </button>
-      <div class="purchase-detail-title" :data-tone="statusTone(detail.status)">
-        <RecordHeading
-          :title="
-            (detail.kind === 'REQUEST' ? '采购需求 ' : '采购订单 ') +
-            detail.document_no
-          "
-          :subtitle="
-            (detail.supplier_name || '供应商待确定') +
-            ' · ' +
-            detail.warehouse_name
-          "
-          :status="stateText(detail.status)"
-        ></RecordHeading>
-      </div>
-      <dl class="purchase-facts">
-        <div v-if="detail.kind === 'ORDER'">
-          <dt>供应商</dt>
-          <dd>{{ detail.supplier_name || '供应商待确定' }}</dd>
-        </div>
-        <div>
-          <dt>收货仓库</dt>
-          <dd>{{ detail.warehouse_name }}</dd>
-        </div>
-        <div>
-          <dt>{{ detail.kind === 'ORDER' ? '约定到货日期' : '需要日期' }}</dt>
-          <dd>{{ businessDate(detail.needed_date) }}</dd>
-        </div>
-        <div>
-          <dt>创建账号</dt>
-          <dd>{{ detail.created_by }}</dd>
-        </div>
-      </dl>
-      <p class="purchase-purpose"><span>用途</span>{{ detail.purpose }}</p>
-      <p v-if="detail.production_order_no" class="hint">
-        生产来源：{{
-          detail.production_order_no
-        }}。数量来自已确认快照；仍须完成采购审核。
-      </p>
-      <p v-if="detail.original_order_id" class="hint">
-        补货原订单：
-        <button
-          :disabled="blocked"
-          @click="openDetail(detail.original_order_id)"
-        >
-          {{
-            detail.related.find((d) => d.id === detail?.original_order_id)
-              ?.document_no || `#${detail.original_order_id}`
-          }}
-        </button>
-      </p>
-      <div class="detail-actions">
-        <button
-          v-if="
-            detail.kind === 'ORDER' &&
-            writable &&
-            ['APPROVED', 'FULFILLING'].includes(detail.status)
-          "
-          class="primary"
-          :disabled="blocked"
-          @click="open('arrange')"
-        >
-          安排到货
-        </button>
-        <button
-          v-if="canReplenish"
-          :disabled="blocked"
-          @click="open('create', detail.id)"
-        >
-          新建关联补货需求
-        </button>
-        <button
-          v-if="canEdit && detail.source_type !== 'MANUFACTURING'"
-          :disabled="blocked"
-          @click="open('edit')"
-        >
-          编辑
-        </button>
-        <button
-          v-if="canEdit"
-          class="primary"
-          :disabled="blocked"
-          @click="open('submit')"
-        >
-          提交审核
-        </button>
-        <button
-          v-if="canReview"
-          class="primary"
-          :disabled="blocked"
-          @click="open('approve')"
-        >
-          批准
-        </button>
-        <button v-if="canReview" :disabled="blocked" @click="open('reject')">
-          驳回
-        </button>
-        <button
-          v-if="
-            writable &&
-            detail.kind === 'REQUEST' &&
-            detail.status === 'APPROVED'
-          "
-          class="primary"
-          :disabled="blocked"
-          @click="open('convert')"
-        >
-          转采购订单
-        </button>
-        <button
-          v-if="
-            writable &&
-            [
-              'DRAFT',
-              'REJECTED',
-              'SUBMITTED',
-              'APPROVED',
-              'FULFILLING',
-            ].includes(detail.status)
-          "
-          :disabled="
-            blocked ||
-            (detail.kind === 'ORDER' &&
-              (detail.arrangements || []).some((a) => a.status !== 'WITHDRAWN'))
-          "
-          @click="open('cancel')"
-        >
-          {{ detail.kind === 'REQUEST' ? '撤销需求' : '取消订单' }}
-        </button>
-      </div>
-      <p v-if="detail.status === 'SUBMITTED' && !canReview" class="hint">
-        等待其他采购审批员审核。
-      </p>
-      <p v-if="authorities.includes('finance:read') && detail.kind === 'ORDER'">
-        <a
-          :href="`/finance?warehouseId=${detail.warehouse_id}&direction=PAYABLE&orderNumber=${encodeURIComponent(detail.document_no)}`"
-          >查看金额依据与应付</a
-        >
-      </p>
-      <RecordTabs
-        v-model="detailTab"
-        prefix="purchase"
-        :tabs="detailTabs"
-        :disabled="blocked"
-      />
-      <div
-        v-show="detailTab === 'overview'"
-        id="purchase-panel-overview"
-        role="tabpanel"
-        aria-labelledby="purchase-tab-overview"
-      >
-        <p v-if="detail.kind === 'ORDER'" class="hint">
-          金额由财务独立确认；数量履约不代表已付款。物料与数量来自已批准需求。
-        </p>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>物料 / 编码</th>
-                <th>数量</th>
-                <th>单位</th>
-                <th v-if="detail.kind === 'ORDER'">来源需求</th>
-                <th v-if="detail.kind === 'ORDER'">已安排 / 剩余</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="l in detail.lines" :key="l.id">
-                <td>
-                  {{ l.material_name
-                  }}<small class="material-code">{{ l.material_code }}</small>
-                </td>
-                <td class="quantity-cell">{{ displayQuantity(l.quantity) }}</td>
-                <td>{{ l.unit }}</td>
-                <td v-if="detail.kind === 'ORDER'">
-                  <button
-                    :disabled="blocked || !detail.request_id"
-                    @click="detail.request_id && openDetail(detail.request_id)"
-                  >
-                    {{
-                      detail.related.find((d) => d.id === detail?.request_id)
-                        ?.document_no || '查看来源需求'
-                    }}
-                  </button>
-                </td>
-                <td v-if="detail.kind === 'ORDER'" class="quantity-cell">
-                  {{ displayQuantity(allocated(l.id)) }} /
-                  {{ remaining(l.quantity, allocated(l.id)) }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <PurchaseFulfillmentPanel
-          v-if="detail.fulfillment"
-          :value="detail.fulfillment"
-          :warehouse-id="detail.warehouse_id"
-          :locations="detail.displayLocations || []"
-          :materials="detail.lines"
-          :arrangements="detail.arrangements || []"
-          :closure="detail.closure"
-          :matches="detail.closureMatches !== false"
-          :can-write="writable && detail.status === 'FULFILLING'"
-          :blocked="blocked"
-          :authorities="authorities"
-          @refresh="openDetail(detail.id)"
-          @close="open('close')"
-        />
-      </div>
-      <section
-        v-if="detail.kind === 'ORDER'"
-        v-show="detailTab === 'arrangements'"
-        id="purchase-panel-arrangements"
-        role="tabpanel"
-        aria-labelledby="purchase-tab-arrangements"
-        class="arrangements"
-      >
-        <div class="detail-heading">
-          <h2>到货安排</h2>
-        </div>
-        <p class="hint">
-          待送达和送达失败仍占用数量；全部确认撤回后才可取消订单。
-        </p>
-        <p v-if="!detail.arrangements?.length" class="hint">暂无到货安排</p>
-        <article
-          v-for="a in detail.arrangements"
-          :key="a.id"
-          class="arrangement-record"
-        >
-          <strong
-            >PA-{{ String(a.id).padStart(8, '0') }} ·
-            {{ stateText(a.status) }}</strong
-          >
-          <p class="hint">
-            预计到货 {{ businessDate(a.expected_date)
-            }}<span v-if="a.wms_arrival_id">
-              · WMS 通知 #{{ a.wms_arrival_id }}</span
-            >
-          </p>
-          <p v-if="a.last_error" class="error">
-            送达失败：{{ a.last_error }}。核对后可重试，额度仍保留。
-          </p>
-          <p v-for="l in a.lines" :key="l.id">
-            {{
-              identity(
-                detail.lines.find((m) => m.material_code === l.material_code)
-                  ?.material_name,
-                l.material_code,
-              )
-            }}
-            · 安排 {{ displayQuantity(l.quantity) }}
-            {{
-              detail.lines.find((m) => m.material_code === l.material_code)
-                ?.unit
-            }}<span v-if="a.wms">
-              · 已收
-              {{
-                displayQuantity(
-                  a.wms.lines.find((x) => x.arrangementLineId === l.id)
-                    ?.receivedQty,
-                )
-              }}
-              {{
-                detail.lines.find((m) => m.material_code === l.material_code)
-                  ?.unit
-              }}</span
-            >
-          </p>
-          <div class="detail-actions">
-            <button
-              v-if="writable && a.status === 'PENDING'"
-              :disabled="blocked"
-              @click="open('deliver', a.id)"
-            >
-              {{ a.last_error ? '重试送达' : '送达 WMS' }}
-            </button>
-            <button
-              v-if="writable && a.status !== 'WITHDRAWN'"
-              :disabled="blocked || !!a.wms?.receipts.length"
-              @click="open('withdraw', a.id)"
-            >
-              撤回安排
-            </button>
-            <a
-              v-if="canReceive && a.wms_arrival_id && !blocked"
-              :href="`/receiving?warehouseId=${detail.warehouse_id}&arrivalId=${a.wms_arrival_id}`"
-              >查看 WMS 收货</a
-            >
-          </div>
-          <p v-if="a.wms?.receipts.length" class="hint">
-            已有收货记录，不能撤回。<span
-              v-for="r in a.wms.receipts"
-              :key="r.id"
-            >
-              {{ r.number }}（{{
-                r.status === 'DRAFT' ? '草稿' : '已提交'
-              }}）</span
-            >
-          </p>
-        </article>
-      </section>
-      <div
-        v-show="detailTab === 'overview' && detail.related.length"
-        class="related"
-      >
-        <strong>关联单据</strong
-        ><button
-          v-for="d in detail.related"
-          :key="d.id"
-          :disabled="blocked"
-          @click="openDetail(d.id)"
-        >
-          {{ d.document_no }} · {{ stateText(d.status) }}
-        </button>
-      </div>
-      <section
-        v-show="detailTab === 'history'"
-        id="purchase-panel-history"
-        role="tabpanel"
-        aria-labelledby="purchase-tab-history"
-        class="history"
-      >
-        <h2>操作历史（{{ detail.history.length }}）</h2>
-        <p v-if="!detail.history.length" class="hint">暂无操作记录</p>
-        <div v-for="h in detail.history" :key="h.id" class="history-item">
-          <OperationRecord
-            :title="auditNames[h.action] || h.action"
-            :account="h.created_by"
-            :at="h.created_at"
-            :note="h.reason"
-            note-label="操作依据"
-          />
-          <details>
-            <summary>变更快照</summary>
-            <p class="hint">变更前</p>
-            <pre>{{ describeSnapshot(h.before_state) }}</pre>
-            <p class="hint">变更后</p>
-            <pre>{{ describeSnapshot(h.after_state) }}</pre>
-          </details>
-        </div>
-        <OperationTimeNote v-if="detail.history.length" />
-      </section>
-    </section>
-    <div v-if="mode" class="overlay">
-      <section
-        class="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="purchase-modal-title"
-      >
-        <h2 id="purchase-modal-title">
-          {{
-            mode === 'create'
-              ? '新建采购需求'
-              : mode === 'edit'
-                ? '编辑单据'
-                : actions[mode]
-          }}
-        </h2>
-        <p v-if="formError" class="error" role="alert">{{ formError }}</p>
-        <p v-if="error" class="error" role="alert">{{ error }}</p>
-        <p
-          v-if="originalOrderId && ['create', 'edit'].includes(mode)"
-          class="hint"
-        >
-          补货原订单 #{{
-            originalOrderId
-          }}，建单后保留关联。数量需人工填写并重新审批，不恢复原单额度。
-        </p>
-        <p v-if="mode === 'cancel'" class="hint">
-          取消保留原单和历史。采购订单取消成功后，对应需求可重新转单。
-        </p>
-        <p v-if="mode === 'convert'" class="hint">
-          按已批准需求整单转入一个供应商，数量与单位保持不变。
-        </p>
-        <p v-if="mode === 'close'" class="hint">
-          结案按当前收货、质量、上架及实际退供事实核对并保存快照。含退供不等于全部合格，不恢复补货额度，也不代表财务结清。
-        </p>
-        <p v-if="mode === 'withdraw'" class="hint">
-          只有没有任何收货记录（含草稿）的安排才能撤回；WMS
-          确认撤回后才释放数量。
-        </p>
-        <p v-if="mode === 'deliver'" class="hint">
-          将这份安排送达 WMS 供仓管收货；重复请求不会新建另一份通知。
-        </p>
-        <form @submit.prevent="send">
-          <fieldset :disabled="busy || !!pending">
-            <div class="form-grid">
-              <template v-if="mode === 'create' || mode === 'edit'"
-                ><label
-                  >用途<input
-                    v-model="draft.purpose"
-                    required
-                    maxlength="500" /></label
-              ></template>
-              <label
-                v-if="['create', 'edit', 'convert', 'arrange'].includes(mode)"
-                >{{
-                  mode === 'arrange'
-                    ? '预计到货日期'
-                    : (mode === 'edit' && detail?.kind === 'ORDER') ||
-                        mode === 'convert'
-                      ? '约定到货日期'
-                      : '需要日期'
-                }}<input v-model="draft.neededDate" type="date" required
-              /></label>
-              <label
-                v-if="
-                  mode === 'convert' ||
-                  (mode === 'edit' && detail?.kind === 'ORDER')
-                "
-                >供应商<select v-model="draft.supplierId" required>
-                  <option :value="0" disabled>请选择供应商</option>
-                  <option
-                    v-for="s in suppliers"
-                    :key="s.id"
-                    :value="s.id"
-                    :disabled="s.status !== 'ENABLED'"
-                  >
-                    {{ s.code }} · {{ s.name
-                    }}{{ s.status !== 'ENABLED' ? '（停用）' : '' }}
-                  </option>
-                </select></label
-              >
-            </div>
-            <template v-if="mode === 'arrange'">
-              <p class="hint">填写本次安排数量；不安排的物料留空。</p>
-              <label
-                v-for="(l, index) in arrangementLines"
-                :key="l.orderLineId"
-                class="reason"
-                >{{
-                  identity(
-                    detail?.lines[index]?.material_name,
-                    detail?.lines[index]?.material_code,
-                  )
-                }}
-                · 剩余
-                {{
-                  remaining(
-                    detail?.lines[index]?.quantity || '0',
-                    allocated(l.orderLineId),
-                  )
-                }}
-                {{ detail?.lines[index]?.unit }}
-                <input
-                  v-model="l.quantity"
-                  :aria-label="`安排数量 ${index + 1}`"
-                  inputmode="decimal"
-                  pattern="[0-9]{1,12}(\.[0-9]{1,6})?"
-                />
-              </label>
-            </template>
-            <template v-if="mode === 'create' || mode === 'edit'">
-              <p class="hint">
-                使用基本单位；同物料自动合并。订单保留已批准需求数量。
-              </p>
-              <div
-                v-for="(l, index) in draft.lines"
-                :key="index"
-                class="draft-line"
-              >
-                <label
-                  >物料 {{ index + 1
-                  }}<select
-                    v-model="l.materialId"
-                    required
-                    :disabled="mode === 'edit' && detail?.kind === 'ORDER'"
-                  >
-                    <option :value="0" disabled>请选择物料</option>
-                    <option
-                      v-for="m in materials"
-                      :key="m.id"
-                      :value="m.id"
-                      :disabled="m.status !== 'ENABLED'"
-                    >
-                      {{ m.code }} · {{ m.name }}（{{ m.unit }}）
-                    </option>
-                  </select></label
-                >
-                <label
-                  >数量 {{ index + 1
-                  }}<input
-                    v-model="l.quantity"
-                    required
-                    inputmode="decimal"
-                    pattern="[0-9]{1,12}(\.[0-9]{1,6})?"
-                    :disabled="mode === 'edit' && detail?.kind === 'ORDER'"
-                /></label>
-                <button
-                  v-if="mode === 'create' || detail?.kind === 'REQUEST'"
-                  type="button"
-                  :disabled="draft.lines.length === 1"
-                  @click="draft.lines.splice(index, 1)"
-                >
-                  移除
-                </button>
-              </div>
-              <button
-                v-if="mode === 'create' || detail?.kind === 'REQUEST'"
-                type="button"
-                :disabled="draft.lines.length >= 100"
-                @click="draft.lines.push({ materialId: 0, quantity: '' })"
-              >
-                添加物料
-              </button>
-              <p
-                v-if="materials.length >= 1000 || suppliers.length >= 1000"
-                class="hint"
-              >
-                目录最多加载 1000 条；未找到所需资料时请联系资料管理员核对。
-              </p>
-            </template>
-            <label v-if="mode !== 'create'" class="reason"
-              >{{ mode === 'edit' ? '变更原因' : '操作说明'
-              }}<textarea v-model="reason" required maxlength="500" />
-            </label>
-            <div class="modal-actions">
-              <button type="button" @click="close">取消</button
-              ><button class="primary" type="submit">
-                {{
-                  busy
-                    ? '处理中…'
-                    : mode === 'create' || mode === 'edit'
-                      ? '保存草稿'
-                      : '确认' + (actions[mode] || '操作')
-                }}
-              </button>
-            </div>
-          </fieldset>
-        </form>
-        <p v-if="pending && !pendingPermission">
-          当前账号无原操作权限，请联系管理员核对。
-        </p>
-        <button
-          v-if="pending"
-          :disabled="locked || busy || !pendingPermission"
-          @click="retry"
-        >
-          结果待核对，原样重试
-        </button>
-      </section>
-    </div>
+    <PurchaseDocumentDetail
+      v-if="detail"
+      v-model:detail-tab="detailTab"
+      :detail="detail"
+      :blocked="blocked"
+      :writable="writable"
+      :can-edit="canEdit"
+      :can-review="canReview"
+      :can-replenish="canReplenish"
+      :can-receive="canReceive"
+      :authorities="authorities"
+      @return-to-list="returnToList"
+      @open-detail="openDetail"
+      @open-action="open"
+    />
+    <PurchaseDocumentModal
+      v-if="mode"
+      v-model:reason="reason"
+      :mode="mode"
+      :detail="detail"
+      :initial-draft="draft"
+      :initial-arrangement-lines="arrangementLines"
+      :original-order-id="originalOrderId"
+      :suppliers="suppliers"
+      :materials="materials"
+      :form-error="formError"
+      :error="error"
+      :busy="busy"
+      :locked="locked"
+      :pending="pending"
+      :pending-permission="pendingPermission"
+      @close="close"
+      @send="send"
+      @retry="retry"
+    />
   </main>
 </template>

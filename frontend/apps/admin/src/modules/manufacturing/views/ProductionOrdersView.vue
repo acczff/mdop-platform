@@ -1,121 +1,37 @@
 <script setup lang="ts">
-import OperationRecord from '@/shared/components/OperationRecord.vue'
-import OperationTimeNote from '@/shared/components/OperationTimeNote.vue'
-import ResultPager from '@/shared/components/ResultPager.vue'
-import { statusTone } from '@/shared/presentation/business'
-import { useListPosition } from '@/shared/composables/useListPosition'
-import RecordHeading from '@/shared/components/RecordHeading.vue'
-import { identity } from '@/shared/presentation'
-import {
-  quantity as displayQuantity,
-  businessDate,
-} from '@/shared/presentation'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useListPosition } from '@/shared/composables/useListPosition'
 import { ApiError, request, type Page } from '@/shared/api'
 import { type Warehouse } from '@/modules/masterdata/api'
-import MaterialPlanPanel from '@/modules/manufacturing/components/MaterialPlanPanel.vue'
-import CompletionPanel from '@/modules/manufacturing/components/CompletionPanel.vue'
-import ProductionClosurePanel from '@/modules/manufacturing/components/ProductionClosurePanel.vue'
+import {
+  type BomSnapshot,
+  type DemandDraft,
+  type ManufacturingDirectoryEntry,
+  type OrderDraft,
+  type PendingProductionRequest,
+  type ProductionDemand,
+  type ProductionOrderItem,
+  type SalesSourceLine,
+} from '../productionOrderTypes'
+import ProductionDemandList from '../components/ProductionDemandList.vue'
+import ProductionOrderDetail from '../components/ProductionOrderDetail.vue'
+import ProductionOrderModal from '../components/ProductionOrderModal.vue'
 
 const props = defineProps<{ authorities: string[]; username: string }>()
-interface Directory {
-  id: number
-  code: string
-  name: string
-  status: string
-  unit?: string
-}
-interface Bom {
-  id: number
-  product_id: number
-  product_code: string
-  version_label: string
-  base_quantity: string
-  product_unit: string
-  components: {
-    material_code: string
-    material_name: string
-    quantity: string
-    unit: string
-  }[]
-}
-interface Order {
-  id: number
-  order_no: string
-  status: string
-  version: number
-  site_id: number
-  site_code: string
-  site_name: string
-  warehouse_name: string
-  bom_id: number
-  bom_snapshot: string
-  planned_date: string
-  created_by: string
-  last_edited_by: string
-  submitted_by: string
-  approved_by: string
-  approved_at: string
-}
-interface Demand {
-  id: number
-  warehouse_id: number
-  source_type: string
-  source_reference: string
-  product_id: number
-  product_code: string
-  product_name: string
-  quantity: string
-  unit: string
-  needed_date: string
-  purpose: string
-  status: string
-  version: number
-  created_by: string
-  orders: Order[]
-  order_no?: string
-  order_status?: string
-  history: {
-    id: number
-    action: string
-    reason: string
-    created_by: string
-    created_at: string
-  }[]
-}
-interface Source {
-  id: number
-  document_no: string
-  material_code: string
-  material_name: string
-  quantity: string
-  unit: string
-}
-interface Pending {
-  url: string
-  method: string
-  body: string
-  warehouse: number
-}
+
 const base = '/api/v1/manufacturing'
 const storageKey = `mdop-production-order-pending:${props.username}`
 const warehouse = ref(0),
   page = ref(0),
   warehouses = ref<Warehouse[]>([])
-const materials = ref<Directory[]>([]),
-  sites = ref<Directory[]>([]),
-  boms = ref<Bom[]>([]),
-  sources = ref<Source[]>([])
-const result = ref<{ items: Demand[]; total: number }>(),
-  detail = ref<Demand>(),
-  selected = ref<Order>()
+const materials = ref<ManufacturingDirectoryEntry[]>([]),
+  sites = ref<ManufacturingDirectoryEntry[]>([]),
+  boms = ref<BomSnapshot[]>([]),
+  sources = ref<SalesSourceLine[]>([])
+const result = ref<{ items: ProductionDemand[]; total: number }>(),
+  detail = ref<ProductionDemand>(),
+  selected = ref<ProductionOrderItem>()
 const { pageRoot, rememberList, focusDetail, restoreList } = useListPosition()
-function returnToList() {
-  if (blocked.value) return
-  ++detailGeneration
-  detail.value = undefined
-  void restoreList()
-}
 const error = ref(''),
   notice = ref(''),
   mode = ref(''),
@@ -124,8 +40,8 @@ const error = ref(''),
 const loading = ref(false),
   busy = ref(false),
   locked = ref(false),
-  pending = ref<Pending>()
-const demand = ref({
+  pending = ref<PendingProductionRequest>()
+const demand = ref<DemandDraft>({
   sourceType: 'MANUAL',
   sourceReference: '',
   productId: 0,
@@ -134,7 +50,11 @@ const demand = ref({
   purpose: '',
   salesLineId: 0,
 })
-const order = ref({ siteId: 0, bomId: 0, plannedDate: '' })
+const order = ref<OrderDraft>({ siteId: 0, bomId: 0, plannedDate: '' })
+
+let generation = 0,
+  detailGeneration = 0
+
 const write = computed(() => props.authorities.includes('manufacturing:write'))
 const review = computed(() =>
   props.authorities.includes('manufacturing:review'),
@@ -145,41 +65,8 @@ const blocked = computed(
 const pendingPermission = computed(() =>
   pending.value?.url.match(/\/(approve|reject)$/) ? review.value : write.value,
 )
-const active = computed(() =>
-  detail.value?.orders.some((o) => o.status !== 'CANCELLED'),
-)
-const labels: Record<string, string> = {
-  OPEN: '有效需求',
-  CANCELLED: '已取消',
-  DRAFT: '草稿',
-  SUBMITTED: '待审核',
-  REJECTED: '已驳回',
-  APPROVED: '已批准',
-  COMPLETED: '已完成',
-  CLOSE: '确认结束',
-  create: '新建需求',
-  order: '转生产订单',
-  edit: '编辑工单',
-  submit: '提交审核',
-  approve: '批准',
-  reject: '驳回',
-  cancel: '取消工单',
-  'cancel-demand': '取消需求',
-  DEMAND: '创建需求',
-  ORDER: '转生产订单',
-  EDIT: '编辑工单',
-  SUBMIT: '提交审核',
-  APPROVE: '批准',
-  REJECT: '驳回',
-  CANCEL: '取消工单',
-  CANCEL_DEMAND: '取消需求',
-  MATERIAL_CALCULATE: '计算材料需求',
-  MATERIAL_PURCHASE: '确认采购建议',
-}
-const label = (s: string) => labels[s] || s
-let generation = 0,
-  detailGeneration = 0
-function canReview(o: Order) {
+
+function canReview(o: ProductionOrderItem) {
   return (
     review.value &&
     ![
@@ -190,18 +77,20 @@ function canReview(o: Order) {
     ].includes(props.username)
   )
 }
-function snapshot(o: Order): Bom | undefined {
-  try {
-    return JSON.parse(o.bom_snapshot) as Bom
-  } catch {
-    return undefined
-  }
+
+function returnToList() {
+  if (blocked.value) return
+  ++detailGeneration
+  detail.value = undefined
+  void restoreList()
 }
-function remember(p?: Pending) {
+
+function remember(p?: PendingProductionRequest) {
   if (p) sessionStorage.setItem(storageKey, JSON.stringify(p))
   else sessionStorage.removeItem(storageKey)
   pending.value = p
 }
+
 async function load(next = 0) {
   if (busy.value || locked.value) return
   const token = ++generation
@@ -232,12 +121,16 @@ async function load(next = 0) {
       warehouse.value = all[0]?.id || 0
     if (!warehouse.value) return
     const [list, ms, ss, src] = await Promise.all([
-      request<{ items: Demand[]; total: number }>(
+      request<{ items: ProductionDemand[]; total: number }>(
         `${base}/demands?warehouseId=${warehouse.value}&page=${next}&size=20`,
       ),
-      request<Directory[]>('/api/master-data/materials'),
-      request<Directory[]>('/api/master-data/production-sites'),
-      request<Source[]>(`${base}/sales-sources?warehouseId=${warehouse.value}`),
+      request<ManufacturingDirectoryEntry[]>('/api/master-data/materials'),
+      request<ManufacturingDirectoryEntry[]>(
+        '/api/master-data/production-sites',
+      ),
+      request<SalesSourceLine[]>(
+        `${base}/sales-sources?warehouseId=${warehouse.value}`,
+      ),
     ])
     if (token === generation) {
       result.value = list
@@ -251,6 +144,7 @@ async function load(next = 0) {
     if (token === generation) loading.value = false
   }
 }
+
 function closureSaved(orderId: number) {
   notice.value = '工单结束已保存'
   if (result.value && detail.value) {
@@ -268,6 +162,7 @@ function closureSaved(orderId: number) {
   }
   if (detail.value) void openDetail(detail.value.id)
 }
+
 async function openDetail(id: number) {
   if (blocked.value || loading.value) return
   if (!detail.value) rememberList()
@@ -275,7 +170,7 @@ async function openDetail(id: number) {
   detail.value = undefined
   error.value = ''
   try {
-    const d = await request<Demand>(`${base}/demands/${id}`)
+    const d = await request<ProductionDemand>(`${base}/demands/${id}`)
     if (token === detailGeneration) {
       detail.value = d
       void focusDetail()
@@ -285,7 +180,8 @@ async function openDetail(id: number) {
       error.value = `详情读取失败：${(e as Error).message}`
   }
 }
-async function open(value: string, o?: Order) {
+
+async function open(value: string, o?: ProductionOrderItem) {
   if (blocked.value || loading.value || !result.value) return
   mode.value = value
   selected.value = o
@@ -309,9 +205,9 @@ async function open(value: string, o?: Order) {
   if (value === 'order' || value === 'edit') {
     busy.value = true
     try {
-      const list: Bom[] = []
+      const list: BomSnapshot[] = []
       for (let p = 0; p < 10; p++) {
-        const r = await request<{ items: Bom[]; total: number }>(
+        const r = await request<{ items: BomSnapshot[]; total: number }>(
           `${base}/boms?status=PUBLISHED&q=${encodeURIComponent(detail.value!.product_code)}&page=${p}&size=100`,
         )
         list.push(
@@ -327,14 +223,18 @@ async function open(value: string, o?: Order) {
     }
   }
 }
+
 function close() {
   if (!busy.value && !pending.value) {
     mode.value = ''
     formError.value = ''
   }
 }
-async function send() {
+
+async function send(payload: { demand: DemandDraft; order: OrderDraft }) {
   if (busy.value || pending.value || locked.value) return
+  demand.value = payload.demand
+  order.value = payload.order
   const d = detail.value,
     o = selected.value
   const body: Record<string, unknown> = {
@@ -399,6 +299,7 @@ async function send() {
   }
   await retry()
 }
+
 async function retry() {
   if (locked.value || busy.value || !pending.value || !pendingPermission.value)
     return
@@ -409,9 +310,12 @@ async function retry() {
   error.value = ''
   notice.value = ''
   const p = pending.value
-  let saved: Demand
+  let saved: ProductionDemand
   try {
-    saved = await request<Demand>(p.url, { method: p.method, body: p.body })
+    saved = await request<ProductionDemand>(p.url, {
+      method: p.method,
+      body: p.body,
+    })
     remember()
     mode.value = ''
   } catch (e) {
@@ -441,11 +345,12 @@ async function retry() {
   await load(page.value)
   if (!error.value) await openDetail(saved.id)
 }
+
 onMounted(() => {
   try {
     const raw = sessionStorage.getItem(storageKey)
     if (raw) {
-      const p = JSON.parse(raw) as Pending
+      const p = JSON.parse(raw) as PendingProductionRequest
       if (
         !new RegExp(
           `^${base}/(?:demands(?:/[1-9][0-9]*/(?:orders|cancel))?|orders/[1-9][0-9]*(?:/actions/(?:submit|approve|reject|cancel))?)$`,
@@ -465,6 +370,7 @@ onMounted(() => {
   }
   void load()
 })
+
 onBeforeUnmount(() => {
   generation++
   detailGeneration++
@@ -496,394 +402,49 @@ onBeforeUnmount(() => {
         >当前账号无原操作权限，请联系管理员核对。</span
       >
     </div>
-    <div v-show="!detail" class="business-list panel">
-      <form class="toolbar" @submit.prevent="load(0)">
-        <label
-          >目标成品仓<select
-            v-model.number="warehouse"
-            :disabled="blocked || loading"
-            @change="load(0)"
-          >
-            <option v-for="w in warehouses" :key="w.id" :value="w.id">
-              {{ w.code }} · {{ w.name
-              }}{{ w.status === 'ENABLED' ? '' : '（停用）' }}
-            </option>
-          </select></label
-        >
-        <button :disabled="blocked || loading">刷新</button
-        ><button
-          v-if="write"
-          type="button"
-          class="primary"
-          :disabled="
-            blocked ||
-            loading ||
-            !result ||
-            warehouses.find((w) => w.id === warehouse)?.status !== 'ENABLED'
-          "
-          @click="open('create')"
-        >
-          新建需求
-        </button>
-      </form>
-      <p v-if="!loading && !warehouse" class="muted">
-        尚未分配成品仓权限，请联系系统管理员。
-      </p>
-      <div
-        class="table-scroll"
-        role="region"
-        aria-label="生产需求列表，可横向滚动"
-        tabindex="0"
-      >
-        <table>
-          <thead>
-            <tr>
-              <th>来源 / 产品</th>
-              <th>计划数量</th>
-              <th>需求日期</th>
-              <th>当前工单</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="d in result?.items" :key="d.id">
-              <td>
-                {{ d.source_reference
-                }}<small>{{ d.product_code }} · {{ d.product_name }}</small>
-              </td>
-              <td>{{ displayQuantity(d.quantity) }} {{ d.unit }}</td>
-              <td>{{ businessDate(d.needed_date) }}</td>
-              <td>
-                {{ d.order_no || '无有效工单'
-                }}<small>{{ label(d.order_status || d.status) }}</small>
-              </td>
-              <td>
-                <button
-                  :disabled="blocked || loading"
-                  @click="openDetail(d.id)"
-                >
-                  查看
-                </button>
-              </td>
-            </tr>
-            <tr v-if="!result?.items.length">
-              <td colspan="5">
-                {{
-                  loading
-                    ? '正在加载…'
-                    : result
-                      ? '暂无生产需求'
-                      : '资料未就绪，请刷新'
-                }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <ResultPager
-        v-if="result"
-        :total="result.total"
-        :page="page"
-        :disabled="blocked || loading"
-        @change="load"
-      />
-    </div>
-    <section v-if="detail" aria-label="生产需求详情" class="detail">
-      <button class="back-to-list" :disabled="blocked" @click="returnToList">
-        ← 返回列表
-      </button>
-      <RecordHeading
-        :title="identity(detail.product_name, detail.product_code)"
-        :subtitle="
-          '需求量：' + displayQuantity(detail.quantity) + ' ' + detail.unit
-        "
-        :status="label(detail.status)"
-        :tone="statusTone(detail.status)"
-      />
-      <dl class="purchase-facts">
-        <div>
-          <dt>
-            {{ detail.source_type === 'SALES' ? '销售来源' : '手工依据' }}
-          </dt>
-          <dd>{{ detail.source_reference }}</dd>
-        </div>
-        <div>
-          <dt>需求日期</dt>
-          <dd>{{ businessDate(detail.needed_date) }}</dd>
-        </div>
-        <div>
-          <dt>计划数量</dt>
-          <dd>{{ displayQuantity(detail.quantity) }} {{ detail.unit }}</dd>
-        </div>
-        <div>
-          <dt>创建账号</dt>
-          <dd>{{ detail.created_by }}</dd>
-        </div>
-      </dl>
-      <p class="purchase-purpose"><span>用途</span>{{ detail.purpose }}</p>
-      <div v-if="write && detail.status === 'OPEN' && !active" class="toolbar">
-        <button :disabled="blocked" @click="open('order')">转生产订单</button
-        ><button :disabled="blocked" @click="open('cancel-demand')">
-          取消需求
-        </button>
-      </div>
-      <article v-for="o in detail.orders" :key="o.id" class="order">
-        <div class="heading">
-          <h3>生产订单 {{ o.order_no }}</h3>
-          <span class="purchase-status" :data-tone="statusTone(o.status)">{{
-            label(o.status)
-          }}</span>
-        </div>
-        <p>
-          {{ o.site_code }} · {{ o.site_name }} → {{ o.warehouse_name }} · 计划
-          {{ businessDate(o.planned_date) }}
-        </p>
-        <OperationRecord
-          v-if="o.approved_by"
-          title="工单批准"
-          result="已批准"
-          :account="o.approved_by"
-          :at="o.approved_at"
-        />
-        <OperationTimeNote v-if="o.approved_by" />
-        <div class="toolbar">
-          <template v-if="write && ['DRAFT', 'REJECTED'].includes(o.status)"
-            ><button :disabled="blocked" @click="open('edit', o)">
-              编辑工单</button
-            ><button :disabled="blocked" @click="open('submit', o)">
-              提交审核
-            </button></template
-          >
-          <template v-if="o.status === 'SUBMITTED' && canReview(o)"
-            ><button :disabled="blocked" @click="open('approve', o)">
-              批准</button
-            ><button :disabled="blocked" @click="open('reject', o)">
-              驳回
-            </button></template
-          >
-          <button
-            v-if="write && o.status !== 'CANCELLED'"
-            :disabled="blocked"
-            @click="open('cancel', o)"
-          >
-            取消工单
-          </button>
-        </div>
-        <details>
-          <summary>
-            固定 BOM · {{ snapshot(o)?.version_label || '待核对' }}
-          </summary>
-          <p v-if="snapshot(o)">
-            基准产量 {{ displayQuantity(snapshot(o)!.base_quantity) }}
-            {{ snapshot(o)!.product_unit }}；工单生产量
-            {{ displayQuantity(detail.quantity) }}
-            {{ detail.unit }}
-          </p>
-          <p v-else class="error">快照无法读取，请核对原记录。</p>
-          <div class="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>组件</th>
-                  <th>基准用量</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="c in snapshot(o)?.components" :key="c.material_code">
-                  <td>{{ c.material_code }} · {{ c.material_name }}</td>
-                  <td>{{ displayQuantity(c.quantity) }} {{ c.unit }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p class="muted">工单批准时固定的 BOM 用量依据。</p>
-        </details>
-        <details
-          v-if="['APPROVED', 'CANCELLED', 'COMPLETED'].includes(o.status)"
-          class="record-section"
-          open
-        >
-          <summary>完工登记与成品入库</summary>
-          <CompletionPanel
-            v-if="['APPROVED', 'CANCELLED', 'COMPLETED'].includes(o.status)"
-            :key="`completion:${o.id}:${o.version}`"
-            :order-id="o.id"
-            :authorities="authorities"
-            :username="username"
-          />
-        </details>
-        <details class="record-section" open>
-          <summary>材料计划与领料执行</summary>
-          <MaterialPlanPanel
-            v-if="['APPROVED', 'CANCELLED', 'COMPLETED'].includes(o.status)"
-            :key="`${o.id}:${o.version}`"
-            :order-id="o.id"
-            :authorities="authorities"
-            :username="username"
-          />
-        </details>
-        <ProductionClosurePanel
-          v-if="['APPROVED', 'COMPLETED'].includes(o.status)"
-          :key="`closure:${o.id}:${o.version}`"
-          :order-id="o.id"
-          :username="username"
-          :authorities="authorities"
-          @closed="closureSaved(o.id)"
-        />
-      </article>
-      <details>
-        <summary>
-          操作历史（已加载 {{ detail.history.length }} 条，上限 1000 条）
-        </summary>
-        <OperationRecord
-          v-for="h in detail.history"
-          :key="h.id"
-          :title="label(h.action)"
-          :account="h.created_by"
-          :at="h.created_at"
-          :note="h.reason"
-          note-label="操作依据"
-        />
-        <OperationTimeNote v-if="detail.history.length" />
-      </details>
-    </section>
-    <div v-if="mode" class="modal-backdrop">
-      <section
-        class="modal"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="label(mode)"
-      >
-        <h2>{{ label(mode) }}</h2>
-        <form @submit.prevent="send">
-          <fieldset :disabled="busy || !!pending">
-            <template v-if="mode === 'create'">
-              <label
-                >需求来源<select v-model="demand.sourceType">
-                  <option value="MANUAL">手工依据</option>
-                  <option value="SALES">已批准销售行</option>
-                </select></label
-              >
-              <template v-if="demand.sourceType === 'MANUAL'"
-                ><label
-                  >来源依据<input
-                    v-model="demand.sourceReference"
-                    required
-                    maxlength="100" /></label
-                ><label
-                  >产品<select v-model.number="demand.productId" required>
-                    <option :value="0" disabled>选择启用物料</option>
-                    <option
-                      v-for="m in materials.filter(
-                        (m) => m.status === 'ENABLED',
-                      )"
-                      :key="m.id"
-                      :value="m.id"
-                    >
-                      {{ m.code }} · {{ m.name }}（{{ m.unit }}）
-                    </option>
-                  </select></label
-                ><label
-                  >计划数量<input
-                    v-model="demand.quantity"
-                    required
-                    inputmode="decimal"
-                    pattern="(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,6})?" /></label
-                ><label
-                  >需求日期<input
-                    v-model="demand.neededDate"
-                    type="date"
-                    required /></label
-              ></template>
-              <label v-else
-                >销售行<select v-model.number="demand.salesLineId" required>
-                  <option :value="0" disabled>选择销售行</option>
-                  <option v-for="s in sources" :key="s.id" :value="s.id">
-                    {{ s.document_no }} / {{ s.id }} · {{ s.material_code }} ·
-                    {{ displayQuantity(s.quantity) }} {{ s.unit }}
-                  </option>
-                </select></label
-              >
-              <label
-                >生产用途<textarea
-                  v-model="demand.purpose"
-                  required
-                  maxlength="500"
-                />
-              </label>
-              <p class="muted">
-                产品与数量保存后不改写；销售来源整行转需求，不自动扣除库存。目录最多显示
-                1000 条。
-              </p>
-            </template>
-            <template v-else-if="mode === 'order' || mode === 'edit'"
-              ><p>
-                {{ detail?.product_code }} ·
-                {{ displayQuantity(detail?.quantity) }}
-                {{ detail?.unit }}
-              </p>
-              <label
-                >生产地点<select v-model.number="order.siteId" required>
-                  <option :value="0" disabled>选择启用地点</option>
-                  <option
-                    v-for="s in sites.filter((s) => s.status === 'ENABLED')"
-                    :key="s.id"
-                    :value="s.id"
-                  >
-                    {{ s.code }} · {{ s.name }}
-                  </option>
-                </select></label
-              ><label
-                >BOM 版本<select v-model.number="order.bomId" required>
-                  <option :value="0" disabled>明确选择已发布版本</option>
-                  <option v-for="b in boms" :key="b.id" :value="b.id">
-                    {{ b.version_label }} · 基准
-                    {{ displayQuantity(b.base_quantity) }}
-                    {{ b.product_unit }}
-                  </option>
-                </select></label
-              ><label
-                >计划日期<input
-                  v-model="order.plannedDate"
-                  type="date"
-                  required
-              /></label>
-              <p class="muted">
-                保存所选版本快照，后续新版本不覆盖本工单。地点及版本最多显示
-                1000 条。
-              </p></template
-            >
-            <p v-else>
-              {{ selected?.order_no || detail?.source_reference }} ·
-              {{ displayQuantity(detail?.quantity) }} {{ detail?.unit }}<br />{{
-                mode === 'cancel'
-                  ? '有有效采购、领料、待复核或已批准完工记录时不能取消；历史记录保留。'
-                  : mode === 'approve'
-                    ? '批准后固定 BOM、地点和生产数量；不自动发料或报工。'
-                    : '请核对当前依据并填写原因。'
-              }}
-            </p>
-            <label v-if="mode !== 'create'"
-              >操作原因<textarea v-model="reason" required maxlength="500" />
-            </label>
-            <p v-if="formError" role="alert" class="error">{{ formError }}</p>
-            <div class="toolbar">
-              <button type="button" @click="close">返回</button
-              ><button
-                class="primary"
-                :disabled="
-                  busy ||
-                  ((mode === 'order' || mode === 'edit') &&
-                    !boms.some((b) => b.id === order.bomId))
-                "
-              >
-                {{ busy ? '处理中…' : '确认保存' }}
-              </button>
-            </div>
-          </fieldset>
-        </form>
-      </section>
-    </div>
+    <ProductionDemandList
+      v-show="!detail"
+      v-model:warehouse="warehouse"
+      :warehouses="warehouses"
+      :page="page"
+      :result="result"
+      :loading="loading"
+      :blocked="blocked"
+      :write="write"
+      @load="load"
+      @create="open('create')"
+      @open-detail="openDetail"
+    />
+    <ProductionOrderDetail
+      v-if="detail"
+      :detail="detail"
+      :blocked="blocked"
+      :write="write"
+      :review="review"
+      :authorities="authorities"
+      :username="username"
+      @return-to-list="returnToList"
+      @open-action="open"
+      @closure-saved="closureSaved"
+    />
+    <ProductionOrderModal
+      v-if="mode"
+      v-model:reason="reason"
+      :mode="mode"
+      :detail="detail"
+      :selected="selected"
+      :initial-demand="demand"
+      :initial-order="order"
+      :materials="materials"
+      :sites="sites"
+      :boms="boms"
+      :sources="sources"
+      :form-error="formError"
+      :busy="busy"
+      :pending="pending"
+      @close="close"
+      @send="send"
+    />
   </main>
 </template>
 
@@ -891,107 +452,15 @@ onBeforeUnmount(() => {
 .production-orders {
   max-width: 1200px;
 }
-.heading,
-.toolbar {
+.heading {
   display: flex;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-}
-.heading {
   justify-content: space-between;
-}
-.toolbar {
-  margin: 16px 0;
-}
-label {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-}
-.table-scroll {
-  overflow-x: auto;
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 600px;
-}
-td,
-th {
-  text-align: left;
-  padding: 12px;
-  border-bottom: 1px solid var(--border, #ddd);
-}
-small {
-  display: block;
-  margin-top: 4px;
-  color: var(--muted, #777);
-}
-button {
-  white-space: nowrap;
-}
-.detail,
-.order {
-  border-top: 1px solid var(--border, #ddd);
-  padding-top: 20px;
-  margin-top: 24px;
-}
-.order {
-  padding-bottom: 20px;
-}
-details {
-  margin: 16px 0;
-}
-summary {
-  cursor: pointer;
 }
 .pending {
   padding: 12px;
   background: #fff4da;
-}
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  background: #0005;
-  display: grid;
-  place-items: center;
-  padding: 16px;
-}
-.modal {
-  width: min(560px, 100%);
-  max-height: 90dvh;
-  overflow: auto;
-  background: white;
-  padding: 24px;
-  border-radius: 12px;
-  box-sizing: border-box;
-}
-fieldset {
-  border: 0;
-  padding: 0;
-  margin: 0;
-  min-width: 0;
-  display: grid;
-  gap: 16px;
-}
-input,
-select,
-textarea {
-  max-width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-}
-textarea {
-  min-height: 70px;
-}
-@media (max-width: 600px) {
-  .toolbar label {
-    width: 100%;
-  }
-  .modal {
-    padding: 16px;
-  }
 }
 </style>
