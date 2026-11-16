@@ -6,10 +6,16 @@ server:
         secure: true
 
 logging:
+  structured:
+    format:
+      console: ecs
   level:
     io.github.acczff.mdop: INFO
 
 management:
+  server:
+    address: ${MDOP_MANAGEMENT_ADDRESS:127.0.0.1}
+    port: ${MDOP_MANAGEMENT_PORT:8091}
   endpoint:
     health:
       show-details: never
