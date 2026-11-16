@@ -53,11 +53,11 @@ flowchart LR
 
 ## 从一笔收货读起
 
-1. [ReceivingView.vue](../../frontend/apps/admin/src/views/ReceivingView.vue)：选通知、编辑草稿、保持幂等键、刷新结果。API/CSRF 与数量运算分别在 [api.ts](../../frontend/apps/admin/src/api.ts) 和 [quantity.ts](../../frontend/apps/admin/src/quantity.ts)。
+1. [ReceivingView.vue](../../frontend/apps/admin/src/modules/receiving/views/ReceivingView.vue)：选通知、编辑草稿、保持幂等键、刷新结果。API/CSRF 与数量运算分别在 [client.ts](../../frontend/apps/admin/src/shared/api/client.ts) 和 [quantity.ts](../../frontend/apps/admin/src/shared/quantity.ts)。
 2. [ReceivingController.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/receiving/api/ReceivingController.java)：HTTP 映射、DTO 校验和操作权限；[ReceivingModels.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/receiving/application/ReceivingModels.java) 定义输入输出。
 3. [ReceivingService.java](../../backend/mdop-wms/src/main/java/io/github/acczff/mdop/wms/receiving/application/ReceivingService.java)：业务状态、仓库范围、幂等和事务。在事务中锁定通知/单据，按固定维度顺序锁余额，写库存流水和 Outbox。
 4. [DeliveryWorker.java](../../backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/DeliveryWorker.java) 与 [DeliveryService.java](../../backend/mdop-integration/src/main/java/io/github/acczff/mdop/integration/messaging/DeliveryService.java)：后台重试与发布；网络调用不进入库存事务。消息被代理确认和外部系统实际接收是两个状态。
-5. [ReceivingTests.java](../../backend/mdop-boot/src/test/java/io/github/acczff/mdop/ReceivingTests.java)、[MessagingTests.java](../../backend/mdop-boot/src/test/java/io/github/acczff/mdop/MessagingTests.java) 与 [Receiving.spec.ts](../../frontend/apps/admin/src/__tests__/Receiving.spec.ts)：从回归理解正常、重复、并发、失败及权限边界。
+5. [ReceivingTests.java](../../backend/mdop-boot/src/test/java/io/github/acczff/mdop/ReceivingTests.java)、[MessagingTests.java](../../backend/mdop-boot/src/test/java/io/github/acczff/mdop/MessagingTests.java) 与 [Receiving.spec.ts](../../frontend/apps/admin/src/modules/receiving/__tests__/Receiving.spec.ts)：从回归理解正常、重复、并发、失败及权限边界。
 
 ## 不能破坏的业务约束
 

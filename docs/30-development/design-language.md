@@ -31,7 +31,7 @@
 
 ## 与当前业务的对应
 
-原型对照 [采购页面](../../frontend/apps/admin/src/views/PurchasingView.vue)、[履约面板](../../frontend/apps/admin/src/components/PurchaseFulfillmentPanel.vue) 及 [数据展示规范](data-presentation.md)。
+原型对照 [采购页面](../../frontend/apps/admin/src/modules/purchasing/views/PurchasingView.vue)、[履约面板](../../frontend/apps/admin/src/modules/purchasing/components/PurchaseFulfillmentPanel.vue) 及 [数据展示规范](data-presentation.md)。
 
 - 当前采购订单由已批准需求转单生成；不在订单列表新增“直接建采购订单”入口。
 - 当前未建立金额依据；不加入单价、税额、应付、付款和发票数据。

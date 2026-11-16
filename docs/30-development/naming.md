@@ -21,9 +21,9 @@
 | Java 包 | 全小写，按层或域 | `wms.receiving.application` |
 | Java 包说明 | 固定 `package-info.java` | — |
 | 测试类 | 被测对象 + `Tests` | `ReceivingTests`、`LoginThrottleTests` |
-| Vue 组件 | `PascalCase.vue`，后缀表达角色 | `ReceivingView.vue`、`CompletionPanel.vue` |
-| 前端测试 | 被测对象 + `.spec.ts` | `Inventory.spec.ts` |
-| 前端工具/模块 | `camelCase.ts` | `quantity.ts`、`businessPresentation.ts` |
+| Vue 组件 | `PascalCase.vue`，后缀表达角色；按域放入 `src/modules/<domain>/{views,components}`，共享放入 `src/shared/components` | `ReceivingView.vue`、`CompletionPanel.vue` |
+| 前端测试 | 被测对象 + `.spec.ts`；域内测试放入 `src/modules/<domain>/__tests__`，共享放入 `src/shared/__tests__` | `Inventory.spec.ts` |
+| 前端工具/模块 | `camelCase.ts` | `quantity.ts`、`business.ts` |
 | 配置 | 小写，Spring 约定 | `application-local.yml` |
 
 ## 三、脚本与 SQL
