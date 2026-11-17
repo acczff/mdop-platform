@@ -5,9 +5,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -29,31 +27,21 @@ public class MdopSecurityConfiguration {
     }
 
     @Bean
-    @ConditionalOnBean(StringRedisTemplate.class)
-    @ConditionalOnProperty(
-            name = "mdop.auth.lockout.store",
-            havingValue = "redis",
-            matchIfMissing = true)
-    LoginThrottle redisLoginThrottle(
-            StringRedisTemplate redis,
-            @Value("${mdop.auth.lockout.max-attempts:5}") int maxAttempts,
-            @Value("${mdop.auth.lockout.window-minutes:15}") long windowMinutes,
-            @Value("${mdop.auth.lockout.lock-minutes:15}") long lockMinutes,
-            ObjectProvider<MeterRegistry> meters) {
-        return new RedisLoginThrottle(
-                redis, maxAttempts, windowMinutes, lockMinutes, lockoutCounter(meters));
-    }
-
-    @Bean
     @ConditionalOnMissingBean(LoginThrottle.class)
-    LoginThrottle inMemoryLoginThrottle(
+    LoginThrottle loginThrottle(
+            ObjectProvider<StringRedisTemplate> redisProvider,
+            @Value("${mdop.auth.lockout.store:redis}") String store,
             @Value("${mdop.auth.lockout.max-attempts:5}") int maxAttempts,
             @Value("${mdop.auth.lockout.window-minutes:15}") long windowMinutes,
             @Value("${mdop.auth.lockout.lock-minutes:15}") long lockMinutes,
             Clock clock,
             ObjectProvider<MeterRegistry> meters) {
-        return new InMemoryLoginThrottle(
-                maxAttempts, windowMinutes, lockMinutes, clock, lockoutCounter(meters));
+        Counter counter = lockoutCounter(meters);
+        StringRedisTemplate redis = redisProvider.getIfAvailable();
+        if ("redis".equalsIgnoreCase(store) && redis != null) {
+            return new RedisLoginThrottle(redis, maxAttempts, windowMinutes, lockMinutes, counter);
+        }
+        return new InMemoryLoginThrottle(maxAttempts, windowMinutes, lockMinutes, clock, counter);
     }
 
     private static Counter lockoutCounter(ObjectProvider<MeterRegistry> meters) {
@@ -67,12 +55,10 @@ public class MdopSecurityConfiguration {
     @Bean
     SessionInvalidator sessionInvalidator(
             ObjectProvider<FindByIndexNameSessionRepository<?>> sessions) {
-        FindByIndexNameSessionRepository<?> repository = sessions.getIfAvailable();
-        if (repository == null) {
-            return username -> {};
-        }
         return username -> {
             if (username == null || username.isBlank()) return;
+            FindByIndexNameSessionRepository<?> repository = sessions.getIfAvailable();
+            if (repository == null) return;
             repository.findByPrincipalName(username).keySet().forEach(repository::deleteById);
         };
     }

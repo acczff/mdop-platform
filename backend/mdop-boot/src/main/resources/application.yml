@@ -10,10 +10,10 @@ spring:
   application:
     name: mdop-platform
   session:
-    store-type: ${MDOP_SESSION_STORE_TYPE:redis}
-    redis:
-      repository-type: indexed
-      namespace: mdop:session
+    data:
+      redis:
+        repository-type: indexed
+        namespace: mdop:session
 
   flyway:
     enabled: true
